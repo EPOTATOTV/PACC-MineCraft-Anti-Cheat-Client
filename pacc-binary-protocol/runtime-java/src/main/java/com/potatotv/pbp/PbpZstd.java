@@ -487,6 +487,9 @@ public final class PbpZstd {
         if (litType == 0) {
             literals = Arrays.copyOfRange(raw, lp, lp + (int) regenSize);
         } else {
+            if (lp >= blockEnd) {
+                throw new PbpException(PbpException.Code.TRUNCATED, "RLE literals 内容不完整");
+            }
             literals = new byte[(int) regenSize];
             Arrays.fill(literals, raw[lp]);
         }
@@ -523,6 +526,9 @@ public final class PbpZstd {
             return blockEnd;
         }
 
+        if (q >= blockEnd) {
+            throw new PbpException(PbpException.Code.TRUNCATED, "序列模式字节缺失");
+        }
         int modes = raw[q++] & 0xFF;
         if ((modes & 0x03) != 0) {
             throw new PbpException(PbpException.Code.BAD_FORMAT, "序列模式字节保留位非零");

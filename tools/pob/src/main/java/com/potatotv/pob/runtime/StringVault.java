@@ -68,7 +68,12 @@ public final class StringVault {
     private static byte[] hex(String value) {
         byte[] out = new byte[value.length() / 2];
         for (int i = 0; i < out.length; i++) {
-            out[i] = (byte) Integer.parseInt(value.substring(i * 2, i * 2 + 2), 16);
+            try {
+                out[i] = (byte) Integer.parseInt(value.substring(i * 2, i * 2 + 2), 16);
+            } catch (NumberFormatException e) {
+                // BLOB 由 POB 生成，理应始终合法；非法即视为产物损坏，直接失败而非静默取默认值。
+                throw new IllegalStateException("字符串库 BLOB 含非法十六进制", e);
+            }
         }
         return out;
     }

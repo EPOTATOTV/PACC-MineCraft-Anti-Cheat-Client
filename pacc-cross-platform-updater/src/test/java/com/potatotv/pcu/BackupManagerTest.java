@@ -150,10 +150,7 @@ class BackupManagerTest {
     }
 
     @Test
-    void 拒绝含路径穿越的版本号(@TempDir Path root) throws IOException {
-        Path install = Files.createDirectories(root.resolve("install"));
-        BackupManager manager = new BackupManager(config(install, root.resolve("backup")));
-
+    void 拒绝含路径穿越的版本号() {
         assertThrows(PcuException.class, () -> BackupManager.sanitize("../../etc"));
         assertThrows(PcuException.class, () -> BackupManager.sanitize(".."));
         assertThrows(PcuException.class, () -> BackupManager.sanitize("5.4.0/../evil"));

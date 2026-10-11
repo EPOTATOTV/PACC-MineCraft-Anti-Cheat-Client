@@ -228,7 +228,11 @@ final class Json {
                     case 'r' -> sb.append('\r');
                     case 't' -> sb.append('\t');
                     case 'u' -> {
-                        sb.append((char) Integer.parseInt(text.substring(pos, pos + 4), 16));
+                        try {
+                            sb.append((char) Integer.parseInt(text.substring(pos, pos + 4), 16));
+                        } catch (NumberFormatException e) {
+                            throw new PrlException("JSON 非法 \\u 转义", e);
+                        }
                         pos += 4;
                     }
                     default -> throw new PrlException("JSON 非法转义 \\" + escape);
@@ -245,10 +249,14 @@ final class Json {
             if (raw.isEmpty()) {
                 throw new PrlException("JSON 位置 " + start + " 不是合法值");
             }
-            if (raw.indexOf('.') < 0 && raw.indexOf('e') < 0 && raw.indexOf('E') < 0) {
-                return Long.parseLong(raw);
+            try {
+                if (raw.indexOf('.') < 0 && raw.indexOf('e') < 0 && raw.indexOf('E') < 0) {
+                    return Long.parseLong(raw);
+                }
+                return Double.parseDouble(raw);
+            } catch (NumberFormatException e) {
+                throw new PrlException("JSON 位置 " + start + " 不是合法数字: " + raw);
             }
-            return Double.parseDouble(raw);
         }
 
         private void expect(char expected) {

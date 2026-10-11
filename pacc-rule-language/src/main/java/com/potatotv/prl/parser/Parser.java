@@ -692,28 +692,40 @@ public final class Parser {
 
     private static double rawNumericValue(Token t) {
         String text = t.value().replace("_", "");
-        if (text.startsWith("0x") || text.startsWith("0X")) {
-            return Long.parseLong(text.substring(2), 16);
+        try {
+            if (text.startsWith("0x") || text.startsWith("0X")) {
+                return Long.parseLong(text.substring(2), 16);
+            }
+            if (text.startsWith("0b") || text.startsWith("0B")) {
+                return Long.parseLong(text.substring(2), 2);
+            }
+            return Double.parseDouble(text);
+        } catch (NumberFormatException e) {
+            throw new ParseException("非法的数字字面量: " + t.value(), t.line(), t.col());
         }
-        if (text.startsWith("0b") || text.startsWith("0B")) {
-            return Long.parseLong(text.substring(2), 2);
-        }
-        return Double.parseDouble(text);
     }
 
     private static double parseDouble(Token t) {
-        return Double.parseDouble(t.value().replace("_", ""));
+        try {
+            return Double.parseDouble(t.value().replace("_", ""));
+        } catch (NumberFormatException e) {
+            throw new ParseException("非法的浮点字面量: " + t.value(), t.line(), t.col());
+        }
     }
 
     private static long parseLong(Token t) {
         String text = t.value().replace("_", "");
-        if (text.startsWith("0x") || text.startsWith("0X")) {
-            return Long.parseLong(text.substring(2), 16);
+        try {
+            if (text.startsWith("0x") || text.startsWith("0X")) {
+                return Long.parseLong(text.substring(2), 16);
+            }
+            if (text.startsWith("0b") || text.startsWith("0B")) {
+                return Long.parseLong(text.substring(2), 2);
+            }
+            return Long.parseLong(text);
+        } catch (NumberFormatException e) {
+            throw new ParseException("非法的整数字面量: " + t.value(), t.line(), t.col());
         }
-        if (text.startsWith("0b") || text.startsWith("0B")) {
-            return Long.parseLong(text.substring(2), 2);
-        }
-        return Long.parseLong(text);
     }
 
     /**

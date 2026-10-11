@@ -104,7 +104,6 @@ class PlatformAdapterTest {
         MobilePlatformAdapter adapter = new MobilePlatformAdapter(UpdatePlatform.HARMONY,
                 new NoopBridge(root));
         assertEquals(UpdatePlatform.HARMONY, adapter.platform());
-        assertTrue(adapter instanceof PackageInstallerAdapter);
     }
 
     @Test

@@ -20,6 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PbpCodecTest {
 
+    /** 复用的随机源；每次用 {@code setSeed} 复位，输出仍只由种子决定。 */
+    private static final Random RANDOM = new Random();
+
     /** 最小消息实现：一个 bytes 字段，方便凑出超过阈值的大载荷。 */
     private static final class Blob implements PbpMessage {
 
@@ -97,7 +100,8 @@ class PbpCodecTest {
     @Test
     void incompressiblePayloadAboveThresholdStaysPlain() {
         byte[] data = new byte[4096];
-        new Random(11).nextBytes(data);
+        RANDOM.setSeed(11);
+        RANDOM.nextBytes(data);
         PbpFrame frame = PbpCodec.frameOf(new Blob(data), 1L);
         assertFalse(frame.compressed(), "压不小的载荷不该被标记为压缩");
         assertArrayEquals(encodedOf(data), frame.payload());

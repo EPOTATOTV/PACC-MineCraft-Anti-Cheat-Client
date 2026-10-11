@@ -109,7 +109,7 @@ class PbpZstdCrossCheckTest {
         for (int i = 0; i < size; i++) {
             data[i] = switch (pattern) {
                 case 0 -> (byte) rnd.nextInt(256);
-                case 1 -> (byte) (i % 7 * 13);
+                case 1 -> (byte) ((i % 7) * 13);
                 case 2 -> (byte) TEXT.charAt(i % TEXT.length());
                 default -> (byte) (i / 64);
             };

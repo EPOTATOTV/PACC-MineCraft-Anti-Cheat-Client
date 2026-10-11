@@ -26,6 +26,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class BZip2Test {
 
+    /** 复用的随机源；每次用 {@code setSeed} 复位，输出仍只由种子决定。 */
+    private static final Random RANDOM = new Random();
+
     private static final String PY_COMPRESS = """
             import sys, bz2
             open(sys.argv[2], 'wb').write(bz2.compress(open(sys.argv[1], 'rb').read(), 9))
@@ -55,7 +58,8 @@ class BZip2Test {
 
     private static byte[] random(int size, long seed) {
         byte[] data = new byte[size];
-        new Random(seed).nextBytes(data);
+        RANDOM.setSeed(seed);
+        RANDOM.nextBytes(data);
         return data;
     }
 

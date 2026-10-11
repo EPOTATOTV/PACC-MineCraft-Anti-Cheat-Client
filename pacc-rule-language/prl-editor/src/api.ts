@@ -102,7 +102,12 @@ async function request<T>(
   init: RequestInit,
   signal?: AbortSignal,
 ): Promise<T> {
-  const base = (options.baseUrl ?? PRL_API_BASE).replace(/\/+$/, '')
+  const rawBase = options.baseUrl ?? PRL_API_BASE
+  let baseEnd = rawBase.length
+  while (baseEnd > 0 && rawBase[baseEnd - 1] === '/') {
+    baseEnd -= 1
+  }
+  const base = rawBase.slice(0, baseEnd)
   const fetcher: PrlFetcher = options.fetcher ?? ((url, requestInit) => fetch(url, requestInit))
   const abort = createAbort(options.requestTimeoutMs, signal)
   try {

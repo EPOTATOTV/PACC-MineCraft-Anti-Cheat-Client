@@ -25,6 +25,9 @@ class BsDiffTest {
     private static final Path VECTOR_DIR = Path.of("src", "test", "resources", "vectors");
     private static final Path TOOLS_DIR = Path.of("tools", "pcu-patchgen");
 
+    /** 复用的随机源；每次用 {@code setSeed} 复位，输出仍只由种子决定。 */
+    private static final Random RANDOM = new Random();
+
     /** 让「生成的补丁交给 python 参考实现应用」成为一次真实调用，不走自研的解压端。 */
     private static final String PY_APPLY = """
             import sys
@@ -48,7 +51,8 @@ class BsDiffTest {
 
     private static byte[] random(int size, long seed) {
         byte[] data = new byte[size];
-        new Random(seed).nextBytes(data);
+        RANDOM.setSeed(seed);
+        RANDOM.nextBytes(data);
         return data;
     }
 

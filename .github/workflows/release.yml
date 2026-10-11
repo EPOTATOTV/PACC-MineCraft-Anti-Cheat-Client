@@ -163,9 +163,591 @@ jobs:
           name: release-artifacts
           path: release/
 
+  # ---- 服务端插件与 Addon 扫描模块（Java / Go）----
+  # 覆盖设计文档 §3 的全部服务端形态：Paper / Spigot / Nukkit / Nukkit-MOT / AllayMC / Geyser。
+  # 共享检测内核在 pacc-server-core，多平台共享适配层在 server-plugins/pacc-bukkit，先 install 再打各平台产物。
+  build-plugins:
+    name: 构建服务端插件与 Addon 扫描模块
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3  # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: 安装内部依赖（检测内核 / 共享适配层 / Addon 扫描）
+        run: |
+          set -euo pipefail
+          ( cd pacc-server-core   && mvn -B -q -DskipTests install )
+          ( cd pacc-addon-scanner && mvn -B -q -DskipTests install )
+          # 两个共享适配层要先 install：Java 版平台插件依赖 pacc-bukkit，
+          # 基岩版平台插件（Nukkit / Nukkit-MOT）依赖 pacc-bedrock。
+          ( cd server-plugins/pacc-bukkit  && mvn -B -q -DskipTests install )
+          ( cd server-plugins/pacc-bedrock && mvn -B -q -DskipTests install )
+
+      - name: 构建各平台服务端插件
+        run: |
+          set -euo pipefail
+          # 各平台产物均为自包含 shade jar（服务端 API 为 provided，不打包进产物）。
+          # 目录不存在的平台跳过并告警，避免某一平台尚未落地时挡住整体发布。
+          for m in pacc-paper pacc-spigot pacc-nukkit pacc-nukkit-mot pacc-geyser; do
+            if [ -d "server-plugins/$m" ]; then
+              ( cd "server-plugins/$m" && mvn -B -q -DskipTests package )
+            else
+              echo "::warning::server-plugins/$m 不存在，跳过该平台产物"
+            fi
+          done
+
+      - name: 打包 Addon 扫描模块
+        run: |
+          set -euo pipefail
+          ( cd pacc-addon-scanner && mvn -B -q -DskipTests package )
+
+      - name: 安装 Go 1.22
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5.6.0
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: server-plugins/pacc-allaymc/go.mod
+
+      - name: 构建 AllayMC 插件（Go）
+        run: |
+          set -euo pipefail
+          if [ -d server-plugins/pacc-allaymc ]; then
+            cd server-plugins/pacc-allaymc
+            go vet ./...
+            go build -trimpath -ldflags="-s -w" -o pacc-allaymc .
+          else
+            echo "::warning::server-plugins/pacc-allaymc 不存在，跳过 Go 插件产物"
+          fi
+
+      - name: 汇总插件制品并生成校验和
+        run: |
+          set -euo pipefail
+          mkdir -p release-plugins
+          # 只收「可直接投放」的平台插件产物。pacc-bukkit / pacc-bedrock 是共享适配层，
+          # 已被 shade 进各平台 jar，本身不是可安装插件，混进来只会让下载目录多出两个哑包。
+          for m in pacc-paper pacc-spigot pacc-nukkit pacc-nukkit-mot pacc-geyser; do
+            cp server-plugins/$m/target/$m-*.jar release-plugins/ 2>/dev/null || true
+          done
+          cp pacc-addon-scanner/target/pacc-addon-scanner-*.jar release-plugins/ 2>/dev/null || true
+          cp server-plugins/pacc-allaymc/pacc-allaymc release-plugins/ 2>/dev/null || true
+          if [ -z "$(ls -A release-plugins)" ]; then
+            echo "::error::未收集到任何插件制品"; exit 1
+          fi
+          cd release-plugins && sha256sum ./* > SHA256SUMS-plugins.txt
+          cat SHA256SUMS-plugins.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: release-plugins-artifacts
+          path: release-plugins/
+
+  # ---- 客户端模组（Forge / Fabric，Gradle）----
+  # 玩家端模组在当前 Minecraft 版本上加载 pacc-client-core 做本机检测，无任何封禁 / 踢出能力。
+  # 构建依赖 MC 映射、Forge / Fabric 加载器，Windows 开发机编不了，只在 Linux runner 上验。
+  build-client-mods:
+    name: 构建 Forge / Fabric 客户端模组
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3  # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: 安装内部依赖 pacc-client-core
+        run: |
+          set -euo pipefail
+          ( cd pacc-client-core && mvn -B -q -DskipTests install )
+
+      # 说明：两个模组是 Gradle 工程且未附带 wrapper，这里用 runner 预装的 Gradle。
+      # 若需固定 Gradle 版本，应改为固定发行版（下载 + sha256 校验）或引入已 pin SHA 的 setup 动作。
+      - name: 环境自检（Gradle / Java）
+        run: |
+          set -euo pipefail
+          gradle --version
+          java -version
+
+      - name: 构建 Forge 模组
+        run: |
+          set -euo pipefail
+          ( cd pacc-forge-mod && gradle build --no-daemon )
+
+      - name: 构建 Fabric 模组
+        run: |
+          set -euo pipefail
+          ( cd pacc-fabric-mod && gradle build --no-daemon )
+
+      - name: 汇总模组制品并生成校验和
+        run: |
+          set -euo pipefail
+          mkdir -p release-mods
+          find pacc-forge-mod/build/libs pacc-fabric-mod/build/libs \
+            -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-dev.jar' \
+            -exec cp {} release-mods/ \;
+          if [ -z "$(ls -A release-mods)" ]; then
+            echo "::error::未收集到任何模组制品"; exit 1
+          fi
+          cd release-mods && sha256sum ./* > SHA256SUMS-mods.txt
+          cat SHA256SUMS-mods.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: release-mods-artifacts
+          path: release-mods/
+
+  # ---- Linux 原生客户端安装包（deb / rpm / AppImage）----
+  # 与 CI 的 df-platform 同源：Linux 专有部分（procfs / eBPF 能力位）只在 Linux runner 编得动。
+  # 发布流程不再跑测试（CI 已在 master 上跑过），只出可投放的安装包。
+  build-linux-client:
+    name: 构建 Linux 原生客户端安装包
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d  # stable
+        with:
+          toolchain: stable
+
+      - name: 缓存 cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        with:
+          workspaces: platform/linux-client
+
+      - name: 构建 Linux 原生客户端
+        working-directory: platform/linux-client
+        run: |
+          set -euo pipefail
+          cargo build --release
+
+      - name: 打包 Linux 原生客户端
+        working-directory: platform/linux-client
+        run: |
+          set -euo pipefail
+          # 用 -f 而不是 -x：仓库在 Windows 上开发，git 里 core.fileMode=false，
+          # .sh 的执行位不可靠，一律用 bash 显式调用。
+          if [ -f ./package.sh ]; then
+            # --no-build：上一步已 build 过；日志落文件便于排查 deb/rpm 打包问题
+            if ! bash ./package.sh --no-build 2>&1 | tee /tmp/package.log; then
+              echo "::error::Linux 客户端打包失败，完整日志如下"
+              cat /tmp/package.log
+              exit 1
+            fi
+            ls -l target/dist/
+          else
+            echo "::error::platform/linux-client/package.sh 缺失，无法产出 Linux 安装包"
+            exit 1
+          fi
+
+      - name: 汇总 Linux 制品并生成校验和
+        run: |
+          set -euo pipefail
+          mkdir -p release-linux
+          cp platform/linux-client/target/dist/* release-linux/
+          if [ -z "$(ls -A release-linux)" ]; then
+            echo "::error::未收集到任何 Linux 安装包制品"; exit 1
+          fi
+          cd release-linux && sha256sum ./* > SHA256SUMS-linux.txt
+          cat SHA256SUMS-linux.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: release-linux-client-artifacts
+          path: release-linux/
+
+  # ---- Android 客户端（Capacitor + 原生探针）----
+  # release APK 需要签名密钥（属外部事务，此处不配置），故只出 debug APK；
+  # 正式分发的签名与上架由带凭据的独立步骤完成。
+  build-android:
+    name: 构建 Android 客户端
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3  # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 安装 Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ptv-mobile/package-lock.json
+
+      - name: 安装前端依赖并按需构建
+        working-directory: ptv-mobile
+        run: |
+          set -euo pipefail
+          npm ci
+          # 没有 build 脚本的项目（纯壳）直接跳过 Web 资源构建，避免误报失败
+          if node -e "process.exit(require('./package.json').scripts.build?0:1)"; then
+            npm run build
+          else
+            echo "::notice::ptv-mobile 未定义 build 脚本，跳过 Web 资源构建"
+          fi
+
+      - name: 同步 Capacitor Android 工程
+        working-directory: ptv-mobile
+        run: npx cap sync android
+
+      - name: 校验 Android 工程存在
+        working-directory: ptv-mobile/android
+        run: |
+          set -euo pipefail
+          if [ ! -f ./gradlew ]; then
+            echo "::error::ptv-mobile/android/gradlew 缺失，无法构建 APK"
+            exit 1
+          fi
+
+      - name: 构建 Debug APK
+        working-directory: ptv-mobile/android
+        run: |
+          set -euo pipefail
+          # release APK 需签名密钥（保密，未在此配置），此处只出 debug APK
+          ./gradlew assembleDebug --no-daemon
+
+      - name: 汇总 Android 制品并生成校验和
+        run: |
+          set -euo pipefail
+          mkdir -p release-android
+          find ptv-mobile/android/app/build/outputs/apk -type f -name '*.apk' \
+            -exec cp {} release-android/ \;
+          if [ -z "$(ls -A release-android)" ]; then
+            echo "::error::未收集到任何 Android APK 制品"; exit 1
+          fi
+          cd release-android && sha256sum ./* > SHA256SUMS-android.txt
+          cat SHA256SUMS-android.txt
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: release-android-artifacts
+          path: release-android/
+
+  # ---- 下载站聚合（deploy/dl-web）----
+  # 把各渠道制品收拢进 deploy/dl-web/files/ 并生成 release-manifest.json。
+  # 站点真正上线到 CDN / 主机需要带凭据的独立步骤，这里不假设任何凭据，
+  # 因此本 job 不并入 publish 的 needs，失败也不阻断 Release 发布。
+  upload-dl-site:
+    name: 汇总静态下载站
+    needs: [ verify, build, build-windows, build-plugins, build-client-mods, build-linux-client, build-android ]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 下载后端 / 前端 / 玩家端制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-artifacts
+          path: release
+
+      - name: 下载 Windows 制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-windows-artifacts
+          path: release-win
+
+      - name: 下载服务端插件制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-plugins-artifacts
+          path: release-plugins
+
+      - name: 下载客户端模组制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-mods-artifacts
+          path: release-mods
+
+      - name: 下载 Linux 客户端制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-linux-client-artifacts
+          path: release-linux
+
+      - name: 下载 Android 制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-android-artifacts
+          path: release-android
+
+      - name: 汇总到下载站目录并生成清单
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p deploy/dl-web/files
+          for d in release release-win release-plugins release-mods release-linux release-android; do
+            [ -d "$d" ] || continue
+            # 各渠道的 SHA256SUMS 不投放：清单由下面的 manifest 统一重算
+            find "$d" -type f ! -name 'SHA256SUMS*' -exec cp {} deploy/dl-web/files/ \;
+          done
+          python3 - <<'PY'
+          import datetime
+          import hashlib
+          import json
+          import os
+
+          files_dir = "deploy/dl-web/files"
+          artifacts = []
+          for name in sorted(os.listdir(files_dir)):
+              path = os.path.join(files_dir, name)
+              if not os.path.isfile(path):
+                  continue
+              digest = hashlib.sha256()
+              with open(path, "rb") as handle:
+                  for chunk in iter(lambda: handle.read(1 << 20), b""):
+                      digest.update(chunk)
+              artifacts.append({"name": name, "sha256": digest.hexdigest()})
+          manifest = {
+              "version": os.environ["VERSION"],
+              "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "artifacts": artifacts,
+          }
+          with open(os.path.join(files_dir, "release-manifest.json"), "w", encoding="utf-8") as out:
+              json.dump(manifest, out, ensure_ascii=False, indent=2)
+          print(json.dumps(manifest, ensure_ascii=False, indent=2))
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: dl-site
+          path: deploy/dl-web
+
+      - name: 提示下载站仍需部署
+        run: |
+          echo "::notice::下载站已汇总为 artifact dl-site，仍需由带凭据的独立步骤部署到 CDN / 主机"
+
+  # ---- Windows 客户端安装包（Tauri 壳 + WPF 诊断工具 + Inno 安装包）----
+  # 复用 ubuntu build 产出的前端 dist 与 ptv-client jar，避免在 Windows 上重跑前端构建。
+  # 代码签名 / WHQL 属外部事务：缺证书只 ::notice 跳过，绝不让流水线失败。
+  build-windows:
+    name: 构建 Windows 客户端安装包
+    # 必须等 build 完成：本 job 要下载它产出的 release-artifacts（前端 dist + ptv-client jar）
+    needs: [ verify, build ]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+
+      - name: 下载 ubuntu 构建产物（含 ptv-client jar 与前端 dist）
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-artifacts
+          path: release
+
+      - name: 安装 Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ptv-desktop/package-lock.json
+
+      - name: 安装 JDK 21（备用，便于排查 jar 问题）
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3  # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d  # stable
+        with:
+          toolchain: stable
+
+      - name: 缓存 cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        with:
+          workspaces: ptv-desktop/src-tauri
+
+      - name: 复用前端产物并放置 ptv-client jar
+        shell: pwsh
+        run: |
+          # 前端已在 ubuntu build job 构建，这里只解包，避免在 Windows 重跑一遍
+          New-Item -ItemType Directory -Force ptv-frontend/dist | Out-Null
+          tar -xzf release/ptv-frontend-dist.tar.gz -C ptv-frontend/dist
+          # Tauri 资源 glob 是 ../../ptv-client/lib/ptv-client-*.jar；
+          # 先清掉仓库里的陈旧 jar，防止把旧版本一并打进壳
+          Remove-Item ptv-client/lib/ptv-client-*.jar -Force -ErrorAction SilentlyContinue
+          Copy-Item release/ptv-client-*.jar ptv-client/lib/ -Force
+          Get-ChildItem ptv-client/lib
+
+      - name: 安装桌面壳依赖
+        working-directory: ptv-desktop
+        run: npm ci
+
+      - name: 构建 Tauri 桌面壳
+        working-directory: ptv-desktop
+        shell: pwsh
+        run: |
+          # 前端 dist 已就绪，清空 beforeBuildCommand，避免在没有前端 node_modules 时重跑构建
+          $env:TAURI_CONFIG = '{"build":{"beforeBuildCommand":""}}'
+          # npm ci 已装入本地 @tauri-apps/cli（devDependencies: ^2），无需全局安装
+          npm run build
+
+      - name: 安装 .NET 8 SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9  # v4.3.1
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 发布 WPF 诊断工具
+        shell: pwsh
+        run: |
+          # 多文件自包含发布（与 build-client.ps1 一致），整目录进 manager\
+          dotnet publish tools/windows-gui/PaccManager.csproj -c Release -r win-x64 `
+            --self-contained true -p:PublishSingleFile=false -o dist/win-x64/manager
+
+      - name: 汇聚安装源目录 dist/win-x64
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/win-x64/bin | Out-Null
+          # 主客户端：Tauri 产物名为 pacc-desktop.exe（Cargo 包名），安装契约要求 PACCClient.exe
+          Copy-Item ptv-desktop/src-tauri/target/release/pacc-desktop.exe dist/win-x64/PACCClient.exe -Force
+          # Java 探针 jar
+          Copy-Item release/ptv-client-*.jar dist/win-x64/bin/ -Force
+          # 安装目录内的配置模板（不含密钥；运行时配置由 installer.ps1 落 ProgramData）
+          $cfg = @"
+          # PACC 客户端配置模板（安装包内基线；实际运行时配置由 installer.ps1 生成到 ProgramData）
+          pacc.client.endpoint=wss://pacc.potatotv.asia/ws/ptv
+          pacc.client.api-base=https://api.potatotv.asia
+          pacc.detection.redscreen-threshold=85
+          pacc.detection.sample-rate=1.0
+          pacc.log.level=INFO
+          pacc.client.driver.enabled=true
+          pacc.client.keyboard-lock.enabled=true
+          "@
+          Set-Content -Path dist/win-x64/bin/pacc-client.properties -Value $cfg -Encoding utf8
+          Get-ChildItem -Recurse dist/win-x64 -File | Select-Object -First 20 FullName
+
+      - name: 编译 Inno Setup 安装包
+        shell: pwsh
+        run: |
+          $candidates = @(
+            'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+            'C:\Program Files\Inno Setup 6\ISCC.exe'
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            Write-Host '::notice::未预装 Inno Setup，改用 Chocolatey 安装'
+            choco install innosetup -y --no-progress
+            $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) { throw '找不到 ISCC.exe' }
+          & $iscc 'tools\installer\pacc-client-installer.iss'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: 汇聚 Windows 发布产物 release-win
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-win | Out-Null
+          # Inno 安装包
+          Copy-Item tools/installer/Output/PACCClientSetup-*.exe release-win/ -Force
+          # Tauri 原生安装包（msi / nsis exe）
+          $bundle = 'ptv-desktop/src-tauri/target/release/bundle'
+          if (Test-Path $bundle) {
+            Get-ChildItem $bundle -Recurse -File |
+              Where-Object { $_.Extension -in '.msi', '.exe' } |
+              ForEach-Object { Copy-Item $_.FullName release-win/ -Force }
+          }
+          # WPF 诊断工具整目录打包
+          Compress-Archive -Path dist/win-x64/manager/* -DestinationPath release-win/pacc-manager-win-x64.zip -Force
+          # 内核驱动：仓库无预构建制品时跳过（需 WDK + EV/WHQL 签名，属外部事务）
+          if (Test-Path dist/win-x64/drivers) {
+            Copy-Item dist/win-x64/drivers/* release-win/ -Force
+          } else {
+            Write-Host '::notice::仓库无预构建内核驱动制品，跳过 PaccPtv.sys 发布（需 WDK + EV/WHQL 签名）'
+          }
+          Get-ChildItem release-win
+
+      - name: 代码签名（可选，缺证书不失败）
+        shell: pwsh
+        env:
+          CERT_B64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          CERT_PWD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERT_B64) -or [string]::IsNullOrWhiteSpace($env:CERT_PWD)) {
+            Write-Host '::notice::未配置 WINDOWS_CERT_PFX_BASE64 / WINDOWS_CERT_PASSWORD，跳过 EV 代码签名（不视为失败）'
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'pacc-sign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
+          $signtool = (Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+                       Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1 -ExpandProperty FullName)
+          if (-not $signtool) {
+            Write-Host '::warning::未找到 signtool.exe，跳过签名（不视为失败）'
+            exit 0
+          }
+          $targets = Get-ChildItem release-win -Recurse -File | Where-Object { $_.Extension -in '.exe', '.msi' }
+          foreach ($t in $targets) {
+            & $signtool sign /fd SHA256 /f $pfx /p $env:CERT_PWD /tr http://timestamp.digicert.com /td SHA256 $t.FullName
+            if ($LASTEXITCODE -ne 0) { throw ("签名失败：{0}" -f $t.FullName) }
+          }
+          Remove-Item $pfx -Force
+
+      - name: 生成校验和与下载站版本清单
+        shell: pwsh
+        run: |
+          $lines = Get-ChildItem release-win -File |
+            Where-Object { $_.Name -ne 'SHA256SUMS-windows.txt' } |
+            ForEach-Object {
+              $h = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant()
+              "$h  $($_.Name)"
+            }
+          $lines | Set-Content release-win/SHA256SUMS-windows.txt -Encoding ascii
+          Get-Content release-win/SHA256SUMS-windows.txt
+          # version.json 草稿：仅作为 artifact，需人工/后续自动化同步到 dl.potatotv.asia，不提交仓库
+          $setup = Get-ChildItem release-win -Filter 'PACCClientSetup-*.exe' | Select-Object -First 1
+          if ($setup) {
+            $sh = (Get-FileHash -Algorithm SHA256 $setup.FullName).Hash.ToLowerInvariant()
+            $ver = '${{ needs.verify.outputs.version }}'
+            @{
+              client_version = "v$ver"
+              client_url     = "/files/$($setup.Name)"
+              client_sha256  = $sh
+              min_version    = $ver
+            } | ConvertTo-Json | Set-Content release-win/version.json -Encoding utf8
+          }
+          Write-Host '::notice::Windows 制品需人工/后续自动化同步到 https://dl.potatotv.asia；需更新 deploy/dl-web/files/version.json 的 client_version / client_url / client_sha256 / min_version 字段'
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: release-windows-artifacts
+          path: release-win/
+
   publish:
     name: 建 Release 并做来源证明
-    needs: [ verify, build ]
+    needs: [ verify, build, build-windows, build-plugins, build-client-mods, build-linux-client, build-android ]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -178,11 +760,47 @@ jobs:
           name: release-artifacts
           path: release
 
+      - name: 下载 Windows 制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-windows-artifacts
+          path: release-win
+
+      - name: 下载服务端插件制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-plugins-artifacts
+          path: release-plugins
+
+      - name: 下载客户端模组制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-mods-artifacts
+          path: release-mods
+
+      - name: 下载 Linux 客户端制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-linux-client-artifacts
+          path: release-linux
+
+      - name: 下载 Android 制品
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          name: release-android-artifacts
+          path: release-android
+
       - name: 生成构建来源证明
         # v4.2.2；任何人都能用 gh attestation verify 校验这些产物确实出自本仓库的这次构建
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
-          subject-path: release/*
+          subject-path: |
+            release/*
+            release-win/*
+            release-plugins/*
+            release-mods/*
+            release-linux/*
+            release-android/*
 
       - name: 创建 GitHub Release
         env:
@@ -192,4 +810,4 @@ jobs:
           gh release create "${{ needs.verify.outputs.tag }}" \
             --title "PACC ${{ needs.verify.outputs.version }}" \
             --generate-notes \
-            release/*
+            release/* release-win/* release-plugins/* release-mods/* release-linux/* release-android/*

@@ -268,6 +268,63 @@ jobs:
           set -euo pipefail
           python -m unittest discover -s tests -t .
 
+  # ---- 服务端插件与 Addon 扫描（Bukkit 系 / 基岩系 / 代理 / Go）----
+  # 覆盖设计文档 §3 的全部服务端形态：Paper / Spigot / Nukkit / Nukkit-MOT / Geyser / AllayMC。
+  # 两个共享适配层（pacc-bukkit / pacc-bedrock）必须先 install，各平台插件才解析得到。
+  # 这里一律不加 -DskipTests：插件源码写坏在 PR 上就该被挡住。
+  server-plugins:
+    name: 服务端插件构建
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: 安装 JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      - name: 安装内部依赖（检测内核 / Addon 扫描 / 共享适配层）
+        run: |
+          set -euo pipefail
+          ( cd pacc-server-core   && mvn -B -q install )
+          ( cd pacc-addon-scanner && mvn -B -q install )
+          ( cd server-plugins/pacc-bukkit  && mvn -B -q install )
+          ( cd server-plugins/pacc-bedrock && mvn -B -q install )
+      - name: 构建并测试各平台服务端插件
+        run: |
+          set -euo pipefail
+          for m in pacc-paper pacc-spigot pacc-nukkit pacc-nukkit-mot pacc-geyser; do
+            ( cd "server-plugins/$m" && mvn -B -q package )
+          done
+      - name: 打包 Addon 扫描模块
+        working-directory: pacc-addon-scanner
+        run: mvn -B -q package
+      - name: 安装 Go 1.22
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5.6.0
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: server-plugins/pacc-allaymc/go.mod
+      - name: 构建 AllayMC 插件（Go）
+        working-directory: server-plugins/pacc-allaymc
+        run: |
+          set -euo pipefail
+          go vet ./...
+          go build -trimpath -ldflags="-s -w" -o pacc-allaymc .
+      - name: 上传插件测试报告
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
+        with:
+          name: server-plugin-test-reports
+          path: |
+            pacc-server-core/target/surefire-reports/
+            pacc-addon-scanner/target/surefire-reports/
+            server-plugins/pacc-bukkit/target/surefire-reports/
+            server-plugins/pacc-bedrock/target/surefire-reports/
+            server-plugins/pacc-geyser/target/surefire-reports/
+          if-no-files-found: ignore
+
   # ---- 前端（Node 20 + Vite）----
   frontend:
     name: 前端构建

@@ -21,6 +21,26 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ureq = { version = "2", default-features = false, features = ["json"] }
 
+# 键盘锁用的 Win32 API。只列实际用到的 feature：
+#  - Win32_Foundation：HANDLE/LPARAM/WPARAM/LRESULT/CloseHandle/ERROR_SUCCESS
+#  - Win32_Storage_FileSystem：CreateFileW（打开 \\.\PaccPtv）
+#  - Win32_Security：CreateFileW 的签名引用 SECURITY_ATTRIBUTES，需一并开启
+#  - Win32_System_IO：DeviceIoControl
+#  - Win32_System_Registry：RegGetValueW（读解锁令牌）
+#  - Win32_System_Threading：GetCurrentThreadId（钩子线程消息泵要 PostThreadMessageW）
+#  - Win32_UI_WindowsAndMessaging：SetWindowsHookExW/GetMessageW/KBDLLHOOKSTRUCT/WH_KEYBOARD_LL
+# 版本锁在 0.61，与 Tauri 2 依赖树里已有的 windows 0.61.3 复用同一份 crate。
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_Security",
+    "Win32_System_IO",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
 [profile.release]
 # 发行加固：strip 抹掉符号表（逆向者拿不到函数名与类型名），
 # lto + codegen-units=1 让跨 crate 内联与优化充分展开，顺带减少可被识别的代码结构，

@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "capability that allows the main window to run shell（启动 Java 服务）与访问主包资源",
-  "windows": ["main", "redscreen"],
+  "description": "capability that allows shell windows to run shell（启动 Java 服务）与访问主包资源。redscreen-* 是运行时按显示器动态创建的红屏窗口，consent 是首次启动协议窗口。",
+  "windows": ["main", "redscreen", "redscreen-*", "consent"],
   "permissions": [
     "core:default",
     "shell:allow-execute",

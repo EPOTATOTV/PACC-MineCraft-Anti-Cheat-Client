@@ -3,7 +3,7 @@
 //! 并把端口 + token 写入 control.json；本模块读取后向该服务下发检测控制并查询状态。
 //! 任意一步失败都返回 Err，由调用方回退为"桌面壳未托管可用 Java 服务"的友好提示。
 
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -78,6 +78,26 @@ impl ControlClient {
             .map_err(|e| format!("本地控制服务请求失败: {e}"))?
             .into_json()
             .map_err(|e| format!("解析响应失败: {e}"))
+    }
+
+    /// 向 Java 侧回报一次实施后的真实键盘/红屏状态（`POST /enforcement`）。
+    /// Java 侧据此记录 enforcement 事实，不参与是否锁定的决策。
+    pub fn post_enforcement(
+        &self,
+        keyboard_locked: bool,
+        keyboard_backend: &str,
+        driver_active: bool,
+        redscreen_shown: bool,
+    ) -> Result<Value, String> {
+        self.post_json(
+            "/enforcement",
+            json!({
+                "keyboard_locked": keyboard_locked,
+                "keyboard_backend": keyboard_backend,
+                "driver_active": driver_active,
+                "redscreen_shown": redscreen_shown,
+            }),
+        )
     }
 }
 

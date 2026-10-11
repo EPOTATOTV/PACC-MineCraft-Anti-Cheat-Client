@@ -2391,6 +2391,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-updater",
  "ureq",
+ "windows",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 # PACC v5.0 域名网关
 # 统一入口：admin / api / pacc / dl 四个子域名路由
-FROM nginx:1.25-alpine
+FROM nginx:1.25-alpine@sha256:516475cc129da42866742567714ddc681e5eed7b9ee0b9e9c015e464b4221a00
 
 # 下载站静态资源（dl.potatotv.asia）
 COPY deploy/dl-web /usr/share/nginx/dl

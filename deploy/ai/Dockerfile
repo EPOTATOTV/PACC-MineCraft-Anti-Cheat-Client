@@ -1,5 +1,5 @@
 # PACC AI 推理服务镜像
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce
 
 ENV PYTHONUNBUFFERED=1 \
     PACC_AI_MODEL_PATH=/data/model.json

@@ -147,7 +147,8 @@ jobs:
         working-directory: pacc-binary-protocol/tools/zstd-crosscheck
         run: |
           set -euo pipefail
-          python -m pip install --quiet zstandard
+          # 固定版本：zstandard 是校验用的 CI 工具，浮动版本会让同一提交在不同时间得到不同结果
+          python -m pip install --quiet 'zstandard==0.23.0'
           python crosscheck.py --mvn mvn
       - name: 构建后端 ptv-backend
         working-directory: ptv-backend

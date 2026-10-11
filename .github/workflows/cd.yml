@@ -13,7 +13,8 @@ on:
 
 permissions:
   contents: read
-  packages: write   # 推送 ghcr.io 镜像所需
+  # 说明：镜像推送所需的 packages: write 已下放到 build-push 作业级授予，
+  # 顶层只保留只读（Scorecard TokenPermissionsID 要求顶层最小权限）。
 
 concurrency:
   group: cd-${{ github.ref }}
@@ -29,6 +30,9 @@ jobs:
     name: 构建并推送镜像
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write   # 推送 ghcr.io 镜像所需，仅此作业需要
     strategy:
       fail-fast: false
       matrix:
@@ -70,9 +74,10 @@ jobs:
     needs: build-push
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # 上传 SARIF 到 Code Scanning 需该权限
+    # 上传 SARIF 到 Code Scanning 需该权限；拉取待扫描镜像需 packages: read
     permissions:
       security-events: write
+      packages: read
     strategy:
       fail-fast: false
       matrix:

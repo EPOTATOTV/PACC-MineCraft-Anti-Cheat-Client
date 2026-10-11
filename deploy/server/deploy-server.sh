@@ -19,8 +19,18 @@ die()  { printf "${RED}✗ %s${NC}\n" "$*"; exit 1; }
 
 # ---------- 1. 依赖：Docker ----------
 if ! command -v docker >/dev/null 2>&1; then
-  echo "▶ 未检测到 Docker，开始安装..."
-  curl -fsSL https://get.docker.com | sh
+  echo "▶ 未检测到 Docker，使用 Docker 官方 apt 源安装..."
+  # 不用 `curl … | sh` 的通用安装脚本：远程脚本内容不可复现，等于把 root 交给一个
+  # 随时会变的 URL。改为官方 apt 源 + 受签名校验的仓库公钥，安装过程可审计、可复现。
+  # shellcheck source=/dev/null
+  . /etc/os-release
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL "https://download.docker.com/linux/${ID}/gpg" -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" \
+    > /etc/apt/sources.list.d/docker.list
+  apt-get update
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   ok "Docker 已安装"
 fi
 docker --version >/dev/null 2>&1 || die "Docker 不可用，请检查"

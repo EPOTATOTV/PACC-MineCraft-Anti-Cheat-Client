@@ -29,9 +29,9 @@ public class PaccNetworkPlugin: CAPPlugin {
             case .cellular:
                 isCellular = true
             default:
-                // 隧道/VPN 接口通常落在 .other
-                if path.satisfiesRequirement(.init(interfaceType: interface.type, isExpensive: false))
-                    && isLikelyVPN(interface) {
+                // 隧道/VPN 接口通常落在 .other。NWPath 没有 satisfiesRequirement 方法，
+                // 判定用的是 usesInterfaceType(_:) + 接口名前缀启发式。
+                if path.usesInterfaceType(interface.type) && isLikelyVPN(interface) {
                     isVPN = true
                 }
             }

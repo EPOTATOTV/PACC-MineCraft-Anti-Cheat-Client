@@ -1,6 +1,7 @@
 package com.potatotv.pacc.controller;
 
 import com.potatotv.pacc.domain.FeatureVector;
+import com.potatotv.pacc.security.SuperAdminOnly;
 import com.potatotv.pacc.service.detection.DetectionAnalysisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/v41")
 @RequiredArgsConstructor
+@SuperAdminOnly
 @SuppressWarnings("null") // 128 维特征流 lambda 的 Eclipse JDT null 分析误报
 public class Detection41Controller {
 

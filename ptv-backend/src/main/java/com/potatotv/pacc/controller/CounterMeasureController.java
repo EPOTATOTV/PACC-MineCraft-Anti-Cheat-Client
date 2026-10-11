@@ -11,6 +11,7 @@ import com.potatotv.pacc.service.CounterMeasureRiskService.CounterMeasureResult;
 import com.potatotv.pacc.service.HardwareFingerprintService.HardwareReport;
 import com.potatotv.pacc.service.IntegrityGuardService.Input;
 import com.potatotv.pacc.repository.CheatHardwareProfileRepository;
+import com.potatotv.pacc.security.SuperAdminOnly;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +35,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/admin/countermeasure")
 @RequiredArgsConstructor
+@SuperAdminOnly
 public class CounterMeasureController {
 
     private final CounterMeasureRiskService riskService;

@@ -4,6 +4,7 @@ import com.potatotv.pacc.domain.FeatureVector;
 import com.potatotv.pacc.domain.ThreatIntelSample;
 import com.potatotv.pacc.domain.ZeroDayFinding;
 import com.potatotv.pacc.repository.ThreatIntelSampleRepository;
+import com.potatotv.pacc.security.SuperAdminOnly;
 import com.potatotv.pacc.service.detection.v46.ActiveLearningService;
 import com.potatotv.pacc.service.detection.v46.SignatureExpansionService;
 import com.potatotv.pacc.service.detection.v46.ThreatIntelAnalystService;
@@ -31,6 +32,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/admin/v46")
 @RequiredArgsConstructor
+@SuperAdminOnly
 public class V46AdminController {
 
     private final ZeroDayAnomalyService zeroDayService;

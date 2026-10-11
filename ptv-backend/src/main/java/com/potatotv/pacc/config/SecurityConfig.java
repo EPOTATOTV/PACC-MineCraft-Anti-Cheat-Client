@@ -40,6 +40,10 @@ public class SecurityConfig {
     @Value("${pacc.security.admin-2fa-required:false}")
     private boolean admin2faRequired;
 
+    /** 服务端插件共享密钥：为空时 /api/v1/server/** 一律 401（fail-closed），不影响其余接口。 */
+    @Value("${pacc.server-plugin.secret:}")
+    private String serverPluginSecret;
+
     private final AdminTokenService adminTokenService;
     private final TokenService tokenService;
     private final ApiKeyRepository apiKeyRepository;
@@ -79,6 +83,8 @@ public class SecurityConfig {
         http.addFilterBefore(new AdminKeyFilter(adminApiKey, adminTokenService, allowedOrigins, admin2faRequired), UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(new JwtAuthFilter(tokenService), UsernamePasswordAuthenticationFilter.class);
         http.addFilterBefore(new ApiV1AuthFilter(apiKeyRepository, apiUsageLogRepository, apiKeyService, apiMasterSecret), UsernamePasswordAuthenticationFilter.class);
+        // 服务端插件通道：共享密钥 + 请求体 HMAC 签名（与开放 API 凭据互不影响）
+        http.addFilterBefore(new ServerPluginAuthFilter(serverPluginSecret), UsernamePasswordAuthenticationFilter.class);
         // 全局限流置于认证过滤器之后（需读取 adminActor / PTEID 身份属性）
         http.addFilterBefore(new RateLimitFilter(rateLimiterService), UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -6,15 +6,21 @@ option java_package = "com.potatotv.pacc.protocol.v1";
 option java_outer_classname = "PaccProto";
 
 // =========================================================================
-// PACC v5.0 统一通信协议（玩家端 <-> PTV 管控服务器）
-// 协议基于 Protocol Buffers + TLS 1.3 / WSS。系统与游戏服务器无任何通信。
+// PACC 统一通信协议（玩家端 / 服务端插件 <-> PTV 管控服务器）
+// 协议基于 Protocol Buffers + TLS 1.3 / WSS。
+//
+// v5.x：仅玩家端与 PTV 通信，玩家端不获取任何游戏服务器数据。
+// v6.0：新增「服务端插件」对端。服务端插件由服务器管理员部署在游戏服务器上，
+//       通过服务端 API 采集本服务器数据（数据仅用于本服务器反作弊，不跨服务器共享）。
+//       玩家端模式的约束不变：不获取服务器数据、不封禁玩家。
 // =========================================================================
 
-// 对端枚举（仅用于日志与统计，不涉及游戏服务器数据）
+// 对端枚举（仅用于日志与统计）
 enum Peer {
   PEER_UNSPECIFIED = 0;
   PEER_PLAYER_CLIENT = 1;  // 玩家端
   PEER_PTV = 2;            // PTV 管控
+  PEER_SERVER_PLUGIN = 3;  // 服务端插件（v6.0 新增：Paper/Spigot/Nukkit/Nukkit-MOT/AllayMC/Geyser）
 }
 
 enum Edition {
@@ -39,6 +45,16 @@ enum MessageType {
   SIGLIB_SYNC = 12;          // 特征库下发
   CONFIG_SYNC = 13;          // 配置同步
   EVIDENCE_OFFLINE_RESCUE = 14; // 离线补偿证据补传
+
+  // ---- v6.0 服务端插件模式 ----
+  SERVER_PLUGIN_REGISTER = 20;      // 服务端插件启动注册（插件 -> PTV）
+  SERVER_DETECTION_EVENT = 21;      // 服务端检测事件上报（插件 -> PTV）
+  SERVER_PUNISHMENT = 22;           // 服务端处罚记录上报（插件 -> PTV）
+  SERVER_PLUGIN_CONFIG = 23;        // 配置下发（PTV -> 插件）
+  SERVER_TRIGGERED_REDSCREEN = 24;  // 服务端检测联动红屏（PTV -> 玩家端）
+  CONNECTED_SERVER_INFO = 25;       // 玩家端上报当前连接服务器（玩家端 -> PTV）
+  PLAYER_REPUTATION_QUERY = 26;     // 信誉查询（插件 -> PTV）
+  PLAYER_REPUTATION_RESPONSE = 27;  // 信誉查询应答（PTV -> 插件）
 }
 
 message Envelope {
@@ -169,4 +185,115 @@ message ConfigSync {
   string sensitivity = 1;        // low / normal / high
   map<string, string> flags = 2;
   int64 issued_at = 3;
+}
+
+// =========================================================================
+// v6.0 服务端插件模式
+//
+// 数据边界：本节消息只承载「服务端插件在本服务器上采集到的数据」，
+// 仅用于该服务器的反作弊判定与 PTV 侧的证据/信誉聚合，不跨服务器共享原始数据。
+// 服务端插件默认仅告警（PUNISHMENT_ALERT）；封禁类处罚需服务器管理员在配置中显式开启。
+// =========================================================================
+
+// 服务端类型
+enum ServerType {
+  SERVER_TYPE_UNSPECIFIED = 0;
+  SERVER_TYPE_PAPER = 1;      // Java 版 Paper
+  SERVER_TYPE_SPIGOT = 2;     // Java 版 Spigot
+  SERVER_TYPE_NUKKIT = 3;     // 基岩版 Nukkit
+  SERVER_TYPE_NUKKIT_MOT = 4; // 基岩版 Nukkit-MOT
+  SERVER_TYPE_ALLAYMC = 5;    // 基岩版 AllayMC（Go）
+  SERVER_TYPE_GEYSER = 6;     // 跨平台代理 Geyser
+}
+
+// 处罚类型（默认仅告警）
+enum PunishmentType {
+  PUNISHMENT_UNSPECIFIED = 0;
+  PUNISHMENT_ALERT = 1;       // 仅告警（默认）
+  PUNISHMENT_KICK = 2;        // 踢出
+  PUNISHMENT_TEMP_BAN = 3;    // 临时封禁
+  PUNISHMENT_BAN = 4;         // 永久封禁（需管理员显式开启）
+}
+
+// 服务端插件注册（插件启动时向 PTV 注册服务器信息）
+message ServerPluginRegister {
+  string server_id = 1;             // 服务器唯一 ID
+  ServerType server_type = 2;       // 服务端类型
+  string plugin_version = 3;        // 插件版本
+  string server_version = 4;        // 服务端版本
+  string server_name = 5;           // 服务器名称（展示用）
+  int32 max_players = 6;            // 最大玩家数
+  map<string, string> metadata = 7; // 额外元数据（如 Geyser 代理地址、MOT 协议版本）
+}
+
+// 服务端检测事件上报
+message ServerDetectionEvent {
+  string server_id = 1;
+  string player_uuid = 2;         // 服务端可见的玩家 UUID
+  string player_name = 3;
+  string pteid = 4;               // 关联的玩家端 PTEID（未安装玩家端时为空）
+  string check_type = 5;          // MOVE / COMBAT / PACKET / INVENTORY / INTERACTION / CLIENT_BRAND / ADDON / DATA_CONSISTENCY
+  string cheat_type = 6;          // 疑似作弊类型（Fly / KillAura / ...）
+  int32 confidence = 7;           // 置信度 0-100
+  string detail = 8;              // 检测详情 JSON
+  int64 timestamp = 9;
+  bytes evidence = 10;            // 证据数据（数据包日志等，加密上传）
+}
+
+// 服务端处罚记录（默认 alert；封禁类需管理员显式开启）
+message ServerPunishment {
+  string server_id = 1;
+  string player_uuid = 2;
+  PunishmentType punishment_type = 3;
+  string reason = 4;
+  int64 duration_ms = 5;          // 临时封禁时长；0 表示不限
+  string operator = 6;            // 操作者：ACC_AUTO（自动）/ 管理员名
+  int64 timestamp = 7;
+}
+
+// PTV -> 服务端插件 配置下发
+message ServerPluginConfig {
+  string config_version = 1;
+  map<string, string> settings = 2;   // 检测阈值、开关等
+  repeated string enabled_checks = 3; // 启用的检测项
+  int32 punishment_mode = 4;          // 0=仅告警 1=告警+踢出 2=告警+封禁
+  int64 issued_at = 5;
+}
+
+// PTV -> 玩家端 红屏触发（由服务端检测联动）
+message ServerTriggeredRedscreen {
+  string alert_id = 1;
+  string pteid = 2;
+  string server_id = 3;
+  string cheat_type = 4;
+  int32 level = 5;                 // 2=二级 3=三级
+  string evidence_summary = 6;
+  int64 timestamp = 7;
+}
+
+// 玩家端 -> PTV：上报当前连接服务器信息（玩家本地可见，非服务器数据）
+message ConnectedServerInfo {
+  string pteid = 1;
+  string server_address = 2;      // 服务器地址
+  int32 server_port = 3;
+  string server_brand = 4;        // 客户端识别到的服务端品牌
+  bool has_pacc_plugin = 5;       // 是否检测到服务端安装了 PACC 插件
+  int64 timestamp = 6;
+}
+
+// 服务端插件 -> PTV：查询玩家信誉
+message PlayerReputationQuery {
+  string server_id = 1;
+  string player_uuid = 2;
+  string pteid = 3;               // 可选：已知玩家端 PTEID 时直接查询
+}
+
+// PTV -> 服务端插件：信誉查询应答（仅返回聚合结果，不含玩家端原始数据）
+message PlayerReputationResponse {
+  string player_uuid = 1;
+  string pteid = 2;
+  int32 reputation_score = 3;         // 信誉分 0-100
+  int32 redscreen_count = 4;          // 历史红屏次数
+  repeated string recent_cheats = 5;  // 近期作弊类型
+  bool has_client = 6;                // 是否安装了 PACC 玩家端
 }

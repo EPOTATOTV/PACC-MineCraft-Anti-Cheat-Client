@@ -18,6 +18,9 @@ public interface RedscreenAlertRepository extends JpaRepository<RedscreenAlert, 
 
     List<RedscreenAlert> findTop50ByOrderByOccurredAtDesc();
 
+    /** 服务端插件信誉查询：该账号最近的红屏记录（用于聚合近期作弊类型）。 */
+    List<RedscreenAlert> findTop10ByPteidOrderByOccurredAtDesc(String pteid);
+
     long countByOccurredAtBetweenAndStateIn(
             java.time.Instant start, java.time.Instant end, java.util.Collection<String> states);
 

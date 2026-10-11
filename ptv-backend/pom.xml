@@ -148,6 +148,15 @@
             <version>${pacc.pbp.version}</version>
         </dependency>
 
+        <!-- 配置中心客户端（Apollo）：检测阈值/规则/红屏策略等集中下发。可选依赖——
+             未配置 Apollo 或客户端缺失时后端降级读本地 application.yml，绝不成为启动前提。 -->
+        <dependency>
+            <groupId>com.ctrip.framework.apollo</groupId>
+            <artifactId>apollo-client</artifactId>
+            <version>2.3.0</version>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

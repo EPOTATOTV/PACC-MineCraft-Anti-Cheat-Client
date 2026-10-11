@@ -104,6 +104,42 @@ class FlywayMigrationTest {
         }
     }
 
+    @Test
+    void 服务端插件表迁移脚本可在MySQL兼容模式下执行并产出三张表() throws Exception {
+        String url = String.format(MYSQL_COMPAT_URL_TEMPLATE, UUID.randomUUID());
+        try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
+            for (String statement : statementsOf("db/migration/V41__server_plugin_channel.sql")) {
+                execute(connection, statement);
+            }
+
+            // 注册表：按 serverId 唯一，类型/人数默认值可读
+            assertColumn(connection, "T_SERVER_PLUGIN_REGISTRATION", "MAX_PLAYERS", "0");
+            assertIndexExists(connection, "T_SERVER_PLUGIN_REGISTRATION", "IDX_SP_REGISTRATION_TYPE");
+            execute(connection, "INSERT INTO t_server_plugin_registration (server_id, server_type,"
+                    + " plugin_version, server_version, server_name, max_players, registered_at, last_seen_at)"
+                    + " VALUES ('s1', 'PAPER', '6.0.0', '1.21.1', 'Test', 100, CURRENT_TIMESTAMP,"
+                    + " CURRENT_TIMESTAMP)");
+            assertEquals(1, countRows(connection, "t_server_plugin_registration"));
+
+            // 事件表：置信度默认 0，pteid 维度的索引存在（服务端信誉查询要用）
+            assertColumn(connection, "T_SERVER_PLUGIN_EVENT", "CONFIDENCE", "0");
+            assertIndexExists(connection, "T_SERVER_PLUGIN_EVENT", "IDX_SP_EVENT_PTEID");
+            execute(connection, "INSERT INTO t_server_plugin_event (id, server_id, player_uuid, player_name,"
+                    + " pteid, check_type, cheat_type, confidence, detail, event_ts_ms, received_at,"
+                    + " redscreen_triggered, alert_id) VALUES ('e1', 's1', 'uuid-1', 'Alice', 'PT1', 'MOVE',"
+                    + " 'Fly', 90, 'detail', 1, CURRENT_TIMESTAMP, FALSE, 'alert_1')");
+            assertEquals(1, countRows(connection, "t_server_plugin_event"));
+
+            // 处置表：时长默认 0（不限）
+            assertColumn(connection, "T_SERVER_PLUGIN_PUNISHMENT", "DURATION_MS", "0");
+            assertIndexExists(connection, "T_SERVER_PLUGIN_PUNISHMENT", "IDX_SP_PUNISHMENT_PLAYER");
+            execute(connection, "INSERT INTO t_server_plugin_punishment (id, server_id, player_uuid,"
+                    + " punishment_type, reason, duration_ms, operator, occurred_ts_ms, received_at)"
+                    + " VALUES ('p1', 's1', 'uuid-1', 'KICK', 'Fly', 0, 'ACC_AUTO', 1, CURRENT_TIMESTAMP)");
+            assertEquals(1, countRows(connection, "t_server_plugin_punishment"));
+        }
+    }
+
     private static int countRows(Connection connection, String table) throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery("SELECT COUNT(*) FROM " + table)) {

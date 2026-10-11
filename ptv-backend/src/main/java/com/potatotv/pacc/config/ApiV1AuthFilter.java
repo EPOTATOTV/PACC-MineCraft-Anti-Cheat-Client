@@ -60,6 +60,10 @@ public class ApiV1AuthFilter extends OncePerRequestFilter {
         if (uri.startsWith("/api/v1/auth/")) {
             return true;
         }
+        // 服务端插件通道用共享密钥对请求体签名（ServerPluginAuthFilter），不走开放 API 的 Key 机制
+        if (uri.startsWith("/api/v1/server/")) {
+            return true;
+        }
         // 开放数据 API 与开发者自助门户共用同一套 API Key + HMAC 鉴权
         return !(uri.startsWith("/api/v1/") || uri.startsWith("/api/dev/"));
     }

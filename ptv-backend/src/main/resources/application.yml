@@ -136,6 +136,13 @@ pacc:
     require-known-hash: ${PACC_ATTESTATION_REQUIRE_KNOWN_HASH:false}
   websocket:
     endpoint: /ws                # 玩家端 WebSocket 长连接端点
+  # 远程查端 WebRTC ICE 参数（下发给管理端构造 RTCPeerConnection）。
+  # 凭据走环境变量，绝不硬编码；未配置 turn-urls 时仅下发 STUN（企业 NAT/防火墙下可能连不通）。
+  webrtc:
+    stun-urls: ${PACC_WEBRTC_STUN_URLS:stun:stun.l.google.com:19302}
+    turn-urls: ${PACC_WEBRTC_TURN_URLS:}
+    turn-username: ${PACC_WEBRTC_TURN_USERNAME:}
+    turn-credential: ${PACC_WEBRTC_TURN_CREDENTIAL:}
   wss:
     # 信封时间戳窗口（毫秒）
     ts-window-ms: 60000
@@ -173,6 +180,29 @@ pacc:
     # 下载计数 /api/dl/track 的按来源 IP 自然日配额，超出返回 429。
     # 只统计下载点击数，正常用户一天远达不到；共用出口 IP 的场所（网吧/校园网）可上调。
     dl-track-per-day: ${PACC_RATELIMIT_DL_TRACK_PER_DAY:100}
+  # v6.0 服务端插件通道：Paper/Spigot/Nukkit/Nukkit-MOT/AllayMC/Geyser 扩展在本服进程内上报。
+  # secret 为空时 /api/v1/server/** 一律 401（fail-closed），不影响其余接口；生产经环境变量注入。
+  server-plugin:
+    secret: ${PACC_SERVER_PLUGIN_SECRET:}
+    # 处置级别下发：0=仅告警（默认） 1=告警+踢出 2=告警+封禁；插件仍按本服配置执行，PTV 不跨服封禁。
+    punishment-mode: ${PACC_SERVER_PLUGIN_PUNISHMENT_MODE:0}
+    # 配置版本号：插件据其判断是否需要应用新配置。
+    config-version: ${PACC_SERVER_PLUGIN_CONFIG_VERSION:1}
+    # 下发的启用检查项；与 pacc-server-core 的 CheckType 对齐。
+    enabled-checks: ${PACC_SERVER_PLUGIN_ENABLED_CHECKS:MOVE,COMBAT,PACKET,INVENTORY,INTERACTION,CLIENT_BRAND,ADDON,DATA_CONSISTENCY}
+    # 插件侧告警置信度下限（达到才上报）。
+    confidence-threshold: ${PACC_SERVER_PLUGIN_CONFIDENCE_THRESHOLD:60}
+  # 配置中心（Apollo）：检测阈值 / 规则 / 红屏策略 / 特征库版本 / 服务端插件等运行期参数可集中下发。
+  # 默认 provider=local，直接读本文件；仅当显式置为 apollo 且注入 app-id/meta 时才连远端。
+  # 降级：Apollo 未配置、引导未开启或远端不可用时，后端照常启动并读本地默认值——
+  # Apollo 绝不是启动前提（密钥 fail-closed 校验只认环境变量，不受此处影响）。
+  config-center:
+    provider: ${PACC_CONFIG_CENTER_PROVIDER:local}
+    app-id: ${PACC_APOLLO_APP_ID:pacc-ptv}
+    meta: ${PACC_APOLLO_META:}
+    default-namespace: application
+    namespaces: detection.rules,detection.threshold,redscreen.policy,feature.library,server.plugin
+    bootstrap-enabled: ${PACC_APOLLO_BOOTSTRAP_ENABLED:false}
 
 logging:
   level:
@@ -244,6 +274,9 @@ pacc:
     stub-enabled: true
     # 本地联调：兜底前缀，避免构造重置链接时落到公网地址
     reset-base-url: http://localhost:5173
+  # 本地联调用演示密钥，便于插件端无外网对接；生产务必经环境变量注入强随机值
+  server-plugin:
+    secret: "pacc-dev-server-plugin-secret-change-me"
   feishu:
     enabled: false
 springdoc:

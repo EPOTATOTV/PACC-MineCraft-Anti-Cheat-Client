@@ -1,6 +1,7 @@
 package com.potatotv.pacc.controller;
 
 import com.potatotv.pacc.domain.DeterPolicy;
+import com.potatotv.pacc.security.SuperAdminOnly;
 import com.potatotv.pacc.service.detection.v47.DeterrenceService;
 import com.potatotv.pacc.service.detection.v47.FamilyIntelligenceService;
 import com.potatotv.pacc.service.detection.v47.IocService;
@@ -24,6 +25,7 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/api/admin/v47")
 @RequiredArgsConstructor
+@SuperAdminOnly
 public class V47AdminController {
 
     private final FamilyIntelligenceService familyService;

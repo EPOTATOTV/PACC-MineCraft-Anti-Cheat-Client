@@ -8,6 +8,46 @@
 
 ---
 
+## [Unreleased]
+
+Windows 正式推送完善：补齐键盘锁真实实施、安装流程、发布流水线，并统一红屏与远程查端闭环。
+版本号暂不变更，仍为 5.4.0。
+
+### 新增
+
+- **内核键盘过滤模块**（`platform/kernel-windows/pacc_kbdfilter.c`）：kbfiltr 式拦截 `IOCTL_INTERNAL_KEYBOARD_CONNECT`，
+  用自定义服务回调包装 kbdclass 的 `KeyboardClassServiceCallback`，锁定时丢弃 `KEYBOARD_INPUT_DATA`。
+  新增 `IOCTL_PACC_SET_KEYBOARD_LOCK` / `IOCTL_PACC_QUERY_KEYBOARD_LOCK`，由桌面壳在红屏期间启用。
+- **安装流程实装**：`tools/windows-gui/deploy/installer.ps1` 由占位改为可用脚本（管理员校验、Windows/x64 预检、
+  生成配置基线、`pnputil` + `sc` 安装驱动、注册开机自启、卸载保留数据目录、安装日志）。
+  Inno Setup 增加许可页、版本预检与 [Run]/[UninstallRun] 集成。
+- **发布流水线产出 Windows 客户端**：`release.yml` 新增 `build-windows` job，产出安装包与
+  `SHA256SUMS-windows.txt`；缺少签名证书时跳过签名而不使流水线失败。
+- **桌面壳能力补齐**：多显示器红屏、键盘锁双后端（内核驱动 / 用户态低级钩子）、首次启动协议确认、
+  Java 客户端自更新编排（停服→备份→替换→健康检查→失败回滚）、崩溃计数与暂停自愈、诊断导出。
+- **远程查端闭环**：后端新增 `GET /api/admin/webrtc/ice-servers`（含 TURN 配置检测），查端会话 30 分钟超时自动回收，
+  结论强制为 `CONFIRMED_CHEAT` / `FALSE_POSITIVE` / `PENDING` 三值；前端接入 ICE 配置、强制结论与玩家侧提示。
+- **桌面红屏 / 协议视图**（`ptv-frontend`）：桌面壳注入 `window.__PACC_VIEW__` 后渲染专用全屏红屏视图与协议确认视图。
+
+### 改进
+
+- 红屏渲染统一到 Tauri 壳，Java 端仅在无桌面壳时降级为 Swing 窗口。
+- 红屏只暂停被检测者的输入：其他在线玩家收到的是公示红屏，保留键盘并显示「继续」按钮。
+
+### 修复
+
+- 桌面壳此前会对所有在线玩家实施键盘锁，违反「未检测者不受影响」约束；现按服务端下发的
+  `redscreen_is_target` 判定，仅锁被检测者。
+- 桌面壳红屏 / 协议窗口此前按 `pathname` 路由，静态资源根路径下会错误渲染成管理端数据大盘；
+  改为按视图标记渲染专用视图。
+
+### 已知问题
+
+- 内核驱动尚未完成 WHQL 认证与 EV 代码签名（本次不处理），无签名环境下安装会提示驱动来源。
+- Rust 桌面壳发行 profile 已开启 `strip` / `lto`，未引入额外的二进制混淆器。
+
+---
+
 ## [5.4.0] - DF Alpha 1.0.0 - 2026-09-28
 
 首个对外发布版本。功能基本完整、可接受早期用户测试，但仍在快速迭代，不承诺 SLA，

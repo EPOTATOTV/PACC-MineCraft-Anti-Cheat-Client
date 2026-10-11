@@ -16,7 +16,7 @@
     "@ant-design/icons": "^6.3.4",
     "@potatotv/prl-editor": "file:../pacc-rule-language/prl-editor",
     "antd": "^6.6.5",
-    "echarts": "^5.5.1",
+    "echarts": "^6.1.0",
     "gsap": "^3.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -40,5 +40,8 @@
     "typescript-eslint": "^8.70.1",
     "vite": "^8.3.1",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "source-map-js": "^1.2.2"
   }
 }

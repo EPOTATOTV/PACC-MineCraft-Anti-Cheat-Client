@@ -3,7 +3,6 @@ package com.potatotv.pacc.controller;
 import com.potatotv.pacc.domain.Notification;
 import com.potatotv.pacc.security.RequirePermission;
 import com.potatotv.pacc.service.NotificationService;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,7 +29,7 @@ public class NotificationAdminController {
      */
     @PostMapping("/send")
     @RequirePermission("system:create")
-    public ResponseEntity<?> send(@RequestBody Map<String, String> body, HttpServletRequest request) {
+    public ResponseEntity<?> send(@RequestBody Map<String, String> body) {
         String title = body.get("title");
         if (title == null || title.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "title 不能为空"));

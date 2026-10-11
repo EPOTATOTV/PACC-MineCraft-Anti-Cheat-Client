@@ -47,7 +47,7 @@ public class WebhookDispatcher {
         return (u == null || u.isBlank()) ? "" : u;
     }
 
-    public void onRedscreen(RedscreenAlert alert, int queuePosition) {
+    public void onRedscreen(RedscreenAlert alert) {
         if (target().isEmpty()) return; // 未配置则跳过
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("event_type", "redscreen_alert");
@@ -79,7 +79,7 @@ public class WebhookDispatcher {
             for (int i = 0; i < maxRetry; i++) {
                 try {
                     HttpEntity<String> entity = new HttpEntity<>(mapper.writeValueAsString(body), headers);
-                    restTemplate.postForEntity(UriComponentsBuilder.fromHttpUrl(target()).build().toUri(), entity, String.class);
+                    restTemplate.postForEntity(UriComponentsBuilder.fromUriString(target()).build().toUri(), entity, String.class);
                     return;
                 } catch (Exception e) {
                     log.warn("Webhook 推送重试 {}/{} err={}", i + 1, maxRetry, e.getMessage());

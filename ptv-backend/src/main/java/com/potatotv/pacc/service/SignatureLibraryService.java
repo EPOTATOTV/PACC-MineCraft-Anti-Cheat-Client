@@ -78,7 +78,7 @@ public class SignatureLibraryService {
 
     /** 回滚到上一稳定版本：将当前 GRAY/PUBLISHED 标记回滚（简化：置 DRAFT），命中项自增 version。 */
     @Transactional
-    public int rollback(Signature.Edition edition, String operator) {
+    public int rollback(Signature.Edition edition) {
         Instant now = Instant.now();
         return repo.markState("PUBLISHED", "DRAFT", edition, now)
                 + repo.markState("GRAY", "DRAFT", edition, now);
@@ -137,10 +137,10 @@ public class SignatureLibraryService {
 
     /** 误报率超阈值时回滚到上一稳定版本，返回命中回滚条数；未超阈值返回 0。 */
     @Transactional
-    public int autoRollback(Signature.Edition edition, double falsePositiveRate, String operator) {
+    public int autoRollback(Signature.Edition edition, double falsePositiveRate) {
         if (!autoRollbackThreshold(falsePositiveRate)) {
             return 0;
         }
-        return rollback(edition, operator);
+        return rollback(edition);
     }
 }

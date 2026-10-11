@@ -35,6 +35,9 @@ class AccountServiceTest {
 
     private static final String EMAIL = "tester@ptv.dev";
     private static final String PASSWORD = "Abc123!@#";
+
+    /** 复用同一实例生成测试盐；盐值本身对断言无影响。 */
+    private static final Random SALT_RANDOM = new Random();
     private Account saved;
 
     @BeforeEach
@@ -187,7 +190,7 @@ class AccountServiceTest {
     /** 构造迁移前的存储格式：{@code Base64(salt):Base64(hash)}（生产参数 t=3,m=64MiB,p=1,T=32）。 */
     private static String legacyHash(String password) {
         byte[] salt = new byte[16];
-        new Random(20261002L).nextBytes(salt);
+        SALT_RANDOM.nextBytes(salt);
         byte[] hash = new Argon2(3, 65536, 1, 32).hash(password.getBytes(StandardCharsets.UTF_8), salt);
         return Base64.getEncoder().encodeToString(salt) + ":" + Base64.getEncoder().encodeToString(hash);
     }

@@ -65,7 +65,7 @@ public class PluginMarketController {
     /** 评分 + 评论。 */
     @PostMapping("/{pluginId}/comment")
     public Map<String, Object> comment(@PathVariable String pluginId, @RequestBody Map<String, String> body) {
-        int rating = Integer.parseInt(body.getOrDefault("rating", "5"));
+        int rating = parseIntOr(body.getOrDefault("rating", "5"), 5);
         var c = market.addComment(pluginId, body.getOrDefault("author", "anonymous"), rating, body.get("content"));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", c.getId());
@@ -89,6 +89,14 @@ public class PluginMarketController {
     @GetMapping("/{pluginId}/reviews")
     public Object reviews(@PathVariable("pluginId") String pluginId) {
         return market.reviews(pluginId);
+    }
+
+    private static int parseIntOr(String s, int def) {
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 
     private Plugin.Type toType(String t) {

@@ -23,11 +23,27 @@ public final class RedisOtpLedger implements OtpLedger {
         for (int i = 0; i + 1 < list.size(); i += 2) {
             fields.put(String.valueOf(list.get(i)), String.valueOf(list.get(i + 1)));
         }
-        long created = Long.parseLong(fields.getOrDefault("created", "0"));
-        int attempts = Integer.parseInt(fields.getOrDefault("attempts", "0"));
-        long locked = Long.parseLong(fields.getOrDefault("locked", "0"));
+        long created = parseLong(fields.getOrDefault("created", "0"), 0L);
+        int attempts = parseInt(fields.getOrDefault("attempts", "0"), 0);
+        long locked = parseLong(fields.getOrDefault("locked", "0"), 0L);
         String hash = fields.getOrDefault("hash", "");
         return new OtpEntry(created, attempts, locked, hash);
+    }
+
+    private static long parseLong(String s, long def) {
+        try {
+            return Long.parseLong(s);
+        } catch (NumberFormatException e) {
+            return def;
+        }
+    }
+
+    private static int parseInt(String s, int def) {
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 
     @Override

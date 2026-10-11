@@ -34,7 +34,6 @@ class PaccWireCodecTest {
 
     @Test
     void wrongSecretFails() {
-        PaccWireCodec a = new PaccWireCodec(SECRET, 60_000, new WssSessionKeys(false));
         PaccEnvelope env = PaccWireCodec.build("inspect_offer", "s3", "PT03", "", SECRET);
         PaccWireCodec b = new PaccWireCodec("another-secret", 60_000, new WssSessionKeys(false));
         assertFalse(b.verify(env));

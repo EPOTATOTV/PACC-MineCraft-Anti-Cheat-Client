@@ -76,14 +76,16 @@ public class StatsService {
 
     /** 近 N 天红屏趋势（按天）。 */
     public List<Map<String, Object>> redscreenTrend(int days) {
+        // 入参来自查询串，先夹到 [0,365] 再参与算术，避免极端值造成溢出
+        int n = Math.max(0, Math.min(days, 365));
         Map<String, Long> perDay = new LinkedHashMap<>();
-        for (int i = days - 1; i >= 0; i--) {
+        for (int i = n - 1; i >= 0; i--) {
             Instant d = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(i, ChronoUnit.DAYS);
             perDay.put(d.toString().substring(0, 10), 0L);
         }
-        alertRepository.countGroupByCheatType(Instant.now().minus(days, ChronoUnit.DAYS), Instant.now());
+        alertRepository.countGroupByCheatType(Instant.now().minus(n, ChronoUnit.DAYS), Instant.now());
         // 简化：按日期逐日统计红屏条数
-        IntStream.range(0, days).forEach(i -> {
+        IntStream.range(0, n).forEach(i -> {
             Instant dayStart = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(i, ChronoUnit.DAYS);
             Instant dayEnd = dayStart.plus(1, ChronoUnit.DAYS);
             long c = alertRepository.countByOccurredAtBetweenAndStateIn(dayStart, dayEnd, List.of("PENDING_INSPECT","CONFIRMED","FALSE_POSITIVE"));

@@ -29,27 +29,27 @@ public class BruteForceCheatDetector {
                           List<LayerHit> hits, String summary) {}
 
     /** 多类型批量判定：返回命中的类型列表（按置信度降序）。 */
-    public List<Verdict> evaluateAll(FeatureVector fv, Map<String, Object> ctx) {
+    public List<Verdict> evaluateAll(FeatureVector fv) {
         List<Verdict> out = new ArrayList<>();
         for (CheatType.BruteForce t : CheatType.BruteForce.values()) {
-            evaluate(t, fv, ctx).ifPresent(out::add);
+            evaluate(t, fv).ifPresent(out::add);
         }
         out.sort((a, b) -> Double.compare(b.confidence(), a.confidence()));
         return out;
     }
 
     /** 单类型判定。 */
-    public Optional<Verdict> evaluate(CheatType.BruteForce type, FeatureVector fv, Map<String, Object> ctx) {
+    public Optional<Verdict> evaluate(CheatType.BruteForce type, FeatureVector fv) {
         List<LayerHit> hits = new ArrayList<>();
 
         // L1 信号层：明确阈值/标志位的快速命中
-        signalLayer(type, fv, ctx).ifPresent(hits::add);
+        signalLayer(type, fv).ifPresent(hits::add);
         // L2 时序层：统计异常（均值/方差/突变）
-        timingLayer(type, fv, ctx).ifPresent(hits::add);
+        timingLayer(type, fv).ifPresent(hits::add);
         // L3 物理层：输入/设备/运动物理一致性
-        physicalLayer(type, fv, ctx).ifPresent(hits::add);
+        physicalLayer(type, fv).ifPresent(hits::add);
         // L4 语义层：AI 行为画像 / 语义一致性
-        semanticLayer(type, fv, ctx).ifPresent(hits::add);
+        semanticLayer(type, fv).ifPresent(hits::add);
 
         if (hits.isEmpty()) {
             return Optional.empty();
@@ -62,7 +62,7 @@ public class BruteForceCheatDetector {
     }
 
     // ---------- L1 信号层 ----------
-    private Optional<LayerHit> signalLayer(CheatType.BruteForce t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> signalLayer(CheatType.BruteForce t, FeatureVector fv) {
         double threshold = switch (t) {
             case KILLAURA -> fv.get("feature_killaura_angle_speed");
             case AUTO_CLICKER -> fv.get("feature_click_cps");
@@ -113,7 +113,7 @@ public class BruteForceCheatDetector {
     }
 
     // ---------- L2 时序层 ----------
-    private Optional<LayerHit> timingLayer(CheatType.BruteForce t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> timingLayer(CheatType.BruteForce t, FeatureVector fv) {
         double z = zScore(t, fv);
         if (z >= 2.0) {
             return Optional.of(new LayerHit(2, "时序层",
@@ -134,11 +134,13 @@ public class BruteForceCheatDetector {
         };
         if (baseline <= 0) return 0;
         double v = fv.get("feature_" + t.code() + "_mean");
+        // 端侧上报值可能为非有限值，先拦掉再参与减法，避免下溢
+        if (!Double.isFinite(v)) return 0;
         return (v - baseline) / Math.max(baseline * 0.3, 1e-6);
     }
 
     // ---------- L3 物理层 ----------
-    private Optional<LayerHit> physicalLayer(CheatType.BruteForce t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> physicalLayer(CheatType.BruteForce t, FeatureVector fv) {
         // 人类物理一致性：例如 CPS 与移动冲突、点击间隔方差过小（机器无抖动）
         double intervalVar = fv.get("feature_click_interval_var");
         if (t == CheatType.BruteForce.AUTO_CLICKER && intervalVar > 0 && intervalVar < 0.02) {
@@ -154,7 +156,7 @@ public class BruteForceCheatDetector {
     }
 
     // ---------- L4 语义层 ----------
-    private Optional<LayerHit> semanticLayer(CheatType.BruteForce t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> semanticLayer(CheatType.BruteForce t, FeatureVector fv) {
         double semantic = fv.get("feature_semantic_" + t.code());
         if (semantic >= 0.6) {
             return Optional.of(new LayerHit(4, "语义层",

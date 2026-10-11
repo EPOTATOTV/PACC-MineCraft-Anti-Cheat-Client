@@ -97,7 +97,7 @@ public final class Hkdf {
     /** 字节数组转小写十六进制字符串。 */
     public static String hex(byte[] bytes) {
         if (bytes == null) return "";
-        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        StringBuilder sb = new StringBuilder(Math.multiplyExact(bytes.length, 2));
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));
         }

@@ -117,9 +117,27 @@ public class AccountService {
     }
 
     private boolean isStrongPassword(String p) {
-        return p != null && p.length() >= 8 && p.length() <= 32
-                && p.matches(".*[A-Z].*") && p.matches(".*[a-z].*")
-                && p.matches(".*[0-9].*") && p.matches(".*[^A-Za-z0-9].*");
+        if (p == null || p.length() < 8 || p.length() > 32) {
+            return false;
+        }
+        // 逐字符判定，避免 .*[X].* 这类嵌套量词在超长输入上退化为多项式回溯
+        boolean upper = false;
+        boolean lower = false;
+        boolean digit = false;
+        boolean special = false;
+        for (int i = 0; i < p.length(); i++) {
+            char c = p.charAt(i);
+            if (c >= 'A' && c <= 'Z') {
+                upper = true;
+            } else if (c >= 'a' && c <= 'z') {
+                lower = true;
+            } else if (c >= '0' && c <= '9') {
+                digit = true;
+            } else {
+                special = true;
+            }
+        }
+        return upper && lower && digit && special;
     }
 
     private String randomToken(int bytes) {
@@ -329,7 +347,7 @@ public class AccountService {
     }
 
     private static String hex(byte[] b) {
-        StringBuilder sb = new StringBuilder(b.length * 2);
+        StringBuilder sb = new StringBuilder(Math.multiplyExact(b.length, 2));
         for (byte x : b) sb.append(String.format("%02x", x));
         return sb.toString();
     }

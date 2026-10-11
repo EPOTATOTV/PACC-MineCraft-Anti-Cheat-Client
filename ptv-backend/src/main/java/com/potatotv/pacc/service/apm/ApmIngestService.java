@@ -88,7 +88,11 @@ public class ApmIngestService {
         List<ApmMetric> batch = new ArrayList<>(limit);
         for (int i = 0; i < limit; i++) {
             Sample s = samples.get(i);
-            String name = s == null || s.name() == null ? "" : s.name().trim();
+            if (s == null) {
+                rejected++;
+                continue;
+            }
+            String name = s.name() == null ? "" : s.name().trim();
             if (name.isEmpty() || ApmCatalog.byName(name).isEmpty()) {
                 rejected++;   // 未登记指标：丢弃但不记明细，避免日志被长尾名字污染
                 continue;

@@ -77,7 +77,7 @@ public class SupportService {
      * 工单不存在时返回 null（由 controller 转 404）。
      */
     @Transactional
-    public Map<String, Object> replyTicket(String id, String reply, String responder) {
+    public Map<String, Object> replyTicket(String id, String responder) {
         SupportTicket t = ticketRepository.findById(id).orElse(null);
         if (t == null) {
             return null;
@@ -120,7 +120,7 @@ public class SupportService {
     }
 
     @Transactional
-    public SupportTicket resolveTicket(String id, String responder) {
+    public SupportTicket resolveTicket(String id) {
         SupportTicket t = ticketRepository.findById(id).orElse(null);
         if (t == null) {
             return null;

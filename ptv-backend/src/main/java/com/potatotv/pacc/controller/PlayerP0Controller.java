@@ -64,6 +64,9 @@ import java.util.stream.Collectors;
 @SuppressWarnings("null") // 流/存储层泛型 null 分析误报（本地定性安全）
 public class PlayerP0Controller {
 
+    /** 复用同一实例生成 TOTP 密钥，避免每次新建 SecureRandom。 */
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final DetectionEventRepository eventRepository;
     private final RedscreenAlertRepository redscreenRepository;
     private final AccountRepository accountRepository;
@@ -135,7 +138,7 @@ public class PlayerP0Controller {
     }
 
     @GetMapping("/protection/resources")
-    public List<Map<String, Object>> protectionResources(HttpServletRequest req) {
+    public List<Map<String, Object>> protectionResources() {
         // 端侧 CPU/内存/网络遥测暂未持久化，返回空态；接入遥测表后自动出数据。
         return List.of();
     }
@@ -239,10 +242,7 @@ public class PlayerP0Controller {
     }
 
     @GetMapping("/monitor/logs")
-    public List<Map<String, Object>> monitorLogs(@RequestParam(defaultValue = "100") int limit,
-                                                 @RequestParam(required = false) String level,
-                                                 @RequestParam(required = false) String origin,
-                                                 @RequestParam(required = false) String q, HttpServletRequest req) {
+    public List<Map<String, Object>> monitorLogs() {
         // 端侧运行日志未持久化，返回空态；接入遥测日志表后按 level/origin/q 过滤出数据。
         return List.of();
     }
@@ -312,7 +312,6 @@ public class PlayerP0Controller {
 
     @GetMapping("/notifications/unread-count")
     public Map<String, Object> unreadCount(HttpServletRequest req) {
-        String pteid = pteidOf(req);
         long unread = notifications(null, req).stream().filter(m -> !Boolean.TRUE.equals(m.get("read"))).count();
         return Map.of("count", unread);
     }
@@ -442,7 +441,7 @@ public class PlayerP0Controller {
     public Map<String, Object> totpSetup(HttpServletRequest req) {
         String pteid = pteidOf(req);
         byte[] secret = new byte[20];
-        new SecureRandom().nextBytes(secret);
+        SECURE_RANDOM.nextBytes(secret);
         String b32 = base32Encode(secret);
         String email = accountRepository.findById(pteid).map(Account::getEmail).orElse("player@" + pteid);
         String otpauth = "otpauth://totp/PACC:" + email + "?secret=" + b32 + "&issuer=PACC&period=30&digits=6";

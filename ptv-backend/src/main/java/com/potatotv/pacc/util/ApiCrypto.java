@@ -28,7 +28,7 @@ public final class ApiCrypto {
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
             c.init(Cipher.ENCRYPT_MODE, key(masterSecret), new GCMParameterSpec(TAG_BITS, iv));
             byte[] enc = c.doFinal(plain.getBytes(StandardCharsets.UTF_8));
-            byte[] out = new byte[iv.length + enc.length];
+            byte[] out = new byte[Math.addExact(iv.length, enc.length)];
             System.arraycopy(iv, 0, out, 0, iv.length);
             System.arraycopy(enc, 0, out, iv.length, enc.length);
             return Base64.getEncoder().encodeToString(out);

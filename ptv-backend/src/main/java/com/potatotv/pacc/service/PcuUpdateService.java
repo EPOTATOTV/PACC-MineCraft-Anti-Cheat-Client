@@ -3,6 +3,7 @@ package com.potatotv.pacc.service;
 import com.potatotv.pacc.domain.ReleaseInfo;
 import com.potatotv.pacc.domain.UpdateReport;
 import com.potatotv.pacc.repository.UpdateReportRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -108,7 +109,8 @@ public class PcuUpdateService {
             m.put("delta", delta);
         }
         log.debug("更新检查 platform={} channel={} current={} latest={} pteid={} rollout={}",
-                pf, ch, current, r.getVersion(), pteid, r.getRolloutPercent());
+                LogSanitizer.clean(pf), LogSanitizer.clean(ch), LogSanitizer.clean(current),
+                LogSanitizer.clean(r.getVersion()), LogSanitizer.clean(pteid), r.getRolloutPercent());
         return m;
     }
 

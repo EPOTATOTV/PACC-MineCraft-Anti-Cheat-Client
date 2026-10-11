@@ -492,7 +492,14 @@ public class AdminP0Controller {
         if (o instanceof Number n) {
             return n.intValue();
         }
-        return o == null ? null : Integer.valueOf(String.valueOf(o));
+        if (o == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(String.valueOf(o).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private String joinChannels(List<?> channels) {

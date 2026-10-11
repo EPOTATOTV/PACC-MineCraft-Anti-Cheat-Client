@@ -88,8 +88,9 @@ public class V46AdminController {
     @PostMapping("/zero-day/{id}/reflow")
     public ResponseEntity<?> reflowZeroDay(@PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
         try {
+            String reviewer = body == null ? "" : str(body.get("reviewer"));
             return ResponseEntity.ok(activeLearningService.reflowFinding(id,
-                    str(body == null ? null : body.get("reviewer")).isBlank() ? "admin" : str(body.get("reviewer"))));
+                    reviewer.isBlank() ? "admin" : reviewer));
         } catch (NoSuchElementException e) {
             return ResponseEntity.notFound().build();
         }
@@ -134,7 +135,7 @@ public class V46AdminController {
     @PostMapping("/threat/cluster")
     public ResponseEntity<?> clusterThreat(@RequestBody(required = false) Map<String, Object> body) {
         List<ThreatIntelSample> recent = threatSampleRepository.findTop50ByOrderByCreatedAtDesc();
-        int k = body == null ? 3 : Integer.parseInt(body.getOrDefault("k", 3).toString());
+        int k = body == null ? 3 : numOrDefault(body.get("k"), 3);
         if (recent.isEmpty()) return ResponseEntity.ok(Map.of("analyzed", 0, "clusters", Map.of()));
         Map<String, Object> summary = analystService.cluster(recent, k);
         return ResponseEntity.ok(summary);
@@ -144,7 +145,8 @@ public class V46AdminController {
     @PostMapping("/threat/{id}/promote")
     public ResponseEntity<?> promoteThreat(@PathVariable String id, @RequestBody(required = false) Map<String, Object> body) {
         try {
-            return ResponseEntity.ok(activeLearningService.promoteThreat(id, str(body == null ? null : body.get("operator")).isBlank() ? "admin" : str(body.get("operator"))));
+            String operator = body == null ? "" : str(body.get("operator"));
+            return ResponseEntity.ok(activeLearningService.promoteThreat(id, operator.isBlank() ? "admin" : operator));
         } catch (NoSuchElementException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
@@ -208,5 +210,20 @@ public class V46AdminController {
 
     private static Boolean bool(Object o) {
         return o == null ? null : Boolean.parseBoolean(o.toString());
+    }
+
+    /** 数值入参解析：非数字时回退默认值，避免非法请求体触发 NumberFormatException。 */
+    private static int numOrDefault(Object o, int def) {
+        if (o instanceof Number n) {
+            return n.intValue();
+        }
+        if (o == null) {
+            return def;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(o).trim());
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 }

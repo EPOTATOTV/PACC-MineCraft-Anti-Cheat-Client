@@ -245,7 +245,13 @@ final class PtoJson {
                         if (i + 4 > s.length()) {
                             throw new PtoException("JSON \\u 转义不完整");
                         }
-                        sb.append((char) Integer.parseInt(s.substring(i, i + 4), 16));
+                        int cp;
+                        try {
+                            cp = Integer.parseInt(s.substring(i, i + 4), 16);
+                        } catch (NumberFormatException nfe) {
+                            throw new PtoException("JSON \\u 转义非法：" + s.substring(i, i + 4));
+                        }
+                        sb.append((char) cp);
                         i += 4;
                     }
                     default -> throw new PtoException("JSON 非法转义：\\" + e);

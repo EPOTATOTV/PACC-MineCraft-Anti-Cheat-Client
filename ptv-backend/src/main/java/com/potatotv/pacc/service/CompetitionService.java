@@ -47,6 +47,9 @@ public class CompetitionService {
     private static final int MIN_DISTINCT_DEVICES = 2;
     private static final int MIN_DISTINCT_IPS = 2;
 
+    /** 复用同一实例生成随机场次令牌，避免每次新建 SecureRandom。 */
+    private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+
     private final LoginEventRepository loginEventRepository;
     private final SuspicionFlagRepository flagRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -422,8 +425,8 @@ public class CompetitionService {
 
     private static String randomToken() {
         byte[] b = new byte[24];
-        new java.security.SecureRandom().nextBytes(b);
-        StringBuilder sb = new StringBuilder(b.length * 2);
+        SECURE_RANDOM.nextBytes(b);
+        StringBuilder sb = new StringBuilder(Math.multiplyExact(b.length, 2));
         for (byte x : b) sb.append(String.format("%02x", x));
         return sb.toString();
     }

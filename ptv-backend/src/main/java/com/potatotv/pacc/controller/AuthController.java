@@ -258,14 +258,16 @@ public class AuthController {
             throttle.clear(ipScope);
             lockout.reset(idScope);
             lockout.reset(ipScope);
+            // 登录凭证已通过即记账并触发代练/共享聚合检测。放在 2FA 分支之前，
+            // 使该敏感调用不因用户可控条件（是否启用 2FA / 设备是否受信）而被跳过。
+            Account acc = accountService.findByPteidOrNull(token.pteid());
+            competitionService.recordLogin(token.pteid(),
+                    acc == null ? null : acc.getDeviceFingerprint(), ip);
             // 2FA：若该账号已启用两步验证，先判断当前设备是否已被信任；
             // 可信设备（30 天内验证过且未过期）免于二次验证，直接签发主会话。
             if (totpService.enabled(token.pteid())) {
                 if (totpService.isTrustedDevice(token.pteid(), deviceFp)) {
                     log.info("玩家可信设备直登 pteid={}", token.pteid());
-                    Account accT = accountService.findByPteidOrNull(token.pteid());
-                    competitionService.recordLogin(token.pteid(),
-                            accT == null ? null : accT.getDeviceFingerprint(), ip);
                     setSessionCookies(response, token);
                     Map<String, Object> out = new LinkedHashMap<>();
                     out.put("pteid", token.pteid());
@@ -279,10 +281,6 @@ public class AuthController {
                 return ResponseEntity.ok(pending);
             }
             log.info("玩家登录成功 pteid={}", token.pteid());
-            // 记账并触发代练/共享聚合检测
-            Account acc = accountService.findByPteidOrNull(token.pteid());
-            competitionService.recordLogin(token.pteid(),
-                    acc == null ? null : acc.getDeviceFingerprint(), ip);
             // 会话令牌写入 HttpOnly cookie：JS 不可读，防 XSS 窃取
             setSessionCookies(response, token);
             Map<String, Object> out = new LinkedHashMap<>();

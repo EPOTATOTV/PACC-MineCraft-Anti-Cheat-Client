@@ -55,7 +55,7 @@ public class TenantController {
     @DeleteMapping("/{tenantId}")
     public ResponseEntity<?> delete(@PathVariable String tenantId, HttpServletRequest request) {
         return safeCall(() -> {
-            tenantService.delete(role(request), actor(request), tenantId);
+            tenantService.delete(role(request), tenantId);
             return Map.of("deleted", tenantId);
         });
     }
@@ -68,7 +68,7 @@ public class TenantController {
     @PostMapping("/{tenantId}/admins")
     public ResponseEntity<?> addAdmin(@PathVariable String tenantId,
                                       @RequestBody Map<String, String> body, HttpServletRequest request) {
-        return safeCall(() -> tenantService.addAdmin(role(request), actor(request), tenantId,
+        return safeCall(() -> tenantService.addAdmin(role(request), tenantId,
                 body.get("identity"), body.get("role")));
     }
 
@@ -76,7 +76,7 @@ public class TenantController {
     public ResponseEntity<?> removeAdmin(@PathVariable String tenantId, @PathVariable String identity,
                                          HttpServletRequest request) {
         return safeCall(() -> {
-            tenantService.removeAdmin(role(request), actor(request), tenantId, identity);
+            tenantService.removeAdmin(role(request), tenantId, identity);
             return Map.of("removed", identity);
         });
     }
@@ -86,7 +86,7 @@ public class TenantController {
                                              @RequestBody Map<String, Boolean> body, HttpServletRequest request) {
         boolean enabled = Boolean.TRUE.equals(body.getOrDefault("enabled", Boolean.TRUE));
         return safeCall(() -> {
-            tenantService.setAdminEnabled(role(request), actor(request), tenantId, identity, enabled);
+            tenantService.setAdminEnabled(role(request), tenantId, identity, enabled);
             return Map.of("identity", identity, "enabled", enabled);
         });
     }

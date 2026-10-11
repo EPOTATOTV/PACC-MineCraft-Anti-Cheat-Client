@@ -111,7 +111,7 @@ class RedscreenServiceTest {
     void inspectEnqueueFailureDegradesToZero() {
         prepFullFlow();
         Mockito.doThrow(new RuntimeException("queue down")).when(inspect)
-                .enqueue(anyString(), anyString(), Mockito.anyInt());
+                .enqueue(anyString(), anyString());
         RedscreenAlert alert = service.decideAndHandle("PT42", "killaura", 90, "bedrock", "查端失败");
         assertNotNull(alert);
     }
@@ -120,7 +120,7 @@ class RedscreenServiceTest {
     void webhookFailureDoesNotBlockRedscreen() {
         prepFullFlow();
         Mockito.doThrow(new RuntimeException("webhook down")).when(webhook)
-                .onRedscreen(Mockito.<RedscreenAlert>any(), Mockito.anyInt());
+                .onRedscreen(Mockito.<RedscreenAlert>any());
         RedscreenAlert alert = service.decideAndHandle("PT42", "killaura", 90, "bedrock", "推送失败");
         assertNotNull(alert);
     }
@@ -173,8 +173,8 @@ class RedscreenServiceTest {
         when(accountRepo.findById("PT42")).thenReturn(Optional.of(account));
         when(online.onlineCount()).thenReturn(5);
         when(online.broadcast(anyString())).thenReturn(3L);
-        when(inspect.enqueue(anyString(), anyString(), Mockito.anyInt())).thenReturn(1);
+        when(inspect.enqueue(anyString(), anyString())).thenReturn(1);
         when(cheatRepo.findTopByOrderByRecordHashDesc()).thenReturn(Optional.empty());
-        Mockito.doNothing().when(webhook).onRedscreen(Mockito.<RedscreenAlert>any(), Mockito.anyInt());
+        Mockito.doNothing().when(webhook).onRedscreen(Mockito.<RedscreenAlert>any());
     }
 }

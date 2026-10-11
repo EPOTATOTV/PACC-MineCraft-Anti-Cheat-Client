@@ -34,7 +34,7 @@ public class InspectService {
     private final OnlineStatusService onlineStatusService;
     private final InspectSignalBus inspectSignalBus;
 
-    public int enqueue(String pteid, String alertId, int level) {
+    public int enqueue(String pteid, String alertId) {
         InspectSession s = InspectSession.builder()
                 .sessionId(UUID.randomUUID().toString())
                 .pteid(pteid)

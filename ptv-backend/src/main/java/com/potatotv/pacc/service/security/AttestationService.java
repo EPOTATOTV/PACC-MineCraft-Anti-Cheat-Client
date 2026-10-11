@@ -97,7 +97,7 @@ public class AttestationService {
         Instant expiresAt = now.plusMillis(Math.max(0L, ttlMs));
         pending.put(challengeId, new Pending(nz(pteid), nz(platform), nz(clientVer),
                 nz(codeHash), nz(configHash), now, nonce));
-        log.debug("签发远程证明挑战 challengeId={} pteid={} ttlMs={}", challengeId, pteid, ttlMs);
+        log.debug("签发远程证明挑战 pteid={} ttlMs={}", pteid, ttlMs);
         return new Challenge(challengeId, nonce, now, expiresAt, ttlMs);
     }
 
@@ -239,7 +239,7 @@ public class AttestationService {
             records.save(rec);
         } catch (Exception e) {
             // 留痕失败不应把结论吞掉：客户端仍应拿到 PASS/FAIL 以驱动端侧行为
-            log.error("远程证明记录落库失败 challengeId={} status={}", challengeId, rec.getStatus(), e);
+            log.error("远程证明记录落库失败 status={}", rec.getStatus(), e);
         }
         if (!pass) {
             log.info("远程证明失败 pteid={} reason={} elapsedMs={}", pteid, reason, elapsedMs);

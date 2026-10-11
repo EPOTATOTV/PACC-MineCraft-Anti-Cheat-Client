@@ -4,9 +4,11 @@
 # 用法：
 #   ./scripts/sign-artifacts.sh 5.4.0
 #   ./scripts/sign-artifacts.sh 5.4.0 --verify      # 只做验签，不签名
+#   ./scripts/sign-artifacts.sh 5.4.0 --test        # 用测试证书签名（EV/WHQL 认证前的过渡方案）
 #
 # 证书一律走环境变量，不进仓库：
-#   Windows  PACC_WIN_CERT_PFX / PACC_WIN_CERT_PASSWORD   （EV 代码签名证书）
+#   Windows  PACC_WIN_CERT_PFX / PACC_WIN_CERT_PASSWORD             （EV 代码签名证书）
+#            PACC_WIN_TEST_CERT_PFX / PACC_WIN_TEST_CERT_PASSWORD   （测试证书，--test 模式使用）
 #   Android  PACC_ANDROID_KEYSTORE / PACC_ANDROID_KEY_ALIAS / PACC_ANDROID_KEYSTORE_PASSWORD
 #   JAR      PACC_JAR_KEYSTORE / PACC_JAR_KEY_ALIAS / PACC_JAR_KEYSTORE_PASSWORD
 #   iOS      macOS 上由 Xcode 自动处理（钥匙串里的 Apple Developer 证书）
@@ -58,21 +60,41 @@ sign_windows() {
     return 0
   fi
 
-  if [ -z "${PACC_WIN_CERT_PFX:-}" ] || [ -z "${PACC_WIN_CERT_PASSWORD:-}" ]; then
-    skip "Windows 签名" "未配置 PACC_WIN_CERT_PFX / PACC_WIN_CERT_PASSWORD"
+  # 证书选择：默认走 EV 正式证书；--test 走测试证书（EV / WHQL 认证前的过渡方案）
+  local cert_pfx cert_pwd label
+  if [ "$MODE" = "--test" ]; then
+    cert_pfx="${PACC_WIN_TEST_CERT_PFX:-}"
+    cert_pwd="${PACC_WIN_TEST_CERT_PASSWORD:-}"
+    label="测试签名"
+  else
+    cert_pfx="${PACC_WIN_CERT_PFX:-}"
+    cert_pwd="${PACC_WIN_CERT_PASSWORD:-}"
+    label="EV 签名"
+  fi
+
+  if [ -z "$cert_pfx" ] || [ -z "$cert_pwd" ]; then
+    skip "Windows 签名" "未配置证书（${label}）"
     return 0
+  fi
+
+  if [ "$MODE" = "--test" ]; then
+    echo "  [注意] 使用测试证书签名：仅供内部测试机安装验证，正式发布必须换 EV 证书并完成 WHQL 认证。"
   fi
 
   while IFS= read -r f; do
     # /fd sha256 + RFC3161 时间戳：没有时间戳的签名在证书到期后即失效
-    signtool sign /f "$PACC_WIN_CERT_PFX" /p "$PACC_WIN_CERT_PASSWORD" \
+    signtool sign /f "$cert_pfx" /p "$cert_pwd" \
       /tr http://timestamp.digicert.com /td sha256 /fd sha256 "$f"
-    ok "已签名：$(basename "$f")"
+    ok "已签名（${label}）：$(basename "$f")"
   done <<<"$files"
 
   if find "$BUILD_DIR" -maxdepth 1 -iname '*.sys' | grep -q .; then
-    echo "  注意：内核驱动 .sys 需 WHQL 认证才能被 64 位 Windows 正式加载，"
-    echo "        Alpha 阶段可先用 bcdedit /set testsigning on 的测试签名环境。"
+    echo "  注意：内核驱动 .sys 需 WHQL 认证才能被 64 位 Windows 正式加载。"
+    if [ "$MODE" = "--test" ]; then
+      echo "       测试签名的驱动只能在 bcdedit /set testsigning on 的测试机加载。"
+    else
+      echo "       EV 签名后仍需完成 WHQL 认证与微软签名，正式机方可加载。"
+    fi
   fi
 }
 
@@ -182,6 +204,7 @@ sign_harmony() {
 
 mode_label="签名"
 [ "$MODE" = "--verify" ] && mode_label="验签"
+[ "$MODE" = "--test" ] && mode_label="测试签名"
 echo "== PACC ${VERSION} 发布件${mode_label} =="
 echo "-- Windows（Authenticode / WHQL）--"; sign_windows
 echo "-- Android（APK Signature v2/v3/v4）--"; sign_android

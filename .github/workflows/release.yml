@@ -550,7 +550,8 @@ jobs:
 
   # ---- Windows 客户端安装包（Tauri 壳 + WPF 诊断工具 + Inno 安装包）----
   # 复用 ubuntu build 产出的前端 dist 与 ptv-client jar，避免在 Windows 上重跑前端构建。
-  # 代码签名 / WHQL 属外部事务：缺证书只 ::notice 跳过，绝不让流水线失败。
+  # 代码签名 / WHQL 属外部事务：配置了 EV 证书走正式签名；未配置时回退为 CI 现场生成的
+  # 测试证书做测试签名（TEST-SIGNED，仅测试机可用），两者都不让流水线失败。
   build-windows:
     name: 构建 Windows 客户端安装包
     # 必须等 build 完成：本 job 要下载它产出的 release-artifacts（前端 dist + ptv-client jar）
@@ -690,30 +691,50 @@ jobs:
           }
           Get-ChildItem release-win
 
-      - name: 代码签名（可选，缺证书不失败）
+      - name: 代码签名（EV 证书缺失时回退测试签名）
         shell: pwsh
         env:
           CERT_B64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           CERT_PWD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:CERT_B64) -or [string]::IsNullOrWhiteSpace($env:CERT_PWD)) {
-            Write-Host '::notice::未配置 WINDOWS_CERT_PFX_BASE64 / WINDOWS_CERT_PASSWORD，跳过 EV 代码签名（不视为失败）'
-            exit 0
-          }
-          $pfx = Join-Path $env:RUNNER_TEMP 'pacc-sign.pfx'
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
           $signtool = (Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
                        Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1 -ExpandProperty FullName)
           if (-not $signtool) {
             Write-Host '::warning::未找到 signtool.exe，跳过签名（不视为失败）'
             exit 0
           }
-          $targets = Get-ChildItem release-win -Recurse -File | Where-Object { $_.Extension -in '.exe', '.msi' }
+
+          $targets = Get-ChildItem release-win -Recurse -File | Where-Object { $_.Extension -in '.exe', '.msi', '.sys' }
+          if (-not $targets) { Write-Host 'release-win 下没有可签名的 exe/msi/sys'; exit 0 }
+
+          $pfx = Join-Path $env:RUNNER_TEMP 'pacc-sign.pfx'
+          $isTest = $false
+          if (-not [string]::IsNullOrWhiteSpace($env:CERT_B64) -and -not [string]::IsNullOrWhiteSpace($env:CERT_PWD)) {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_B64))
+            $pwd = $env:CERT_PWD
+            Write-Host '使用 EV 代码签名证书（正式签名）'
+          } else {
+            # EV / WHQL 认证前的过渡：CI 现场生成测试证书做测试签名，
+            # 便于在测试机验证安装与驱动加载；绝不用于对外发布。
+            $pwd = -join ((1..24) | ForEach-Object { [char[]]'abcdefghijklmnopqrstuvwxyz0123456789' | Get-Random })
+            & (Join-Path $env:GITHUB_WORKSPACE 'scripts/gen-test-cert.ps1') -OutPfx $pfx -Password $pwd -Force
+            if ($LASTEXITCODE -ne 0) { throw '生成测试证书失败' }
+            $isTest = $true
+            Write-Host '::warning::未配置 EV 证书，本次使用测试签名（TEST-SIGNED，仅测试机可用）'
+          }
+
           foreach ($t in $targets) {
-            & $signtool sign /fd SHA256 /f $pfx /p $env:CERT_PWD /tr http://timestamp.digicert.com /td SHA256 $t.FullName
+            & $signtool sign /fd SHA256 /f $pfx /p $pwd /tr http://timestamp.digicert.com /td SHA256 $t.FullName
             if ($LASTEXITCODE -ne 0) { throw ("签名失败：{0}" -f $t.FullName) }
           }
           Remove-Item $pfx -Force
+          if ($isTest) {
+            Set-Content -Path release-win/SIGNING-NOTICE.txt -Encoding utf8 -Value @(
+              'TEST-SIGNED'
+              '本次 Windows 产物使用测试证书签名，仅供内部测试机 / testsigning 环境验证。'
+              '正式分发前必须替换为微软 EV 代码签名证书，并完成内核驱动 WHQL 认证。'
+            )
+          }
 
       - name: 生成校验和与下载站版本清单
         shell: pwsh

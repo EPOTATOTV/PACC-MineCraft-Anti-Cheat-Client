@@ -11,6 +11,8 @@
 #
 # 说明：EV 代码签名、WHQL 认证属外部事务，本脚本不依赖签名结果；
 #       缺少内核驱动 inf 时只告警、不失败（内核组件为可选）。
+#       在未取得 WHQL 认证前，可用测试签名驱动：指定 -EnableTestSigning 打开测试签名模式
+#       （bcdedit /set testsigning on，需重启），仅在测试机使用。
 
 [CmdletBinding()]
 param(
@@ -18,6 +20,7 @@ param(
     [string]$DataDir    = (Join-Path $env:ProgramData  "PACC"),
     [switch]$SkipDriver,
     [switch]$SkipAutostart,
+    [switch]$EnableTestSigning,
     [switch]$Uninstall
 )
 
@@ -167,6 +170,19 @@ pacc.client.keyboard-lock.enabled=true
     Write-Log ("已生成默认配置基线：{0}" -f $cfg) OK
 }
 
+function Get-TestSigningState {
+    # 读取当前启动项的 testsigning 状态；返回 $true/$false/$null（无法判定）
+    try {
+        $out = & bcdedit.exe /enum "{current}" 2>$null
+        foreach ($line in $out) {
+            if ($line -match '^\s*testsigning\s+(Yes|No)') { return ($Matches[1] -eq 'Yes') }
+        }
+        return $false
+    } catch {
+        return $null
+    }
+}
+
 function Install-Driver {
     if ($SkipDriver) {
         Write-Log "已指定 -SkipDriver，跳过内核组件安装" WARN
@@ -176,6 +192,18 @@ function Install-Driver {
     if (-not (Test-Path $inf)) {
         Write-Log ("未发现内核驱动 inf（{0}），跳过内核组件安装（可选组件，不算失败）" -f $inf) WARN
         return
+    }
+
+    # WHQL 认证前的过渡：显式开启测试签名模式，测试签名的 .sys 才能被加载。
+    # 会修改本机启动配置且需重启，仅测试机使用。
+    if ($EnableTestSigning) {
+        Write-Log "启用测试签名模式（bcdedit /set testsigning on）——仅测试机使用" WARN
+        & bcdedit.exe /set testsigning on | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "已启用测试签名；需重启后生效。正式发布请改用 EV 签名 + WHQL 认证。" WARN
+        } else {
+            Write-Log ("bcdedit 返回 {0}（可能未关闭安全启动 / 非管理员）" -f $LASTEXITCODE) WARN
+        }
     }
 
     Write-Log ("安装内核驱动：{0}" -f $inf)
@@ -196,6 +224,10 @@ function Install-Driver {
     & sc.exe start $DriverServiceName | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Write-Log ("sc start 返回 {0}（可能已在运行，或驱动未签名被拒）" -f $LASTEXITCODE) WARN
+        # 驱动启动失败且当前未开测试签名时，给出测试签名加载指引
+        if (-not $EnableTestSigning -and (Get-TestSigningState) -ne $true) {
+            Write-Log "若该驱动为测试签名：请以管理员执行 bcdedit /set testsigning on 后重启，再运行安装（或加 -EnableTestSigning）。" WARN
+        }
     } else {
         Write-Log ("内核驱动服务 {0} 已启动（设备 {1}）" -f $DriverServiceName, $DriverDeviceName) OK
     }

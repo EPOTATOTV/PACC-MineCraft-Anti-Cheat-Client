@@ -1,0 +1,51 @@
+; PaccPtv.inf —— PACC Windows 内核组件（进程 / 内存 / 驱动签名取证 + 键盘输入暂停）
+;
+; 供 tools/windows-gui/deploy/installer.ps1 用 pnputil 安装：
+;   pnputil /add-driver <InstallDir>\drivers\PaccPtv.inf /install
+;   sc create PaccPtv type= kernel binPath= "system32\drivers\PaccPtv.sys" start= demand
+;
+; 构建与签名：
+;   - 在 WDK10 x64 开发者命令提示符下 msbuild 产出 PaccPtv.sys；
+;   - 正式发布：EV 代码签名证书 + 微软 WHQL 认证；
+;   - 认证前的测试阶段：scripts/gen-test-cert.ps1 生成测试证书，
+;     scripts/sign-artifacts.sh --test 对 .sys 测试签名，目标机需 bcdedit /set testsigning on。
+;
+; 键盘过滤（pacc_kbdfilter.c）以 kbfiltr 式过滤驱动实现，运行期由驱动在
+; IOCTL_INTERNAL_KEYBOARD_CONNECT 上包装 kbdclass 回调；如需在键盘类设备栈上常驻，
+; 需另行把 PaccPtv 追加到键盘类设备的 UpperFilters（见 deploy/installer.ps1 说明）。
+; 本 INF 只登记内核组件本体与设备服务，不修改键盘类注册表。
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = System
+ClassGuid   = {4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider    = %ProviderName%
+CatalogFile = PaccPtv.cat
+DriverVer   = 10/11/2026,5.4.0.0
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[Manufacturer]
+%ProviderName% = PACC,NTamd64
+
+[PACC.NTamd64]
+%PaccPtv.SvcDesc% = PaccPtv_Inst, ROOT\PaccPtv
+
+[PaccPtv_Inst.NTamd64]
+CopyFiles = @PaccPtv.sys
+
+[PaccPtv_Inst.NTamd64.Services]
+AddService = PaccPtv, 0x00000002, PaccPtv_Service
+
+[PaccPtv_Service]
+DisplayName    = %PaccPtv.SvcDesc%
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = %12%\PaccPtv.sys
+
+[Strings]
+ProviderName    = "PACC"
+PaccPtv.SvcDesc = "PACC Kernel Protection Filter"

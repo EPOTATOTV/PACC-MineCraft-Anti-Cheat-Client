@@ -6,6 +6,9 @@
 从 v5.4.0 起，发布件由 `scripts/build-all.sh` 一条命令产出，并在 `dist/<version>/SHA256SUMS.txt`
 给出全部产物的校验和。签名走 `scripts/sign-artifacts.sh`。
 
+本日志覆盖项目自 2026-08-29 首个提交至今的全部开发过程：4.x 系列、5.0 → 5.4.0、DF Alpha 主线，
+以及 10-11 落地「玩家端 + 服务端插件」双模式的推送。最早期的迭代记录见文末。
+
 ---
 
 ## [Unreleased]
@@ -28,6 +31,14 @@ Windows 正式推送完善：补齐键盘锁真实实施、安装流程、发布
 - **远程查端闭环**：后端新增 `GET /api/admin/webrtc/ice-servers`（含 TURN 配置检测），查端会话 30 分钟超时自动回收，
   结论强制为 `CONFIRMED_CHEAT` / `FALSE_POSITIVE` / `PENDING` 三值；前端接入 ICE 配置、强制结论与玩家侧提示。
 - **桌面红屏 / 协议视图**（`ptv-frontend`）：桌面壳注入 `window.__PACC_VIEW__` 后渲染专用全屏红屏视图与协议确认视图。
+- **WHQL / EV 测试签名链路**：`scripts/gen-test-cert.ps1` 用 `New-SelfSignedCertificate` 生成代码签名测试证书（可选导入受信任存储，
+  需管理员）；`platform/kernel-windows/PaccPtv.inf` 补齐驱动安装包描述，供 `pnputil /add-driver` 使用；
+  `scripts/sign-artifacts.sh --test` 走测试证书签名，正式路径仍走 EV 证书；`release.yml` 的 `build-windows` 在缺少
+  EV 证书时自动回退测试签名，并生成 `SIGNING-NOTICE.txt` 标记为 TEST-SIGNED；`installer.ps1` 新增 `-EnableTestSigning`
+  在测试机上自动 `bcdedit /set testsigning on`。正式 EV 证书与 WHQL 认证待采购后接入，接口已就位。
+- **服务端检测器单元测试**（`pacc-server-core`）：为 `ClientBrandCheck`、`InventoryCheck`、`InteractionCheck`、
+  `DataConsistencyCheck` 补齐单元测试，覆盖大小写不敏感的作弊客户端 / 模组命中、进食与换图腾的间隔阈值、
+  同刻快速放置与向下堆叠的搭桥判定、数据偏差 15% 阈值。服务端核心测试数增至 48 条，`mvn -B test` 全绿。
 
 ### 改进
 
@@ -43,7 +54,9 @@ Windows 正式推送完善：补齐键盘锁真实实施、安装流程、发布
 
 ### 已知问题
 
-- 内核驱动尚未完成 WHQL 认证与 EV 代码签名（本次不处理），无签名环境下安装会提示驱动来源。
+- 内核驱动的正式 WHQL 认证与 EV 代码签名尚未取得，当前发布走**测试签名**：目标机需开启
+  `bcdedit /set testsigning on`（或安装时用 `installer.ps1 -EnableTestSigning`）才能加载，
+  未开启时系统会提示驱动来源。测试签名仅用于内部验证，不作为正式分发形态。
 - Rust 桌面壳发行 profile 已开启 `strip` / `lto`，未引入额外的二进制混淆器。
 
 ---
@@ -257,3 +270,31 @@ Windows 正式推送完善：补齐键盘锁真实实施、安装流程、发布
 ### 改进
 
 - 整合安全加固与全量功能迭代。
+
+---
+
+## [4.0.1] - 2026-08-29
+
+项目起点（仓库最早提交）。当时以「V4_0_1」为内部版本号快速迭代，随后在 08-30 ~ 08-31 收敛为对外的
+v4.0 正式版；本条目是这条主线的源头。
+
+### 新增
+
+- 客户端与服务端首版完整实现（`PACC_V4_0_1`）。
+- 赛事反作弊系统与玩家门户的初始版本。
+
+### 改进
+
+- 补齐项目说明（README）。
+
+### 修复
+
+- `4.0.1.1` → `4.0.1.4` 连续修复早期缺陷。
+
+---
+
+## [4.0.0-rc] - 2026-08-30
+
+- 发布 PACC v4.0 正式版基线，完成全量功能迭代。
+- 认证迁移到 HttpOnly cookie，移除本地存储密钥。
+- 补充生产环境部署指南与一键部署脚本。

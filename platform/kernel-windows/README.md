@@ -75,6 +75,11 @@ kernel-windows/
 msbuild /t:build /p:Configuration=Release /p:TargetVersion=Win10
 ```
 产出 `PaccPtv.sys`，经 EV 签名 + WHQL 后随玩家端安装包发布。
+安装用 INF 见 `PaccPtv.inf`（供 `deploy/installer.ps1` 的 `pnputil /add-driver` 使用）。
+
+WHQL / EV 认证前的测试阶段：用 `scripts/gen-test-cert.ps1` 生成测试证书，
+再 `scripts/sign-artifacts.sh 5.4.0 --test` 做测试签名；目标机需 `bcdedit /set testsigning on` 才能加载。
+安装时给 `deploy/installer.ps1` 加 `-EnableTestSigning` 可自动打开测试签名模式（仅测试机）。
 
 ## 说明
 本源码为反作弊取证用途：仅当玩家显式安装反作弊系统且同意其条款时部署。

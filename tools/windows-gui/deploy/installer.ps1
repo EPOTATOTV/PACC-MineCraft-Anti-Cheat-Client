@@ -1,4 +1,4 @@
-﻿# PACC Windows 客户端安装编排脚本
+﻿﻿# PACC Windows 客户端安装编排脚本
 #
 # 调用方：
 #   - 安装包（Inno Setup，见 tools/installer/pacc-client-installer.iss）：安装后经 [Run] 调用，

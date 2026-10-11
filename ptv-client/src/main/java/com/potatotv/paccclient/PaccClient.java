@@ -94,11 +94,14 @@ public final class PaccClient {
         // 由 Java 客户端（持真实 JWT）写本地文件，Tauri 桥读取后注入 /screen-share 页。
         writeScreenShareCredentials(pteid, token);
 
+        // 让红屏接收器知道本机 PTEID，用于把广播告警判定为「本机被检测」还是「他机公示」
+        RedscreenReceiver.setLocalPteid(pteid);
+
         RedScreenStatePersistence redscreenState =
                 new RedScreenStatePersistence(storeDir.resolve("redscreen.enc"), storePassword);
         redscreenState.loadActive().ifPresent(active -> {
             System.out.println("[PTV-Client] 检测到未解除红屏，重启恢复 level=" + active.level());
-            RedscreenReceiver.markActive(active.level());
+            RedscreenReceiver.markActive(active.level(), active.masked(), active.cheatType(), active.risk());
             FullScreenRed.show(active.level(), active.cheatType(), active.masked(), active.risk());
         });
         RedscreenReceiver.init(redscreenState);

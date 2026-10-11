@@ -6,6 +6,8 @@ import java.awt.*;
 /**
  * 全屏红屏警告界面：全屏红色、置顶、永久保留（直至管理员查端解除）。
  * Swing AWT/S2 实现，独立于游戏窗口。
+ * <p>桌面模式（{@code PACC_DESKTOP_SHELL=tauri}）下由 Tauri 壳渲染多显示器红屏，
+ * 本类仅作为无桌面壳时的降级实现。</p>
  */
 public final class FullScreenRed {
 
@@ -13,9 +15,14 @@ public final class FullScreenRed {
 
     /**
      * 展示红屏警告。level=2 二级 / level=3 三级（严重）。
+     * <p>仅被检测者暂停输入；其它在线玩家收到的是公示红屏，保留键盘并带「继续」按钮。</p>
      */
     public static void show(int level, String cheatType, String pteidMasked, String riskScore) {
-        KeyboardLock.lock();
+        boolean isTarget = RedscreenReceiver.activeIsTarget();
+        if (isTarget) {
+            KeyboardLock.lock();
+        }
+        if (desktopShellManaged()) return;  // 由 Tauri 壳渲染红屏，Java 不再创建窗口
         SwingUtilities.invokeLater(() -> {
             if (frame != null) frame.dispose();
             frame = new JFrame("PACC 反作弊警告");
@@ -25,8 +32,12 @@ public final class FullScreenRed {
             frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
             frame.setBackground(Color.RED);  // 置为红
 
-            String headline = level >= 3 ? "严重作弊嫌疑" : "检测到可疑行为";
-            String tip = "请保持现状等待管理员远程查端。输入已暂停，勿关闭本窗口。";
+            String headline = isTarget
+                    ? (level >= 3 ? "严重作弊嫌疑" : "检测到可疑行为")
+                    : "反作弊公示";
+            String tip = isTarget
+                    ? "请保持现状等待管理员远程查端。输入已暂停，勿关闭本窗口。"
+                    : "本机未被判定为作弊，可直接点击下方按钮继续游戏。";
 
             JPanel panel = new JPanel(new GridBagLayout());
             panel.setBackground(new Color(0xE0, 0x00, 0x00));
@@ -56,9 +67,17 @@ public final class FullScreenRed {
             panel.add(sub, c);
             panel.add(tipLabel, c);
 
+            if (!isTarget) {
+                JButton cont = new JButton("继续");
+                cont.setFont(new Font(Font.DIALOG, Font.BOLD, 20));
+                cont.setFocusPainted(false);
+                cont.addActionListener(e -> dismiss());
+                panel.add(cont, c);
+            }
+
             frame.setContentPane(panel);
             frame.setLocationByPlatform(true);
-            frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+            frame.setCursor(isTarget ? Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR) : Cursor.getDefaultCursor());
             frame.setVisible(true);
             frame.toFront();
             frame.repaint();
@@ -74,5 +93,10 @@ public final class FullScreenRed {
                 frame = null;
             }
         });
+    }
+
+    /** 是否由 Tauri 桌面壳托管（壳渲染红屏，Java 不再创建 Swing 窗口）。 */
+    private static boolean desktopShellManaged() {
+        return "tauri".equalsIgnoreCase(System.getenv("PACC_DESKTOP_SHELL"));
     }
 }

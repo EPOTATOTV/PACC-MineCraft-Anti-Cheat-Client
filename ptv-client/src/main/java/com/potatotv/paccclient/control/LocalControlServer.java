@@ -1,6 +1,7 @@
 package com.potatotv.paccclient.control;
 
 import com.potatotv.paccclient.Json;
+import com.potatotv.paccclient.redscreen.KeyboardLock;
 import com.potatotv.paccclient.redscreen.RedscreenReceiver;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -109,6 +110,7 @@ public final class LocalControlServer {
                 case "GET /detections" -> detections(ex);
                 case "GET /config" -> respond(ex, 200, configJson());
                 case "POST /config" -> applyConfig(ex);
+                case "POST /enforcement" -> enforcement(ex);
                 default -> respond(ex, 404, Json.encode(Map.of("error", "not_found")));
             }
         } catch (Exception e) {
@@ -171,6 +173,32 @@ public final class LocalControlServer {
         }
     }
 
+    /**
+     * 键盘锁实施状态回报：由 Tauri 壳在实施/解除键盘锁后调用，把真实实施结果
+     * （是否上锁、后端 kernel|hook|none、驱动是否活动）写回状态镜像。
+     * {@code redscreen_shown} 仅校验存在，暂不落库。
+     */
+    private void enforcement(HttpExchange ex) throws IOException {
+        String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        try {
+            Map<String, Object> src = Json.decodeObject(body);
+            Object locked = src.get("keyboard_locked");
+            Object backend = src.get("keyboard_backend");
+            Object driver = src.get("driver_active");
+            if (!(locked instanceof Boolean b)) throw new IllegalArgumentException("keyboard_locked 必须是布尔");
+            if (!(backend instanceof String s) || s.isBlank()) throw new IllegalArgumentException("keyboard_backend 缺失");
+            if (!(driver instanceof Boolean d)) throw new IllegalArgumentException("driver_active 必须是布尔");
+            if (!src.containsKey("redscreen_shown")) throw new IllegalArgumentException("redscreen_shown 缺失");
+            if (b) KeyboardLock.lock();
+            else KeyboardLock.unlock();
+            KeyboardLock.reportBackend(s);
+            KeyboardLock.setDriverActive(d);
+            respond(ex, 200, Json.encode(Map.of("ok", true)));
+        } catch (Exception e) {
+            respond(ex, 400, Json.encode(Map.of("error", e.getMessage())));
+        }
+    }
+
     private String statusJson() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("running", controller.isRunning());
@@ -184,6 +212,12 @@ public final class LocalControlServer {
         m.put("last_event_type", controller.lastEventType());
         m.put("redscreen_active", RedscreenReceiver.activeLevel() > 0);
         m.put("redscreen_level", RedscreenReceiver.activeLevel());
+        m.put("redscreen_is_target", RedscreenReceiver.activeIsTarget());
+        m.put("redscreen_cheat_type", RedscreenReceiver.activeCheatType());
+        m.put("redscreen_risk_score", RedscreenReceiver.activeRiskScore());
+        m.put("keyboard_locked", KeyboardLock.isLocked());
+        m.put("keyboard_backend", KeyboardLock.backend());
+        m.put("driver_active", KeyboardLock.isDriverActive());
         return Json.encode(m);
     }
 

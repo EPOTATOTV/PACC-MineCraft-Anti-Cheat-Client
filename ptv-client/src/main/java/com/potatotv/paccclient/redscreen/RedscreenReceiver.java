@@ -15,10 +15,24 @@ public final class RedscreenReceiver {
     private static RedScreenStatePersistence persistence;
     private static volatile int activeLevel;
     private static volatile long activeSince;
+    /** 本机玩家的真实 PTEID，用于判定告警是否指向本机；未注入时为 null。 */
+    private static volatile String localPteid;
+    /** 当前红屏是否针对本机玩家（决定是否锁键盘、是否显示「继续」按钮）。 */
+    private static volatile boolean activeIsTarget;
+    private static volatile String activeCheatType = "unknown";
+    private static volatile String activeRiskScore = "0";
     /** 红屏激活回调（level, alertId）；未注册时为 null。 */
     private static volatile java.util.function.BiConsumer<Integer, String> onActivated;
 
     private RedscreenReceiver() {
+    }
+
+    /**
+     * 注入本机玩家 PTEID（登录后调用），用于把广播告警判定为「本机被检测」还是「他机公示」。
+     * 不注入时 {@link #activeIsTarget()} 保守返回 true，避免被检测者绕过锁定。
+     */
+    public static void setLocalPteid(String pteid) {
+        localPteid = pteid;
     }
 
     /** 注册红屏激活回调（重复注册以最后一次为准）。 */
@@ -40,15 +54,45 @@ public final class RedscreenReceiver {
         return activeSince;
     }
 
-    /** 供启动时重启恢复红屏路径设置激活态（保持控制服务状态一致）。 */
-    public static void markActive(int level) {
+    /** 当前红屏是否针对本机玩家：仅被检测者锁键盘、无「继续」按钮。 */
+    public static boolean activeIsTarget() {
+        return activeIsTarget;
+    }
+
+    public static String activeCheatType() {
+        return activeCheatType;
+    }
+
+    public static String activeRiskScore() {
+        return activeRiskScore;
+    }
+
+    /**
+     * 标记红屏激活态，并按持久化/下发的脱敏 PTEID 判定是否指向本机。
+     * 无法判定（未注入本机 PTEID 或脱敏值缺失）时保守视为被检测者。
+     */
+    public static void markActive(int level, String pteidMasked, String cheatType, String riskScore) {
         activeLevel = Math.max(1, level);
         activeSince = System.currentTimeMillis();
+        activeCheatType = cheatType == null || cheatType.isBlank() ? "unknown" : cheatType;
+        activeRiskScore = riskScore == null || riskScore.isBlank() ? "0" : riskScore;
+        String local = localPteid;
+        activeIsTarget = local == null || local.isBlank() || pteidMasked == null || pteidMasked.isBlank()
+                || mask(local).equals(pteidMasked);
     }
 
     private static void markClear() {
         activeLevel = 0;
         activeSince = 0;
+        activeIsTarget = false;
+        activeCheatType = "unknown";
+        activeRiskScore = "0";
+    }
+
+    /** 脱敏算法需与服务端 {@code RedscreenService.mask} 保持一致。 */
+    private static String mask(String pteid) {
+        if (pteid == null || pteid.length() < 4) return "****";
+        return pteid.substring(0, 2) + "***" + pteid.substring(pteid.length() - 2);
     }
 
     /** 通知红屏激活（回调异常绝不影响红屏本身）。 */
@@ -72,7 +116,7 @@ public final class RedscreenReceiver {
                 String risk = stringOf(json, "risk_score", "0");
                 String alertId = stringOf(json, "alert_id", "");
                 if (persistence != null) persistence.setActive(level, type, pteid, risk);
-                markActive(level);
+                markActive(level, pteid, type, risk);
                 FullScreenRed.show(level, type, pteid, risk);
                 notifyActivated(level, alertId);
             } else if (json.contains("\"type\":\"mitigation\"")) {

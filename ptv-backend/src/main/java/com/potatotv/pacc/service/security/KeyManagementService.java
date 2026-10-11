@@ -4,6 +4,7 @@ import com.potatotv.pacc.domain.KeyAuditLog;
 import com.potatotv.pacc.domain.ManagedKey;
 import com.potatotv.pacc.repository.KeyAuditLogRepository;
 import com.potatotv.pacc.repository.ManagedKeyRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -164,7 +165,7 @@ public class KeyManagementService {
         }
         // create 会把同用途当前 ACTIVE（即 current）降级为 ROTATED 并写 ROTATE 审计，随后落新版本
         ManagedKey rotated = create(current.getPurpose(), operator, note);
-        log.info("托管密钥轮换 old={} new={} 操作者={}", keyId, rotated.getKeyId(), blank(operator));
+        log.info("托管密钥轮换 old={} new={} 操作者={}", LogSanitizer.clean(keyId), LogSanitizer.clean(rotated.getKeyId()), LogSanitizer.clean(blank(operator)));
         return rotated;
     }
 
@@ -190,7 +191,7 @@ public class KeyManagementService {
         key.setRevokeReason(blank(reason));
         keyRepository.save(key);
         appendAudit(keyId, KeyAuditLog.Action.REVOKE, from, ManagedKey.State.REVOKED.name(), operator, reason);
-        log.warn("托管密钥吊销 key_id={} 原因={} 操作者={}", keyId, blank(reason), blank(operator));
+        log.warn("托管密钥吊销 key_id={} 原因={} 操作者={}", LogSanitizer.clean(keyId), LogSanitizer.clean(blank(reason)), LogSanitizer.clean(blank(operator)));
         return key;
     }
 

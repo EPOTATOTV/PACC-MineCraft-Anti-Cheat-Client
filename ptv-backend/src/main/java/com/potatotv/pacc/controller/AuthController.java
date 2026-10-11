@@ -9,6 +9,7 @@ import com.potatotv.pacc.service.TokenService;
 import com.potatotv.pacc.service.TotpService;
 import com.potatotv.pacc.service.VerifyCodeService;
 import com.potatotv.pacc.service.sms.SmsProvider;
+import com.potatotv.pacc.util.LogSanitizer;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.HttpServletRequest;
@@ -116,7 +117,7 @@ public class AuthController {
             // 本地联调 stub：邮箱命中时返回可用的重置链接
             if (token != null) {
                 out.put("dev_link", "/portal/forget?token=" + token);
-                log.info("[邮件stub] 密码重置链接(仅演示)：{}", token);
+                log.info("[邮件stub] 已生成密码重置链接（仅演示，链接经响应返回）");
             }
         } else if (token != null && mailSender != null) {
             // 真实发送：仅当邮箱存在且已配置 SMTP 时才发送，未命中不暴露
@@ -139,9 +140,9 @@ public class AuthController {
             h.setText("您好：\n\n收到密码重置请求。请在 15 分钟内打开以下链接设置新密码：\n\n"
                     + link + "\n\n如非本人操作，请忽略此邮件。来自 PACC 反作弊系统。", false);
             mailSender.send(m);
-            log.info("已向 {} 发送密码重置邮件", email);
+            log.info("已向 {} 发送密码重置邮件", LogSanitizer.clean(email));
         } catch (MessagingException e) {
-            log.error("发送密码重置邮件失败 email={} err={}", email, e.getMessage());
+            log.error("发送密码重置邮件失败 email={} err={}", LogSanitizer.clean(email), LogSanitizer.clean(e.getMessage()));
         }
     }
 
@@ -166,7 +167,7 @@ public class AuthController {
         String ip = clientIp(request);
         // 双维度限流：同一来源 IP + 同一目标，防批量轰炸
         if (!throttle.allowed("code:send:ip:" + ip) || !throttle.allowed("code:send:" + target)) {
-            log.warn("验证码发送被限流 target={} ip={}", maskTarget(target), ip);
+            log.warn("验证码发送被限流 target={} ip={}", LogSanitizer.clean(maskTarget(target)), LogSanitizer.clean(ip));
             return ResponseEntity.status(429).body(Map.of("error", "验证码发送过频，请稍后再试"));
         }
         String code = verifyCodeService.issue(target, scene);
@@ -176,11 +177,11 @@ public class AuthController {
         }
         if (target.contains("@")) {
             if (mailStub) {
-                log.info("[验证码stub] 发往 {} 的验证码={}", target, code);
+                log.info("[验证码stub] 发往 {} 的验证码={}", LogSanitizer.clean(target), code);
             } else if (mailSender != null) {
                 sendOtpMail(target, scene, code);
             } else {
-                log.warn("SMTP 未配置且未启用 stub，验证码未发送 target={}", target);
+                log.warn("SMTP 未配置且未启用 stub，验证码未发送 target={}", LogSanitizer.clean(target));
                 return ResponseEntity.ok(Map.of("ok", true, "message", "验证码已发送"));
             }
         } else {
@@ -219,9 +220,9 @@ public class AuthController {
             h.setText("您好：\n\n您正在" + sceneLabel + "，本次验证码为：\n\n" + code
                     + "\n\n10 分钟内有效，如非本人操作请忽略。来自 PACC 反作弊系统。", false);
             mailSender.send(m);
-            log.info("已向 {} 发送{}验证码", email, sceneLabel);
+            log.info("已向 {} 发送{}验证码", LogSanitizer.clean(email), sceneLabel);
         } catch (MessagingException e) {
-            log.error("发送{}验证码失败 email={} err={}", sceneLabel, email, e.getMessage());
+            log.error("发送{}验证码失败 email={} err={}", sceneLabel, LogSanitizer.clean(email), LogSanitizer.clean(e.getMessage()));
         }
     }
 
@@ -241,11 +242,11 @@ public class AuthController {
         // 长窗锁定优先于短窗限流：短窗已放行但仍在 15 分钟锁定窗口内时同样拒绝。
         // 与限流共用 429 与同一句文案，不暴露「被锁定」这一状态，避免账号枚举。
         if (lockout.isLocked(idScope) || lockout.isLocked(ipScope)) {
-            log.warn("玩家登录被临时锁定 identity={} ip={}", identity, ip);
+            log.warn("玩家登录被临时锁定 identity={} ip={}", LogSanitizer.clean(identity), LogSanitizer.clean(ip));
             return ResponseEntity.status(429).body(Map.of("error", "尝试过于频繁，请稍后再试"));
         }
         if (!throttle.allowed(idScope) || !throttle.allowed(ipScope)) {
-            log.warn("玩家登录被限流 identity={} ip={}", identity, ip);
+            log.warn("玩家登录被限流 identity={} ip={}", LogSanitizer.clean(identity), LogSanitizer.clean(ip));
             return ResponseEntity.status(429).body(Map.of("error", "尝试过于频繁，请稍后再试"));
         }
         try {
@@ -294,7 +295,7 @@ public class AuthController {
             lockout.recordFailure(idScope);
             lockout.recordFailure(ipScope);
             lockout.applyProgressiveDelay(idScope);
-            log.warn("玩家登录失败 ip={}: {}", ip, e.getMessage());
+            log.warn("玩家登录失败 ip={}: {}", LogSanitizer.clean(ip), LogSanitizer.clean(e.getMessage()));
             // 统一文案：不区分「账号不存在」与「密码错误」，防止账号枚举
             return ResponseEntity.status(401).body(Map.of("error", "账号或密码错误"));
         } catch (IllegalStateException e) {
@@ -302,7 +303,7 @@ public class AuthController {
             throttle.hit(ipScope);
             lockout.recordFailure(idScope);
             lockout.recordFailure(ipScope);
-            log.warn("玩家登录被锁定 ip={}: {}", ip, e.getMessage());
+            log.warn("玩家登录被锁定 ip={}: {}", LogSanitizer.clean(ip), LogSanitizer.clean(e.getMessage()));
             // 与“账号/密码错误”一致返回 401，不暴露锁定与账号状态（防枚举）
             return ResponseEntity.status(401).body(Map.of("error", "账号或密码错误"));
         }
@@ -330,7 +331,7 @@ public class AuthController {
         String ipScope = "ip:" + ip;
         if (lockout.isLocked(idScope) || lockout.isLocked(ipScope)
                 || !throttle.allowed(idScope) || !throttle.allowed(ipScope)) {
-            log.warn("2FA 第二步验证被限流 pteid={} ip={}", pteid, ip);
+            log.warn("2FA 第二步验证被限流 pteid={} ip={}", LogSanitizer.clean(pteid), LogSanitizer.clean(ip));
             return ResponseEntity.status(429).body(Map.of("error", "尝试过于频繁，请稍后再试"));
         }
         if (!totpService.validate(pteid, code)) {
@@ -339,7 +340,7 @@ public class AuthController {
             lockout.recordFailure(idScope);
             lockout.recordFailure(ipScope);
             lockout.applyProgressiveDelay(idScope);
-            log.warn("2FA 第二步验证失败 pteid={} ip={}", pteid, ip);
+            log.warn("2FA 第二步验证失败 pteid={} ip={}", LogSanitizer.clean(pteid), LogSanitizer.clean(ip));
             return ResponseEntity.status(401).body(Map.of("error", "验证码不正确或已失效"));
         }
         throttle.clear(idScope);

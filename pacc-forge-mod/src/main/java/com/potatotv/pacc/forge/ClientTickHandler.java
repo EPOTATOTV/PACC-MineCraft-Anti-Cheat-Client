@@ -117,7 +117,6 @@ public final class ClientTickHandler {
         }
         Vec3 eye = player.getEyePosition();
         Vec3 targetPos = target.position();
-        double reach = eye.distanceTo(targetPos);
         double viewAngle = viewAngleDegrees(player, targetPos.subtract(eye));
         return new CombatSample(target.getStringUUID(), eye.x, eye.y, eye.z,
                 targetPos.x, targetPos.y, targetPos.z, viewAngle, System.currentTimeMillis());

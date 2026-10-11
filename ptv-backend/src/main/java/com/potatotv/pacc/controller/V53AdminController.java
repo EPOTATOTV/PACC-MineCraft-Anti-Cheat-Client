@@ -3,6 +3,7 @@ package com.potatotv.pacc.controller;
 import com.potatotv.pacc.security.RequirePermission;
 import com.potatotv.pacc.service.v53.AdminInsightService;
 import com.potatotv.pacc.service.v53.ReplayFrameService;
+import com.potatotv.pacc.util.LogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,7 +74,7 @@ public class V53AdminController {
         String actor = actorOf(req);
         try {
             ReplayFrameService.Frame frame = frames.frame(id, index, actor);
-            log.info("查端回放预览 id={} 帧={}/{} 操作者={}", id, frame.index(), frame.total(), actor);
+            log.info("查端回放预览 id={} 帧={}/{} 操作者={}", LogSanitizer.clean(id), frame.index(), frame.total(), LogSanitizer.clean(actor));
             return ResponseEntity.ok()
                     .contentType(MediaType.IMAGE_JPEG)
                     .header("X-PACC-Frame-Index", String.valueOf(frame.index()))

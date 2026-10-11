@@ -4,6 +4,7 @@ import com.potatotv.pacc.domain.FaqEntry;
 import com.potatotv.pacc.domain.SupportTicket;
 import com.potatotv.pacc.repository.FaqEntryRepository;
 import com.potatotv.pacc.repository.SupportTicketRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -98,7 +99,7 @@ public class SupportService {
                     "SUPPORT", "TICKET_REPLY", "NORMAL",
                     java.util.EnumSet.of(NotificationService.Channel.IN_APP, NotificationService.Channel.EMAIL));
         } catch (Exception e) {
-            log.warn("写入工单回复通知失败 ticket={} err={}", id, e.getMessage());
+            log.warn("写入工单回复通知失败 ticket={} err={}", LogSanitizer.clean(id), LogSanitizer.clean(e.getMessage()));
         }
 
         long firstReplySeconds = t.getCreatedAt() == null ? 0L

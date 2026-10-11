@@ -700,6 +700,54 @@ static struct bpf_object *pacc_object_get(struct pacc_ebpf_set *set, const char 
 	return obj;
 }
 
+/* 为每个受保护进程各挂一份 uprobe。全局挂会把整机所有进程的 dlopen 都打进来，
+ * 噪声淹没信号，而无关进程的 dlopen 没有情报价值。
+ * 返回新增的 link 数（0 表示全部失败）。 */
+static int pacc_attach_uprobe(struct pacc_ebpf_set *set, const struct pacc_attach_spec *sp,
+			      struct bpf_program *prog, const char *uprobe_lib)
+{
+	int added = 0;
+	unsigned int i;
+
+	if (g_npids == 0) {
+		pacc_set_lasterr("未指定受保护进程（--pid），跳过 uprobe："
+				 "uprobe 是 per-PID 挂载，没有目标就没有挂载点");
+		return 0;
+	}
+	for (i = 0; i < sp->nsymbols; i++) {
+		int p;
+
+		for (p = 0; p < g_npids; p++) {
+			struct bpf_uprobe_opts opts;
+			struct bpf_link *link;
+
+			memset(&opts, 0, sizeof(opts));
+			opts.sz = sizeof(opts);
+			opts.func_name = sp->symbols[i];
+			opts.retprobe = false;
+			link = bpf_program__attach_uprobe_opts(prog, g_pids[p],
+							       uprobe_lib, 0, &opts);
+			if (!link || libbpf_get_error(link)) {
+				if (g_verbose)
+					fprintf(stderr, "[PACC]   uprobe %s:%s pid=%d "
+							"失败，跳过\n", uprobe_lib,
+						sp->symbols[i], (int)g_pids[p]);
+				continue;
+			}
+			fprintf(stderr, "[PACC]   uprobe %s:%s (pid=%d) 挂载成功\n",
+				uprobe_lib, sp->symbols[i], (int)g_pids[p]);
+			if (set->n_links < PACC_MAX_LINKS)
+				set->links[set->n_links++] = link;
+			added++;
+		}
+	}
+	if (added == 0)
+		pacc_set_lasterr("uprobe %s:%s 在 %d 个受保护进程上都挂不上"
+				 "（二进制路径不对？进程已退出？权限不足？）；libbpf 报：%s",
+				 uprobe_lib, sp->symbols[0], g_npids, g_lasterr);
+	return added;
+}
+
 /* 挂载一个挂载点，把成功的 link 追加进 set->links，返回新增的 link 数。
  * 返回 0 即失败（原因见 g_lasterr 与 libbpf 日志）。
  * 返回计数而不是单个 link：uprobe 需要对每个受保护进程各挂一份，天然是多个。 */
@@ -746,44 +794,7 @@ static int pacc_attach_one(struct pacc_ebpf_set *set, const struct pacc_attach_s
 		return added;
 
 	case PACC_ATTACH_UPROBE:
-		/* uprobe 必须逐个受保护进程挂。全局挂会把整机所有进程的 dlopen
-		 * 都打进来，噪声淹没信号，而无关进程的 dlopen 没有情报价值。 */
-		if (g_npids == 0) {
-			pacc_set_lasterr("未指定受保护进程（--pid），跳过 uprobe："
-					 "uprobe 是 per-PID 挂载，没有目标就没有挂载点");
-			return 0;
-		}
-		for (i = 0; i < sp->nsymbols; i++) {
-			int p;
-
-			for (p = 0; p < g_npids; p++) {
-				struct bpf_uprobe_opts opts;
-
-				memset(&opts, 0, sizeof(opts));
-				opts.sz = sizeof(opts);
-				opts.func_name = sp->symbols[i];
-				opts.retprobe = false;
-				link = bpf_program__attach_uprobe_opts(prog, g_pids[p],
-								       uprobe_lib, 0, &opts);
-				if (!link || libbpf_get_error(link)) {
-					if (g_verbose)
-						fprintf(stderr, "[PACC]   uprobe %s:%s pid=%d "
-								"失败，跳过\n", uprobe_lib,
-							sp->symbols[i], (int)g_pids[p]);
-					continue;
-				}
-				fprintf(stderr, "[PACC]   uprobe %s:%s (pid=%d) 挂载成功\n",
-					uprobe_lib, sp->symbols[i], (int)g_pids[p]);
-				if (set->n_links < PACC_MAX_LINKS)
-					set->links[set->n_links++] = link;
-				added++;
-			}
-		}
-		if (added == 0)
-			pacc_set_lasterr("uprobe %s:%s 在 %d 个受保护进程上都挂不上"
-					 "（二进制路径不对？进程已退出？权限不足？）；libbpf 报：%s",
-					 uprobe_lib, sp->symbols[0], g_npids, g_lasterr);
-		return added;
+		return pacc_attach_uprobe(set, sp, prog, uprobe_lib);
 	}
 	return 0;
 }
@@ -1061,7 +1072,8 @@ static void pacc_usage(const char *argv0)
 int main(int argc, char **argv)
 {
 	struct pacc_capability cap;
-	struct pacc_sink sink;
+	/* static：下面会把它的地址存入全局 g_sink，不能让全局持有栈地址 */
+	static struct pacc_sink sink;
 	struct pacc_ebpf_set set;
 	const char *object_dir = "./build";
 	const char *socket_path = PACC_DEFAULT_SOCKET;
@@ -1073,9 +1085,19 @@ int main(int argc, char **argv)
 	char desc[PACC_REASON_MAX + 160];
 	char note[PACC_REASON_MAX + 128];
 
+	/* skip：值选项消费掉本 token 后，让下一轮只用于跳过该值。
+	 * 这样 i 只在 for 的递增子句里前进（不在循环体里改动循环变量）。 */
+	int skip = 0;
+
 	for (i = 1; i < argc; i++) {
 		const char *a = argv[i];
-		const char *v = (i + 1 < argc) ? argv[i + 1] : NULL;
+		const char *v;
+
+		if (skip) {
+			skip = 0;
+			continue;
+		}
+		v = (i + 1 < argc) ? argv[i + 1] : NULL;
 
 		if (!strcmp(a, "-h") || !strcmp(a, "--help")) {
 			pacc_usage(argv[0]);
@@ -1092,35 +1114,35 @@ int main(int argc, char **argv)
 			g_capture_all_execve = 0;
 		} else if (!strcmp(a, "--object-dir") && v) {
 			object_dir = v;
-			i++;
+			skip = 1;
 		} else if (!strcmp(a, "--socket") && v) {
 			socket_path = v;
-			i++;
+			skip = 1;
 		} else if (!strcmp(a, "--interval") && v) {
 			interval = atoi(v);
 			if (interval < 1)
 				interval = 1;
-			i++;
+			skip = 1;
 		} else if (!strcmp(a, "--uprobe-lib") && v) {
 			uprobe_lib = v;
-			i++;
+			skip = 1;
 		} else if (!strcmp(a, "--uprobe-sym-dlopen") && v) {
 			pacc_syms_dlopen[0] = v;
-			i++;
+			skip = 1;
 		} else if (!strcmp(a, "--uprobe-sym-dlsym") && v) {
 			pacc_syms_dlsym[0] = v;
-			i++;
+			skip = 1;
 		} else if (!strcmp(a, "--variant") && v) {
 			force_variant = v;
-			i++;
+			skip = 1;
 		} else if (!strcmp(a, "--pid") && v) {
 			if (g_npids >= PACC_MAX_PIDS) {
 				fprintf(stderr, "[PACC] --pid 超过上限 %d，多余的忽略\n",
 					PACC_MAX_PIDS);
-				continue;
+			} else {
+				g_pids[g_npids++] = (pid_t)atoi(v);
+				skip = 1;
 			}
-			g_pids[g_npids++] = (pid_t)atoi(v);
-			i++;
 		} else {
 			fprintf(stderr, "[PACC] 未知参数：%s\n", a);
 			pacc_usage(argv[0]);

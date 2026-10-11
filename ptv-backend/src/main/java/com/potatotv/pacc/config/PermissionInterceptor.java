@@ -3,6 +3,7 @@ package com.potatotv.pacc.config;
 import com.potatotv.pacc.security.RequirePermission;
 import com.potatotv.pacc.security.SuperAdminOnly;
 import com.potatotv.pacc.service.RbacService;
+import com.potatotv.pacc.util.LogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
         // 这类接口不走权限矩阵——矩阵表达不了「仅超管」，只有超管/密钥两种凭据能过。
         if (hasSuperAdminOnly(handlerMethod)) {
             if (!"super-admin".equals(role) && !"api-key".equals(role)) {
-                log.warn("受限资料越权访问 role={} uri={}", role, request.getRequestURI());
+                log.warn("受限资料越权访问 role={} uri={}", LogSanitizer.clean(role), LogSanitizer.clean(request.getRequestURI()));
                 respond403(response, "无操作权限");
                 return false;
             }
@@ -70,7 +71,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
         String required = requirement.value();
         boolean granted = rbacService.hasPermission(adminActor, role, required);
         if (!granted) {
-            log.warn("权限不足 role={} required={} uri={}", role, required, request.getRequestURI());
+            log.warn("权限不足 role={} required={} uri={}", LogSanitizer.clean(role), LogSanitizer.clean(required), LogSanitizer.clean(request.getRequestURI()));
             respond403(response, "无操作权限");
             return false;
         }

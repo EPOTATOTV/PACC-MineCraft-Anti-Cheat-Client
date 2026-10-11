@@ -6,6 +6,7 @@ import com.potatotv.pacc.domain.Appeal;
 import com.potatotv.pacc.repository.AccountRepository;
 import com.potatotv.pacc.repository.AppealRepository;
 import com.potatotv.pacc.repository.CheatRecordRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -214,7 +215,7 @@ public class AppealService {
             ev.put("captured_at", Instant.now().toString());
             return mapper.writeValueAsString(ev);
         } catch (Exception e) {
-            log.warn("申诉证据快照生成失败 alertId={}", alertId);
+            log.warn("申诉证据快照生成失败 alertId={}", LogSanitizer.clean(alertId));
             return null;
         }
     }

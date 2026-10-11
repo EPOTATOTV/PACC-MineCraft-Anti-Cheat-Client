@@ -1,4 +1,4 @@
-﻿// PACC Go 边缘网关（API 网关 / WSS 入口）
+// PACC Go 边缘网关（API 网关 / WSS 入口）
 //
 // 功能（全部标准库实现，零第三方依赖）：
 //   - HTTP 反向代理：/api、/ws 转发到 PTV 后端（含 WebSocket Upgrade 透传）
@@ -177,7 +177,7 @@ func main() {
 				status = http.StatusUnauthorized
 				http.Error(w, `{"error":"unauthorized"}`, status)
 				log.Printf("[gateway] %s %s %s -> %d (unauthorized) %s",
-					clientIP, r.Method, r.URL.Path, status, time.Since(start))
+					clientIP, sanitizeLog(r.Method), sanitizeLog(r.URL.Path), status, time.Since(start))
 				met.record(status, false, true)
 				return
 			}
@@ -188,7 +188,7 @@ func main() {
 			status = http.StatusTooManyRequests
 			http.Error(w, `{"error":"rate limited"}`, status)
 			log.Printf("[gateway] %s %s %s -> %d (rate limited) %s",
-				clientIP, r.Method, r.URL.Path, status, time.Since(start))
+				clientIP, sanitizeLog(r.Method), sanitizeLog(r.URL.Path), status, time.Since(start))
 			met.record(status, true, false)
 			return
 		}
@@ -200,7 +200,7 @@ func main() {
 
 		proxy.ServeHTTP(w, r)
 		status = 200
-		log.Printf("[gateway] %s %s %s -> %d %s", clientIP, r.Method, r.URL.Path, status, time.Since(start))
+		log.Printf("[gateway] %s %s %s -> %d %s", clientIP, sanitizeLog(r.Method), sanitizeLog(r.URL.Path), status, time.Since(start))
 		met.record(status, false, false)
 	})
 
@@ -213,9 +213,20 @@ func main() {
 func clientIP(r *http.Request) string {
 	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 		parts := strings.Split(fwd, ",")
-		return strings.TrimSpace(parts[0])
+		return sanitizeLog(strings.TrimSpace(parts[0]))
 	}
-	return strings.Split(r.RemoteAddr, ":")[0]
+	return sanitizeLog(strings.Split(r.RemoteAddr, ":")[0])
+}
+
+// sanitizeLog 剔除 CR/LF 与控制字符。X-Forwarded-For 与 RequestURI 都由请求方决定，
+// 原样落进日志就能插入换行、伪造出整条日志行（log injection）。
+func sanitizeLog(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 func schemeOf(r *http.Request) string {

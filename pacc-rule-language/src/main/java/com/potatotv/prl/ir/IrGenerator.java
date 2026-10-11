@@ -249,29 +249,28 @@ public final class IrGenerator {
                 return;
             }
             beginStatement();
-            if (statement instanceof Statement.IfStmt ifStmt) {
-                emitIf(ifStmt);
-            } else if (statement instanceof Statement.ForStmt forStmt) {
-                emitFor(forStmt);
-            } else if (statement instanceof Statement.WhileStmt whileStmt) {
-                emitWhile(whileStmt);
-            } else if (statement instanceof Statement.ReturnStmt returnStmt) {
-                emit(IrInstr.ret(expr(returnStmt.value())));
-            } else if (statement instanceof Statement.ExprStmt exprStmt) {
-                // 动作函数（emit_alert）通常当语句用，但它的返回值就是规则的执行结果（§2.12.2 的
-                // RuleManager 只收 DetectionResult）。record_evidence / trigger_redscreen 这些
-                // 纯副作用动作返回 null，让它们覆盖结果槽会把 emit_alert 的返回值抹掉，
-                // 所以只在值非 null 时才写进去 —— 结果是「最后一条有返回值的语句」。
-                int value = expr(exprStmt.expression());
-                if (entry) {
-                    String skipLabel = newLabel("result_skip");
-                    emit(IrInstr.jumpIf(IrOp.JUMP_IF_NULL, value, skipLabel));
-                    emit(IrInstr.store(RESULT_SLOT, value));
-                    resultStored = true;
-                    emit(IrInstr.label(skipLabel));
+            switch (statement) {
+                case Statement.IfStmt ifStmt -> emitIf(ifStmt);
+                case Statement.ForStmt forStmt -> emitFor(forStmt);
+                case Statement.WhileStmt whileStmt -> emitWhile(whileStmt);
+                case Statement.ReturnStmt returnStmt -> emit(IrInstr.ret(expr(returnStmt.value())));
+                case Statement.ExprStmt exprStmt -> {
+                    // 动作函数（emit_alert）通常当语句用，但它的返回值就是规则的执行结果（§2.12.2 的
+                    // RuleManager 只收 DetectionResult）。record_evidence / trigger_redscreen 这些
+                    // 纯副作用动作返回 null，让它们覆盖结果槽会把 emit_alert 的返回值抹掉，
+                    // 所以只在值非 null 时才写进去 —— 结果是「最后一条有返回值的语句」。
+                    int value = expr(exprStmt.expression());
+                    if (entry) {
+                        String skipLabel = newLabel("result_skip");
+                        emit(IrInstr.jumpIf(IrOp.JUMP_IF_NULL, value, skipLabel));
+                        emit(IrInstr.store(RESULT_SLOT, value));
+                        resultStored = true;
+                        emit(IrInstr.label(skipLabel));
+                    }
                 }
-            } else if (statement instanceof Statement.AssignStmt assignStmt) {
-                emitAssign(assignStmt);
+                case Statement.AssignStmt assignStmt -> emitAssign(assignStmt);
+                case null, default -> {
+                }
             }
         }
 

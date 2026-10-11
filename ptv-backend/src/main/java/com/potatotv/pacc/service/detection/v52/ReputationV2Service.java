@@ -4,6 +4,7 @@ import com.potatotv.pacc.domain.PlayerBehaviorProfile;
 import com.potatotv.pacc.domain.ReputationLog;
 import com.potatotv.pacc.repository.PlayerBehaviorProfileRepository;
 import com.potatotv.pacc.repository.V52ReputationLogRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -295,7 +296,7 @@ public class ReputationV2Service {
                 .source(truncate(source, SOURCE_MAX))
                 .createdAt(Instant.now())
                 .build());
-        log.info("信誉 v5.2 调整 pteid={} source={} {}±{} -> {}", pteid, source, before, after - before, after);
+        log.info("信誉 v5.2 调整 pteid={} source={} {}±{} -> {}", LogSanitizer.clean(pteid), LogSanitizer.clean(source), before, after - before, after);
         return true;
     }
 

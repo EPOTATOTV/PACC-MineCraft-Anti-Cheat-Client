@@ -2,6 +2,7 @@ package com.potatotv.pacc.service;
 
 import com.potatotv.pacc.domain.AdminOperationLog;
 import com.potatotv.pacc.repository.AdminOperationLogRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +50,7 @@ public class AdminAuditService {
                     .httpStatus(httpStatus)
                     .build());
         } catch (Exception e) {
-            log.warn("写入管理员操作审计失败 action={} err={}", action, e.getMessage());
+            log.warn("写入管理员操作审计失败 action={} err={}", LogSanitizer.clean(action), LogSanitizer.clean(e.getMessage()));
         }
     }
 }

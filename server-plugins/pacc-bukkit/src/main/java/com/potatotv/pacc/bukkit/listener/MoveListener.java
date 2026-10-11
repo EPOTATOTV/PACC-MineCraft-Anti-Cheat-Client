@@ -7,6 +7,7 @@ import com.potatotv.pacc.server.core.model.PlayerPosition;
 import com.potatotv.pacc.server.core.model.Position;
 
 import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -42,7 +43,8 @@ public final class MoveListener implements Listener {
         Player player = event.getPlayer();
         String playerId = player.getUniqueId().toString();
         GameMode mode = BukkitPlatformAdapter.mapGameMode(player.getGameMode());
-        boolean onGround = player.isOnGround();
+        // Player#isOnGround 已废弃，取 Entity 上的等价实现。
+        boolean onGround = ((Entity) player).isOnGround();
 
         // Bukkit 事件不提供历史时刻，用相邻两刻近似：to 取当前，from 取一刻之前。
         long now = System.currentTimeMillis();

@@ -9,6 +9,7 @@ import com.potatotv.pacc.service.FeishuAuthService;
 import com.potatotv.pacc.service.LoginLockout;
 import com.potatotv.pacc.service.LoginThrottle;
 import com.potatotv.pacc.service.TotpService;
+import com.potatotv.pacc.util.LogSanitizer;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -67,6 +68,10 @@ public class AdminAuthController {
     @Value("${pacc.security.admin-2fa-required:false}")
     private boolean admin2faRequired;
 
+    /** 管理前端来源白名单（Origin）。同时用于校验 OAuth 回跳目标的 Host，防开放重定向。 */
+    @Value("${pacc.security.allowed-origins:}")
+    private String allowedOrigins;
+
     public AdminAuthController(LoginThrottle throttle,
                                LoginLockout lockout,
                                AdminLoginLogRepository loginLogRepository,
@@ -92,7 +97,7 @@ public class AdminAuthController {
         String scope = "admin:" + ip;
         // 长窗锁定与短窗限流都按来源 IP 计：管理密钥是高价值静态凭据，必须压制慢速爆破
         if (lockout.isLocked(scope) || !throttle.allowed(scope)) {
-            log.warn("管理后台登录被限流 ip={}", ip);
+            log.warn("管理后台登录被限流 ip={}", LogSanitizer.clean(ip));
             return ResponseEntity.status(429).body(Map.of("error", "尝试过于频繁，请稍后再试"));
         }
         String key = body.get("admin_key");
@@ -108,7 +113,7 @@ public class AdminAuthController {
             lockout.recordFailure(scope);
             lockout.applyProgressiveDelay(scope);
             record(ip, fingerprint(key), "key", null, "fail");
-            log.warn("管理后台登录失败 ip={}", ip);
+            log.warn("管理后台登录失败 ip={}", LogSanitizer.clean(ip));
             return ResponseEntity.status(401).body(Map.of("error", "管理密钥错误"));
         }
         throttle.clear(scope);
@@ -118,7 +123,7 @@ public class AdminAuthController {
         ResponseEntity<?> gate = secondStepGate(ip, identity, role, "key");
         if (gate != null) return gate;
         record(ip, fingerprint(key), "key", role, "success");
-        log.info("管理后台登录成功 ip={} role={}", ip, role);
+        log.info("管理后台登录成功 ip={} role={}", LogSanitizer.clean(ip), LogSanitizer.clean(role));
         // 会话令牌仅写入 HttpOnly cookie，响应体不暴露，防 XSS 窃取
         String token = adminTokenService.create(identity, role, fingerprint(ip, request.getHeader("User-Agent")));
         setAdminCookie(response, token, SESSION_MAX_AGE);
@@ -145,12 +150,12 @@ public class AdminAuthController {
         String error;
         if (!feishuAuthService.validateState(state)) {
             error = "state_verification_failed";
-            log.warn("飞书回调 state 校验失败 ip={}", ip);
+            log.warn("飞书回调 state 校验失败 ip={}", LogSanitizer.clean(ip));
         } else {
             var user = feishuAuthService.exchange(code);
             if (user.isEmpty()) {
                 error = "oauth_failed";
-                log.warn("飞书登录失败 ip={}", ip);
+                log.warn("飞书登录失败 ip={}", LogSanitizer.clean(ip));
             } else {
                 String userId = user.get().userId();
                 String role = user.get().role();
@@ -163,7 +168,7 @@ public class AdminAuthController {
                     return;
                 }
                 record(ip, userId, "feishu", role, "success");
-                log.info("飞书登录成功 ip={} userId={} role={}", ip, userId, role);
+                log.info("飞书登录成功 ip={} userId={} role={}", LogSanitizer.clean(ip), LogSanitizer.clean(userId), LogSanitizer.clean(role));
                 String token = adminTokenService.create(userId, role, fingerprint(ip, request.getHeader("User-Agent")));
                 setAdminCookie(response, token, SESSION_MAX_AGE);
                 response.sendRedirect(loginRedirect(request));
@@ -174,11 +179,34 @@ public class AdminAuthController {
         response.sendRedirect(loginRedirect(request) + "?feishu_error=" + error);
     }
 
-    /** 飞书回调后回到前端登录页；若部署同域则回根路径，否则回登录页。 */
-    private static String loginRedirect(HttpServletRequest request) {
-        String base = request.getScheme() + "://" + request.getHeader("Host");
+    /** 飞书回调后回到前端登录页；Host 头不可信，只有命中管理来源白名单时才按其拼绝对地址。 */
+    private String loginRedirect(HttpServletRequest request) {
+        String host = request.getHeader("Host");
+        if (host == null || !isAllowedHost(host)) {
+            // Host 不在白名单：回退相对路径，避免被篡改成任意外部站点（开放重定向）
+            return "/";
+        }
         String ctx = request.getContextPath() == null ? "" : request.getContextPath();
-        return base + ctx + "/";
+        return request.getScheme() + "://" + host + ctx + "/";
+    }
+
+    /** Host 头是否命中管理来源白名单（按 host:port 精确比较）。 */
+    private boolean isAllowedHost(String host) {
+        for (String origin : allowedOrigins.split(",")) {
+            String v = origin.trim();
+            if (v.isEmpty()) {
+                continue;
+            }
+            try {
+                java.net.URI u = java.net.URI.create(v);
+                if (host.equalsIgnoreCase(u.getAuthority())) {
+                    return true;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // 配置项不是合法 URL，忽略
+            }
+        }
+        return false;
     }
 
     /** 飞书 OAuth 回调：用授权码换取管理员身份，签发会话令牌。 */
@@ -188,7 +216,7 @@ public class AdminAuthController {
         String ip = clientIp(request);
         String scope = "feishu:" + ip;
         if (!throttle.allowed(scope)) {
-            log.warn("飞书登录被限流 ip={}", ip);
+            log.warn("飞书登录被限流 ip={}", LogSanitizer.clean(ip));
             return ResponseEntity.status(429).body(Map.of("error", "尝试过于频繁，请稍后再试"));
         }
         String code = body.get("code");
@@ -196,7 +224,7 @@ public class AdminAuthController {
         if (user.isEmpty()) {
             throttle.hit(scope);
             record(ip, "(feishu)", "feishu", null, "fail");
-            log.warn("飞书登录失败 ip={}", ip);
+            log.warn("飞书登录失败 ip={}", LogSanitizer.clean(ip));
             return ResponseEntity.status(401).body(Map.of("error", "飞书授权验证失败"));
         }
         // 角色由 FeishuAuthService 依据配置白名单判定（默认拒绝，杜绝任意人员登录）
@@ -206,7 +234,7 @@ public class AdminAuthController {
         ResponseEntity<?> gate = secondStepGate(ip, userId, role, "feishu");
         if (gate != null) return gate;
         record(ip, userId, "feishu", role, "success");
-        log.info("飞书登录成功 ip={} userId={} role={}", ip, userId, role);
+        log.info("飞书登录成功 ip={} userId={} role={}", LogSanitizer.clean(ip), LogSanitizer.clean(userId), LogSanitizer.clean(role));
         String token = adminTokenService.create(userId, role, fingerprint(ip, request.getHeader("User-Agent")));
         setAdminCookie(response, token, SESSION_MAX_AGE);
         return ResponseEntity.ok(Map.of("ok", true, "role", role, "name", user.get().name()));
@@ -255,7 +283,7 @@ public class AdminAuthController {
     private ResponseEntity<?> secondStepGate(String ip, String identity, String role, String method) {
         if (needsSecondStep(identity)) {
             record(ip, identity, method, role, "2fa_pending");
-            log.info("管理员需完成第二步验证 identity={} ip={}", identity, ip);
+            log.info("管理员需完成第二步验证 identity={} ip={}", LogSanitizer.clean(identity), LogSanitizer.clean(ip));
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("twofa_required", true);
             out.put("pending", totpService.issueAdminPending(identity, role));
@@ -263,7 +291,7 @@ public class AdminAuthController {
         }
         if (admin2faRequired) {
             record(ip, identity, method, role, "2fa_required");
-            log.warn("管理员未绑定 2FA 被拒绝 identity={} ip={}", identity, ip);
+            log.warn("管理员未绑定 2FA 被拒绝 identity={} ip={}", LogSanitizer.clean(identity), LogSanitizer.clean(ip));
             return ResponseEntity.status(403)
                     .body(Map.of("error", "本环境要求管理员启用两步验证，请先在已登录会话中完成绑定"));
         }
@@ -280,7 +308,7 @@ public class AdminAuthController {
         String ip = clientIp(request);
         String scope = "admin-2fa:" + ip;
         if (lockout.isLocked(scope) || !throttle.allowed(scope)) {
-            log.warn("管理员 2FA 校验被限流 ip={}", ip);
+            log.warn("管理员 2FA 校验被限流 ip={}", LogSanitizer.clean(ip));
             return ResponseEntity.status(429).body(Map.of("error", "尝试过于频繁，请稍后再试"));
         }
         String pending = body.get("pending");
@@ -301,7 +329,7 @@ public class AdminAuthController {
             lockout.recordFailure(scope);
             lockout.applyProgressiveDelay(scope);
             record(ip, ap.identity(), "totp", null, "fail");
-            log.warn("管理员 2FA 校验失败 identity={} ip={}", ap.identity(), ip);
+            log.warn("管理员 2FA 校验失败 identity={} ip={}", LogSanitizer.clean(ap.identity()), LogSanitizer.clean(ip));
             return ResponseEntity.status(401).body(Map.of("error", "验证码不正确或已失效"));
         }
         throttle.clear(scope);
@@ -311,7 +339,7 @@ public class AdminAuthController {
         setAdminCookie(response, token, SESSION_MAX_AGE);
         setAdmin2faCookie(response, "");
         record(ip, ap.identity(), "totp", ap.role(), "success");
-        log.info("管理员 2FA 校验通过 identity={} role={} ip={}", ap.identity(), ap.role(), ip);
+        log.info("管理员 2FA 校验通过 identity={} role={} ip={}", LogSanitizer.clean(ap.identity()), LogSanitizer.clean(ap.role()), LogSanitizer.clean(ip));
         return ResponseEntity.ok(Map.of("ok", true, "role", ap.role() == null ? "" : ap.role()));
     }
 

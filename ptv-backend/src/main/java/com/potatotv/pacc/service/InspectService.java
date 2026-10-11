@@ -2,6 +2,7 @@ package com.potatotv.pacc.service;
 
 import com.potatotv.pacc.domain.InspectSession;
 import com.potatotv.pacc.repository.InspectSessionRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,9 +70,9 @@ public class InspectService {
         inspectSignalBus.registerPlayer(sessionId, player, s.getPteid());
         if (player != null) {
             inspectSignalBus.sendToPlayer(sessionId, signal("inspect_request", s, null));
-            log.info("已下发查端请求 sessionId={} pteid={}", sessionId, s.getPteid());
+            log.info("已下发查端请求 sessionId={} pteid={}", LogSanitizer.clean(sessionId), LogSanitizer.clean(s.getPteid()));
         } else {
-            log.info("查端目标玩家离线，等待其上线/管理端连接 sessionId={} pteid={}", sessionId, s.getPteid());
+            log.info("查端目标玩家离线，等待其上线/管理端连接 sessionId={} pteid={}", LogSanitizer.clean(sessionId), LogSanitizer.clean(s.getPteid()));
         }
         return s;
     }

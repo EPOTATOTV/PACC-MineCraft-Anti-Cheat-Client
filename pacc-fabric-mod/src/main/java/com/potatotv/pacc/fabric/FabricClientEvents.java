@@ -93,7 +93,6 @@ public final class FabricClientEvents {
         }
         Vec3d eye = player.getEyePos();
         Vec3d targetPos = target.getPos();
-        double reach = eye.distanceTo(targetPos);
         double viewAngle = viewAngleDegrees(player, targetPos.subtract(eye));
         CombatSample sample = new CombatSample(target.getUuidAsString(), eye.x, eye.y, eye.z,
                 targetPos.x, targetPos.y, targetPos.z, viewAngle, System.currentTimeMillis());

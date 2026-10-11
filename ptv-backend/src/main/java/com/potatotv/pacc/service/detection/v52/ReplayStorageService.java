@@ -2,6 +2,7 @@ package com.potatotv.pacc.service.detection.v52;
 
 import com.potatotv.pacc.domain.ReplayRecording;
 import com.potatotv.pacc.repository.ReplayRecordingRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -107,8 +108,8 @@ public class ReplayStorageService {
                 .expiresAt(Instant.now().plus(RETENTION_DAYS, ChronoUnit.DAYS))
                 .build();
         recordings.save(row);
-        log.info("查端回放入库 id={} pteid={} alert={} 帧={} 密文={}B", id, pteid, row.getAlertId(),
-                row.getFrames(), row.getSizeBytes());
+        log.info("查端回放入库 id={} pteid={} alert={} 帧={} 密文={}B", LogSanitizer.clean(id), LogSanitizer.clean(pteid),
+                LogSanitizer.clean(row.getAlertId()), row.getFrames(), row.getSizeBytes());
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);

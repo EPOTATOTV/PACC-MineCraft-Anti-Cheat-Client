@@ -1,6 +1,7 @@
 package com.potatotv.pacc.service;
 
 import jakarta.mail.internet.MimeMessage;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,7 +38,7 @@ public class MailerService {
     public void send(String email, String subject, String text) {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (stubEnabled || mailSender == null) {
-            log.info("[邮件stub] 收件人={} 主题={}\n内容={}", email, subject, text);
+            log.info("[邮件stub] 收件人={} 主题={}\n内容={}", LogSanitizer.clean(email), LogSanitizer.clean(subject), LogSanitizer.clean(text));
             return;
         }
         try {
@@ -48,9 +49,9 @@ public class MailerService {
             h.setSubject(subject);
             h.setText(text, true);
             mailSender.send(m);
-            log.info("已向 {} 发送邮件：{}", email, subject);
+            log.info("已向 {} 发送邮件：{}", LogSanitizer.clean(email), LogSanitizer.clean(subject));
         } catch (Exception e) {
-            log.error("发送邮件失败 email={} subject={} err={}", email, subject, e.getMessage());
+            log.error("发送邮件失败 email={} subject={} err={}", LogSanitizer.clean(email), LogSanitizer.clean(subject), LogSanitizer.clean(e.getMessage()));
         }
     }
 }

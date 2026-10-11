@@ -173,27 +173,27 @@ public final class TypeChecker {
     // ------------------------------------------------------------------ 语句
 
     private void checkStatement(Statement statement) {
-        if (statement instanceof LetDecl let) {
-            checkLet(let);
-        } else if (statement instanceof Statement.IfStmt ifStmt) {
-            checkIf(ifStmt);
-        } else if (statement instanceof Statement.ForStmt forStmt) {
-            checkFor(forStmt);
-        } else if (statement instanceof Statement.WhileStmt whileStmt) {
-            PrlType condition = infer(whileStmt.condition());
-            requireType(condition, PrlType.BOOL, "while 条件", whileStmt.condition());
-            pushScope();
-            for (Statement inner : whileStmt.body()) {
-                checkStatement(inner);
+        switch (statement) {
+            case LetDecl let -> checkLet(let);
+            case Statement.IfStmt ifStmt -> checkIf(ifStmt);
+            case Statement.ForStmt forStmt -> checkFor(forStmt);
+            case Statement.WhileStmt whileStmt -> {
+                PrlType condition = infer(whileStmt.condition());
+                requireType(condition, PrlType.BOOL, "while 条件", whileStmt.condition());
+                pushScope();
+                for (Statement inner : whileStmt.body()) {
+                    checkStatement(inner);
+                }
+                popScope();
             }
-            popScope();
-        } else if (statement instanceof Statement.ReturnStmt returnStmt) {
-            infer(returnStmt.value());
-        } else if (statement instanceof Statement.ExprStmt exprStmt) {
-            // 动作函数（emit_alert 等）就是当语句用的，返回值类型不关心。
-            infer(exprStmt.expression());
-        } else if (statement instanceof Statement.AssignStmt assignStmt) {
-            checkAssign(assignStmt);
+            case Statement.ReturnStmt returnStmt -> infer(returnStmt.value());
+            case Statement.ExprStmt exprStmt -> {
+                // 动作函数（emit_alert 等）就是当语句用的，返回值类型不关心。
+                infer(exprStmt.expression());
+            }
+            case Statement.AssignStmt assignStmt -> checkAssign(assignStmt);
+            case null, default -> {
+            }
         }
     }
 
@@ -914,7 +914,8 @@ public final class TypeChecker {
             PrlType itemType = infer(item);
             PrlType merged = mergeOrNull(element, itemType);
             if (merged == null) {
-                error("列表元素类型不一致：" + element.display() + " 与 " + itemType.display()
+                error("列表元素类型不一致：" + (element == null ? "未知" : element.display())
+                        + " 与 " + itemType.display()
                         + "（§2.3.5 不允许隐式转换）", item.line(), item.col());
                 merged = PrlType.UNKNOWN;
             }
@@ -929,8 +930,8 @@ public final class TypeChecker {
             PrlType itemType = infer(item);
             PrlType merged = mergeOrNull(element, itemType);
             if (merged == null) {
-                error("集合元素类型不一致：" + element.display() + " 与 " + itemType.display(),
-                        item.line(), item.col());
+                error("集合元素类型不一致：" + (element == null ? "未知" : element.display())
+                        + " 与 " + itemType.display(), item.line(), item.col());
                 merged = PrlType.UNKNOWN;
             }
             element = merged;

@@ -2,6 +2,7 @@ package com.potatotv.pacc.controller;
 
 import com.potatotv.pacc.security.RequirePermission;
 import com.potatotv.pacc.service.detection.v52.ReplayStorageService;
+import com.potatotv.pacc.util.LogSanitizer;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,8 +78,10 @@ public class V52ReplayController {
     public ResponseEntity<?> download(@PathVariable String id, HttpServletRequest req) {
         try {
             byte[] avi = replayStorageService.open(id);
-            log.info("查端回放下载 id={} 操作者={} 明文={}B", id,
-                    req.getAttribute("adminActor") == null ? "api-key" : req.getAttribute("adminActor"));
+            Object actorAttr = req.getAttribute("adminActor");
+            String actor = actorAttr == null ? "api-key" : actorAttr.toString();
+            log.info("查端回放下载 id={} 操作者={} 明文={}B", LogSanitizer.clean(id),
+                    LogSanitizer.clean(actor), avi.length);
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType("video/x-msvideo"))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"replay-" + id + ".avi\"")

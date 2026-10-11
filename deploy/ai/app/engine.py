@@ -78,6 +78,7 @@ class AiEngine:
         score = base * w + history_factor * 12.0
 
         # 统计异常：偏离历史均值越远，风险越高（z-score）
+        z = 0.0
         if self.std > 1e-6:
             z = (score - self.mean) / self.std
             if z > 0:

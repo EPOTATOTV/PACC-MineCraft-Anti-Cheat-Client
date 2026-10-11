@@ -297,7 +297,7 @@ public final class PrlDebugger implements PrlExecutionObserver {
     /** 中止这次执行：被调试线程在下一条语句处退出，或者立刻从暂停中醒来。 */
     public void abort() {
         aborted.set(true);
-        commands.offer(Command.ABORT);
+        enqueue(commands, Command.ABORT);
         Thread thread = worker;
         if (thread != null) {
             thread.interrupt();
@@ -389,7 +389,7 @@ public final class PrlDebugger implements PrlExecutionObserver {
     private void pause(PrlFrameView frame) {
         state = DebugState.snapshot(frame);
         paused = true;
-        events.offer(new Paused(state));
+        enqueue(events, new Paused(state));
         long suspendedFrom = System.nanoTime();
         Command command = take();
         // 挂在这里的墙钟时间不是规则在跑：不上报的话，人在面板上多停几秒就会把 §2.11.1 L2 的
@@ -433,7 +433,7 @@ public final class PrlDebugger implements PrlExecutionObserver {
                 case ABORT -> "中止";
             });
         }
-        commands.offer(command);
+        enqueue(commands, command);
     }
 
     // ------------------------------------------------------------------ 内部
@@ -442,7 +442,14 @@ public final class PrlDebugger implements PrlExecutionObserver {
         if (!(event instanceof Paused)) {
             terminal = event;
         }
-        events.offer(event);
+        enqueue(events, event);
+    }
+
+    /** 两个队列都是无界的，offer 正常不会失败；仍检查返回值，避免事件被静默丢弃。 */
+    private static <T> void enqueue(BlockingQueue<T> queue, T value) {
+        if (!queue.offer(value)) {
+            throw new PrlException("调试队列已满，无法投递事件");
+        }
     }
 
     private Event poll(long deadlineNanos) {

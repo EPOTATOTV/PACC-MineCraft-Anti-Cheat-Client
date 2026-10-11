@@ -1,6 +1,7 @@
 package com.potatotv.pacc.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -69,7 +70,7 @@ public class MapBpEventBus {
         try {
             json = mapper.writeValueAsString(msg);
         } catch (Exception e) {
-            log.warn("BP 事件序列化失败 bp={} type={} err={}", bpSessionId, type, e.getMessage());
+            log.warn("BP 事件序列化失败 bp={} type={} err={}", LogSanitizer.clean(bpSessionId), LogSanitizer.clean(type), LogSanitizer.clean(e.getMessage()));
             return;
         }
         for (WebSocketSession s : set) {
@@ -83,7 +84,7 @@ public class MapBpEventBus {
                 }
             } catch (Exception e) {
                 log.warn("BP 事件推送失败 bp={} type={} ws={} err={}",
-                        bpSessionId, type, s.getId(), e.getMessage());
+                        LogSanitizer.clean(bpSessionId), LogSanitizer.clean(type), LogSanitizer.clean(s.getId()), LogSanitizer.clean(e.getMessage()));
             }
         }
     }

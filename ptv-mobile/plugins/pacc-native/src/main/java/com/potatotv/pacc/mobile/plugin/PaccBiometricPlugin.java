@@ -45,7 +45,7 @@ public class PaccBiometricPlugin extends Plugin {
         String reason = call.getString("reason", "请完成生物识别验证");
         BiometricPrompt prompt = build(call);
         Object o = getActivity();
-        if (!(o instanceof FragmentActivity fa)) {
+        if (!(o instanceof FragmentActivity)) {
             call.reject("需要 FragmentActivity 上下文");
             return;
         }

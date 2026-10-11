@@ -57,6 +57,7 @@ class BehaviorProfiler:
             self.temporal_std = [float(x) for x in data.get("temporal_std", [])]
             self.sample_profiles = data.get("sample_profiles", []) or []
         except (ValueError, OSError, TypeError):
+            # 画像文件损坏或不可读时保持内存中的默认值，不影响推理主链路
             pass
 
     def save(self) -> None:

@@ -13,17 +13,6 @@ import java.util.Objects;
  * <p>{@code checksum} 取<strong>源码</strong>的 SHA-256，不是字节码的。字节码是源码的派生结果，
  * 而实际会被人改、被粘贴错的是源码；校验源码能发现「同一个版本号下的内容被换了」，
  * 这正是管理端最需要拦的一种事故。</p>
- *
- * @param ruleName    规则名
- * @param version     语义化版本，如 {@code 1.2.0}
- * @param source      PRL 源码
- * @param bytecode    编译产物（{@code .prlc} 字节）
- * @param checksum    源码的 SHA-256（64 位十六进制）
- * @param author      作者
- * @param status      发布状态
- * @param createdAtMs 创建时间（毫秒时间戳）
- * @param approvedBy  审批人；生产环境发布必需，草稿为 {@code null}
- * @param rollbackTo  回滚目标版本号；由发布流程回填，草稿为 {@code null}
  */
 public final class RuleVersion {
 
@@ -44,6 +33,20 @@ public final class RuleVersion {
                 createdAtMs, null, null);
     }
 
+    /**
+     * 构造一个完整版本。
+     *
+     * @param ruleName    规则名
+     * @param version     语义化版本，如 {@code 1.2.0}
+     * @param source      PRL 源码
+     * @param bytecode    编译产物（{@code .prlc} 字节）
+     * @param checksum    源码的 SHA-256（64 位十六进制）
+     * @param author      作者
+     * @param status      发布状态
+     * @param createdAtMs 创建时间（毫秒时间戳）
+     * @param approvedBy  审批人；生产环境发布必需，草稿为 {@code null}
+     * @param rollbackTo  回滚目标版本号；由发布流程回填，草稿为 {@code null}
+     */
     public RuleVersion(String ruleName, String version, String source, byte[] bytecode, String checksum,
                        String author, RuleStatus status, long createdAtMs, String approvedBy,
                        String rollbackTo) {

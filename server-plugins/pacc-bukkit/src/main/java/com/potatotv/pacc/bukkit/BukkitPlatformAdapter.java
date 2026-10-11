@@ -8,9 +8,9 @@ import com.potatotv.pacc.server.core.model.Position;
 import com.potatotv.pacc.server.core.model.PunishmentType;
 import com.potatotv.pacc.server.core.model.ServerType;
 
-import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -98,7 +98,7 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
         Location loc = player.getLocation();
         Position pos = new Position(loc.getX(), loc.getY(), loc.getZ());
         return new PlayerPosition(playerId, pos, loc.getYaw(), loc.getPitch(),
-                System.currentTimeMillis(), player.isOnGround(), getGameMode(playerId));
+                System.currentTimeMillis(), ((Entity) player).isOnGround(), getGameMode(playerId));
     }
 
     @Override
@@ -145,10 +145,11 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
     /**
      * 执行处置。默认配置（处置级别 0）下引擎不会调到这台方法，只有运维显式把 {@code punishment-mode}
      * 设为 1 / 2 才会走到这里。踢出与封禁都只作用于**本服务器**：KICK 直接踢出，BAN / TEMP_BAN 走
-     * Bukkit 的名称封禁表（时长 &le; 0 为永久）。玩家不在线时只记日志，不做跨请求的补偿。
+     * 1.20 起的 {@link Player#ban(String, Date, String, boolean)}（时长 &le; 0 为永久），最后一项传
+     * true 表示封禁的同时踢出。玩家不在线时只记日志，不做跨请求的补偿。
      */
     @Override
-    @SuppressWarnings("deprecation") // kickPlayer(String) 在 Paper 上已废弃，但它是 Spigot/Paper 通吃的进服踢出入口。
+    @SuppressWarnings("deprecation") // kickPlayer(String) 已废弃，但 Spigot/Paper 通吃的纯踢出入口只有它。
     public void punish(String playerId, PunishmentType type, String reason, long durationMs) {
         if (type == null || type == PunishmentType.ALERT) {
             return; // 仅告警由 alert() 负责，这里不做事。
@@ -165,8 +166,7 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
                 return;
             }
             Date expires = banExpiry(durationMs, System.currentTimeMillis());
-            Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), detail, expires, plugin.getName());
-            player.kickPlayer(detail);
+            player.ban(detail, expires, plugin.getName(), true);
         } catch (RuntimeException ex) {
             // 处置失败绝不冒泡到主线程事件分发里。
             plugin.getLogger().warning("执行处置失败：" + playerId + " " + type + " " + ex.getMessage());

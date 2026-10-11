@@ -2,6 +2,7 @@ package com.potatotv.pacc.service;
 
 import com.potatotv.pacc.domain.Signature;
 import com.potatotv.pacc.repository.SignatureRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -72,7 +73,7 @@ public class SignatureLibraryService {
             d.setUpdatedAt(now);
             repo.save(d);
         });
-        log.info("特征库灰度发布 edition={} percent={} counts={} operator={}", edition, percent, drafts.size(), operator);
+        log.info("特征库灰度发布 edition={} percent={} counts={} operator={}", edition, percent, drafts.size(), LogSanitizer.clean(operator));
     }
 
     /** 回滚到上一稳定版本：将当前 GRAY/PUBLISHED 标记回滚（简化：置 DRAFT），命中项自增 version。 */

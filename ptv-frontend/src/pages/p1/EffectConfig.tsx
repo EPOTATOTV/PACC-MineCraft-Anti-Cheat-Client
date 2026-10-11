@@ -6,7 +6,7 @@ import { ReloadOutlined, SaveOutlined, ThunderboltOutlined } from '@ant-design/i
 import { api } from '../../api/client'
 import type { DlRelease, DlStats, EffectConfigAuditRow, EffectConfigDto } from '../../types'
 import EChart from '../../components/EChart'
-import { RedScreenOverlay } from '../../components/animations/RedScreenOverlay'
+import { RedScreenPreview } from '../../components/animations/RedScreenPreview'
 
 /** 平台折线配色：与 Dashboard 图表同一套，避免两处图表观感割裂 */
 const DL_PALETTE = ['#58a6ff', '#d29922', '#3fb950', '#a371f7', '#39c5cf', '#ff3b30']
@@ -277,7 +277,7 @@ export default function EffectConfig() {
         </Col>
       </Row>
 
-      <RedScreenOverlay
+      <RedScreenPreview
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         title="检测到作弊行为"

@@ -4,7 +4,7 @@ import type { TableColumnsType } from 'antd'
 import { api } from '../api/client'
 import type { RedscreenAlert } from '../types'
 import { StatusPill } from '../components/StatusPill'
-import { RedScreenOverlay } from '../components/animations'
+import { RedScreenPreview } from '../components/animations'
 import { useTableRowReveal } from '../hooks/useGSAP'
 
 const { Title, Text } = Typography
@@ -80,8 +80,8 @@ export default function Redscreen() {
         </div>
       </Card>
 
-      {/* 红屏回放：按当前动效模板重播玩家端看到的警告序列 */}
-      <RedScreenOverlay
+      {/* 红屏回放：按当前动效模板重播玩家端看到的警告序列（管理端预览，非玩家端组件） */}
+      <RedScreenPreview
         open={!!preview}
         title="检测到作弊行为"
         details={

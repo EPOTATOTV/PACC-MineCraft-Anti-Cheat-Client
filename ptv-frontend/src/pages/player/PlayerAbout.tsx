@@ -15,7 +15,7 @@ export default function PlayerAbout() {
         <Col xs={24} md={10}>
           <Card>
             <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: 1 }}>PACC</div>
-            <div style={{ color: 'var(--muted)', marginTop: 4 }}>Potatotv Anti-Cheat Center · v5.0.0</div>
+            <div style={{ color: 'var(--muted)', marginTop: 4 }}>Potatotv Anti-Cheat Center · v{__APP_VERSION__}</div>
             <div style={{ marginTop: 12, lineHeight: 1.8, color: '#c7ccd6' }}>
               PACC 是一套面向电竞赛事的反作弊管控平台，覆盖实时保护、检测监控、远程查端、作弊申诉与赛事风控，
               为赛事运营与参赛玩家提供可信的对局环境。客户端可下载独立安装包，管理端通过浏览器访问。

@@ -138,8 +138,7 @@ export default function RedScreenDetail() {
 
           <Card title="操作" size="small" style={{ marginTop: 14 }}>
             <Space orientation="vertical" style={{ width: '100%' }}>
-              <Button type="primary" block onClick={() => message.success('已发起查端（后端就绪后生效）')}>发起查端</Button>
-              <Button block danger onClick={() => message.success('已标记为误报（后端就绪后写入）')}>标记误报</Button>
+              <Button type="primary" block onClick={() => navigate('/inspect')}>前往查端控制台（提交结论后解除红屏）</Button>
               <Button block onClick={() => message.success('已提取特征入库（后端就绪后写入）')}>提取特征入库</Button>
               <Button block onClick={() => message.success('已导出证据包（后端就绪后生成）')}>导出证据包</Button>
             </Space>

@@ -63,6 +63,15 @@ export default function PlayerRedScreenDetail() {
         <Text type="secondary">{new Date(detail.triggeredAt).toLocaleString('zh-CN', { hour12: false })}</Text>
       </div>
 
+      {detail.state === 'PENDING_INSPECT' && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 14 }}
+          title="管理员正在远程查端，请保持网络连接，并让客户端保持运行（屏幕共享期间请勿关闭本窗口）。"
+        />
+      )}
+
       <Row gutter={[14, 14]}>
         <Col xs={24} lg={14}>
           <Card title="事件信息" size="small">

@@ -20,13 +20,20 @@ interface Props {
 }
 
 /**
- * RedScreenOverlay —— 红屏警告全屏覆盖层（§4.4.1 入场序列）。
+ * RedScreenPreview —— 红屏**管理端预览/回放**组件（§4.4.1 入场序列）。
+ *
+ * 只给管理后台用：红屏记录回放（Redscreen 页）与动效模板预览（EffectConfig 页）。
+ * 它带「解除红屏 (Esc)」出口是刻意的——预览者当然要能关掉。
+ *
+ * 玩家端红屏不在这里：那是桌面壳窗口里的 {@link ../pages/desktop/DesktopRedscreen}，
+ * 被检测者没有关闭按钮也没有 Esc 出口，键盘由原生层暂停。不要把本组件接到玩家端，
+ * 否则等于给被检测者留了一条自行解除红屏的路。
  *
  * 序列：闪烁 → 遮罩从中心扩散 → 警告文字逐字翻入 → 详情滑入 → 扫描线常驻。
  * 各阶段由「红屏动效模板」控制（温和只渐显、标准加闪烁与扩散、强烈再叠加故障文字与内阴影脉冲）。
  * 系统要求减弱动态时整段跳过，直接呈现终态——闪烁类效果对光敏感人群有风险，不做降级版本。
  */
-export function RedScreenOverlay({
+export function RedScreenPreview({
   open,
   title = '检测到作弊行为',
   stamp = 'CHEAT DETECTED',
@@ -141,7 +148,7 @@ export function RedScreenOverlay({
     }
   }, [open, config, template, details.length])
 
-  // Esc 关闭：红屏是强制打断，必须给键盘留出口
+  // Esc 关闭：这里只服务管理端预览
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {

@@ -65,13 +65,19 @@ export function createScreenShare(transport: SignalTransport, sessionId: string)
   return { start, stop, onSignal }
 }
 
-/** 管理端：作为被叫接收玩家端的屏幕共享，渲染到 video 元素。 */
-export function acceptScreenShare(transport: SignalTransport, sessionId: string, video: HTMLVideoElement) {
+/** 管理端：作为被叫接收玩家端的屏幕共享，渲染到 video 元素。
+ *  ICE 服务器由管理端从后端拉取后经 {@code rtcConfig} 传入（缺省回退公开 STUN）。 */
+export function acceptScreenShare(
+  transport: SignalTransport,
+  sessionId: string,
+  video: HTMLVideoElement,
+  rtcConfig: RTCConfiguration = RTC_CONFIG,
+) {
   let pc: RTCPeerConnection | null = null
 
   function ensurePeer(): RTCPeerConnection | null {
     if (pc) return pc
-    pc = new RTCPeerConnection(RTC_CONFIG)
+    pc = new RTCPeerConnection(rtcConfig)
     pc.ontrack = (e) => {
       video.srcObject = e.streams[0] ?? null
       void video.play().catch(() => {})

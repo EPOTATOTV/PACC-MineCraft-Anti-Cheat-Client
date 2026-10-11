@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Badge, Button, Card, Drawer, List, Modal, Space, Table, Tag, Typography, message } from 'antd'
+import { Alert, Badge, Button, Card, Drawer, List, Modal, Radio, Space, Table, Tag, Typography, message } from 'antd'
 import { SyncOutlined } from '@ant-design/icons'
 import type { TableColumnsType } from 'antd'
 import { api } from '../api/client'
@@ -9,6 +9,14 @@ import { acceptScreenShare, type SignalTransport } from '../webrtc/webrtc'
 import { useWebSocket } from '../ws/useWebSocket'
 
 const { Title, Text } = Typography
+
+/** 查端结论（与后端强制取值一致）。 */
+const CONCLUSION_LABEL = {
+  CONFIRMED_CHEAT: '确认作弊',
+  FALSE_POSITIVE: '误报',
+  PENDING: '待分析',
+} as const
+type Conclusion = keyof typeof CONCLUSION_LABEL
 
 interface Forensics {
   session_id?: string
@@ -23,11 +31,15 @@ export default function Inspect() {
   const [all, setAll] = useState<InspectSession[]>([])
   const [err, setErr] = useState('')
   const [note, setNote] = useState('')
-  const [modal, setModal] = useState<{ session: InspectSession; conclusion: 'confirmed' | 'false_positive' } | null>(null)
+  const [conclusionChoice, setConclusionChoice] = useState<Conclusion | ''>('')
+  const [modal, setModal] = useState<InspectSession | null>(null)
   const [view, setView] = useState<InspectSession | null>(null)
   const [wsStatus, setWsStatus] = useState<'连接中' | '已连接' | '已断开' | '掉线'>('连接中')
   const [log, setLog] = useState<string[]>([])
   const [forensics, setForensics] = useState<Forensics | null>(null)
+  const [turnConfigured, setTurnConfigured] = useState<boolean | null>(null)
+  const [iceError, setIceError] = useState('')
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const screenRef = useRef<{ onSignal: (msg: Record<string, unknown>) => Promise<void>; stop: () => void } | null>(null)
   const [screenOn, setScreenOn] = useState(false)
@@ -66,15 +78,31 @@ export default function Inspect() {
     },
   })
 
-  // 打开抽屉：重置取证状态并创建 WebRTC 被叫（信令走事件总线 send）
+  // 打开抽屉：重置状态，拉取后端下发的 ICE（STUN/TURN）后创建 WebRTC 被叫
   useEffect(() => {
     if (!view || !videoRef.current) return
+    let cancelled = false
+    const video = videoRef.current
+    let screen: { onSignal: (msg: Record<string, unknown>) => Promise<void>; stop: () => void } | null = null
     setLog([]); setForensics(null); setScreenOn(false); setWsStatus('连接中')
-    const transport: SignalTransport = { send }
-    const screen = acceptScreenShare(transport, view.sessionId, videoRef.current)
-    screenRef.current = screen
+    setTurnConfigured(null); setIceError(''); setNowMs(Date.now())
+    void (async () => {
+      let rtcConfig: RTCConfiguration | undefined
+      try {
+        const r = await api.webrtc.iceServers()
+        setTurnConfigured(r.turn_configured)
+        if (r.ice_servers.length > 0) rtcConfig = { iceServers: r.ice_servers }
+      } catch (e) {
+        setIceError((e as Error).message)
+      }
+      if (cancelled) return
+      const transport: SignalTransport = { send }
+      screen = acceptScreenShare(transport, view.sessionId, video, rtcConfig)
+      screenRef.current = screen
+    })()
     return () => {
-      screen.stop()
+      cancelled = true
+      screen?.stop()
       screenRef.current = null
       setScreenOn(false)
     }
@@ -87,6 +115,19 @@ export default function Inspect() {
     else if (connStatus === 'disconnected') setWsStatus((s) => (s === '已连接' ? '掉线' : '已断开'))
   }, [connStatus])
 
+  // 查看中的会话每 30s 刷新一次时钟，用于 30 分钟超时提示
+  useEffect(() => {
+    if (!view) return
+    const id = setInterval(() => setNowMs(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [view])
+
+  const sessionExpired = useMemo(() => {
+    if (!view?.expiresAt) return false
+    return nowMs >= new Date(view.expiresAt).getTime()
+  }, [view, nowMs])
+  const linkLost = wsStatus === '掉线' || wsStatus === '已断开'
+
   async function start(session: InspectSession) {
     try {
       await api.inspects.start(session.sessionId)
@@ -96,12 +137,22 @@ export default function Inspect() {
     } catch (e) { setErr((e as Error).message) }
   }
 
+  function openConclude(session: InspectSession) {
+    setModal(session)
+    setConclusionChoice('')
+    setNote('')
+  }
+
   async function doConclude() {
     if (!modal) return
+    if (!conclusionChoice) {
+      message.warning('请先选择查端结论')
+      return
+    }
     try {
-      await api.inspects.conclude(modal.session.sessionId, modal.conclusion, note)
-      message.success(`已完成，结论：${modal.conclusion === 'confirmed' ? '确认作弊' : '误报'}`)
-      setModal(null); setNote(''); setView(null)
+      await api.inspects.conclude(modal.sessionId, conclusionChoice, note)
+      message.success(`已提交结论：${CONCLUSION_LABEL[conclusionChoice]}`)
+      setModal(null); setNote(''); setConclusionChoice(''); setView(null)
       load()
     } catch (e) { setErr((e as Error).message) }
   }
@@ -122,16 +173,15 @@ export default function Inspect() {
     { title: 'PTEID', dataIndex: 'pteid' },
     { title: '操作员', dataIndex: 'operator', render: (v?: string) => v || '-' },
     { title: '状态', dataIndex: 'state', width: 110, render: (v: InspectSession['state']) => <StatusPill value={v} /> },
-    { title: '结论', dataIndex: 'conclusion', render: (v?: string) => v || '-' },
+    { title: '结论', dataIndex: 'conclusion', render: (v?: string) => (v && v in CONCLUSION_LABEL ? CONCLUSION_LABEL[v as Conclusion] : v || '-') },
     { title: '开始时间', dataIndex: 'startedAt', width: 180, render: (v?: string) => (v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '-') },
     {
-      title: '操作', dataIndex: 'state', width: 260,
+      title: '操作', dataIndex: 'state', width: 200,
       render: (_, s) =>
         s.state === 'ACTIVE' ? (
           <Space size={6}>
             <Button size="small" onClick={() => setView(s)}>实时取证</Button>
-            <Button size="small" style={{ background: '#3fb950', color: '#0d1117', border: 'none' }} onClick={() => setModal({ session: s, conclusion: 'false_positive' })}>误报解除</Button>
-            <Button size="small" danger onClick={() => setModal({ session: s, conclusion: 'confirmed' })}>确认作弊</Button>
+            <Button size="small" type="primary" onClick={() => openConclude(s)}>给出结论</Button>
           </Space>
         ) : null,
     },
@@ -158,19 +208,33 @@ export default function Inspect() {
       </Card>
 
       <Modal
-        title={`提交查端结论：${modal?.conclusion === 'confirmed' ? '确认作弊' : '误报'}`}
+        title={`提交查端结论 · ${modal?.sessionId ?? ''}`}
         open={!!modal}
         onOk={doConclude}
-        onCancel={() => { setModal(null); setNote('') }}
-        okText="提交"
+        okButtonProps={{ disabled: !conclusionChoice }}
+        okText="提交并结束查端"
+        onCancel={() => { setModal(null); setNote(''); setConclusionChoice('') }}
       >
-        <p style={{ color: '#8b949e' }}>会话 {modal?.session.sessionId} · PTEID {modal?.session.pteid}</p>
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="必须给出结论才能结束查端。红屏解锁只能由带结论的结束动作触发；选「待分析」会结束会话但红屏保持锁定。"
+        />
+        <p style={{ color: '#8b949e' }}>会话 {modal?.sessionId} · PTEID {modal?.pteid}</p>
+        <Radio.Group value={conclusionChoice} onChange={(e) => setConclusionChoice(e.target.value as Conclusion)}>
+          <Space orientation="vertical">
+            <Radio value="CONFIRMED_CHEAT">确认作弊（红屏转 CONFIRMED，永久记录保留）</Radio>
+            <Radio value="FALSE_POSITIVE">误报（红屏转 FALSE_POSITIVE，撤销记录并恢复信誉）</Radio>
+            <Radio value="PENDING">待分析（结束会话，红屏保持锁定）</Radio>
+          </Space>
+        </Radio.Group>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="备注（可选）"
-          rows={4}
-          style={{ width: '100%', background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border-strong)', borderRadius: 6, padding: 8 }}
+          rows={3}
+          style={{ width: '100%', marginTop: 12, background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border-strong)', borderRadius: 6, padding: 8 }}
         />
       </Modal>
 
@@ -184,6 +248,34 @@ export default function Inspect() {
           <Badge status={wsColor} text={wsStatus} />
           <Text type="secondary" style={{ marginLeft: 12 }}>PTEID {view?.pteid}</Text>
         </div>
+
+        {sessionExpired && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title="会话已超过 30 分钟，连接将自动断开。红屏不会自动解除，需管理员给出结论后才能解锁。"
+          />
+        )}
+        {linkLost && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title="信令连接已断开，屏幕共享中断。请重试；红屏不会自动解除，需管理员给出结论。"
+          />
+        )}
+        {iceError && (
+          <Alert type="error" showIcon style={{ marginBottom: 12 }} title={`获取 ICE 服务器失败：${iceError}`} />
+        )}
+        {turnConfigured === false && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title="后端未配置 TURN 中继，仅使用 STUN。企业 NAT / 防火墙环境下可能无法建立屏幕共享连接。"
+          />
+        )}
 
         <Card size="small" title="实时屏幕" style={{ marginBottom: 12 }}>
           <video
@@ -240,6 +332,12 @@ export default function Inspect() {
             )}
           </div>
         </Card>
+
+        {view && (
+          <Button type="primary" block style={{ marginTop: 12 }} onClick={() => openConclude(view)}>
+            结束查端并提交结论
+          </Button>
+        )}
       </Drawer>
     </div>
   )

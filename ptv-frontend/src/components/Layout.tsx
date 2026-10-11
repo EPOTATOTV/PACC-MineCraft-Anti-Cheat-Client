@@ -1,20 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Breadcrumb, Layout, Menu } from 'antd'
 import Brand from './Brand'
 import AdminHeader from './admin/AdminHeader'
 import { findSelectedKey, navGroups } from './admin/nav'
 import { useI18n } from '../i18n'
+import { useAuthStore } from '../store/auth'
 import type { ReactNode } from 'react'
 
 const { Sider, Content, Footer } = Layout
 
-export default function AdminLayout({ children, role }: { children: ReactNode; role?: string }) {
+export default function AdminLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const [search, setSearch] = useState('')
   const { t } = useI18n()
+  // 角色来自全局 store（F-06），不再逐层 props 传递
+  const role = useAuthStore((s) => s.role)
 
   // 「文档与协议」等分组仅超级管理员可见，非超管前置过滤掉对应分组
   const isSuper = role === 'super-admin'
@@ -47,17 +50,15 @@ export default function AdminLayout({ children, role }: { children: ReactNode; r
   const selected = findSelectedKey(location.pathname)
   // 当前路由所属分组：路由切换时自动展开该分组（仅统计可见分组）
   const selectedGroup = visibleGroups.find((g) => g.items.some((i) => i.key === selected))?.groupKey
-  const [openKeys, setOpenKeys] = useState<string[]>([])
-  // 路由换到别的分组时把新分组并进展开列表。这类「随 prop 变化调整自身状态」的写法，
-  // 官方给的方案就是在渲染期比对上一次的分组再决定是否更新；放进 effect 里同步 setState
-  // 会多一轮级联渲染，也过不了 react-hooks/set-state-in-effect。
-  const [lastGroup, setLastGroup] = useState(selectedGroup)
-  if (selectedGroup !== lastGroup) {
-    setLastGroup(selectedGroup)
-    if (selectedGroup && !openKeys.includes(selectedGroup)) {
-      setOpenKeys([...openKeys, selectedGroup])
-    }
-  }
+  const [openKeys, setOpenKeys] = useState<string[]>(() => (selectedGroup ? [selectedGroup] : []))
+  // 路由换到别的分组时把新分组并进展开列表。渲染期直接 setState 违反 React 纯渲染原则，
+  // 会在 StrictMode 下多跑一遍、也可能触发额外渲染；改为记住上一次分组，在 effect 里同步。
+  const lastGroupRef = useRef<string | undefined>(selectedGroup)
+  useEffect(() => {
+    if (!selectedGroup || selectedGroup === lastGroupRef.current) return
+    lastGroupRef.current = selectedGroup
+    setOpenKeys((keys) => (keys.includes(selectedGroup) ? keys : [...keys, selectedGroup]))
+  }, [selectedGroup])
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -115,7 +116,7 @@ export default function AdminLayout({ children, role }: { children: ReactNode; r
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <Brand size="xs" title="PACC" />
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                © 2026 POTATOTV · PACC Anti-Cheat · v5.0.0
+                © 2026 POTATOTV · PACC Anti-Cheat · v{__APP_VERSION__}
               </span>
             </div>
           </Footer>

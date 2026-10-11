@@ -1,63 +1,27 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Spin } from 'antd'
-import { api } from './api/client'
 import Layout from './components/Layout'
 import PageTransition from './components/PageTransition'
 import TopProgressBar from './components/TopProgressBar'
+import AppErrorBoundary from './components/AppErrorBoundary'
+import { useAuthStore } from './store/auth'
+import { coreRoutes } from './routes/core'
+import { mapsRoutes } from './routes/maps'
+import { p1Routes } from './routes/p1'
+import { v52Routes } from './routes/v52'
+import { v54Routes } from './routes/v54'
+import { dfRoutes } from './routes/df'
 
 // 页面组件一律按需加载：全站 80+ 页面若静态引入会打进同一个 chunk，
 // 首屏要把大屏、报表、图表这些多数人用不到的实现一起下载。
+// 管理端其余路由按域拆到 src/routes/*（F-12），这里只留脱离 Layout 的特殊视图。
 const Login = lazy(() => import('./pages/Login'))
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Redscreen = lazy(() => import('./pages/Redscreen'))
-const Inspect = lazy(() => import('./pages/Inspect'))
-const SignatureLibrary = lazy(() => import('./pages/SignatureLibrary'))
-const Accounts = lazy(() => import('./pages/Accounts'))
-const Detection41 = lazy(() => import('./pages/Detection41'))
-const Countermeasure = lazy(() => import('./pages/Countermeasure'))
-const V46Detection = lazy(() => import('./pages/V46Detection'))
-const V47ThreatIntel = lazy(() => import('./pages/V47ThreatIntel'))
-const Compliance = lazy(() => import('./pages/Compliance'))
-const CheatRecords = lazy(() => import('./pages/CheatRecords'))
-const Competition = lazy(() => import('./pages/Competition'))
-const Tournament = lazy(() => import('./pages/Tournament'))
-const AdminLoginLogs = lazy(() => import('./pages/AdminLoginLogs'))
-const BiReport = lazy(() => import('./pages/bi/BiReport'))
-const OpenApi = lazy(() => import('./pages/openapi/OpenApi'))
-const System = lazy(() => import('./pages/System'))
-const Admins = lazy(() => import('./pages/Admins'))
-const Audit = lazy(() => import('./pages/Audit'))
-const Tenant = lazy(() => import('./pages/Tenant'))
-const StreamLive = lazy(() => import('./pages/StreamLive'))
-const AbExperiment = lazy(() => import('./pages/AbExperiment'))
-const OpsCenter = lazy(() => import('./pages/OpsCenter'))
-const SupportCenter = lazy(() => import('./pages/SupportCenter'))
-const MapPoolManager = lazy(() => import('./pages/maps/MapPoolManager'))
-const BpSessions = lazy(() => import('./pages/maps/BpSessions'))
-const BpConsole = lazy(() => import('./pages/maps/BpConsole'))
-const Releases = lazy(() => import('./pages/p1/Releases'))
-const RuleEditor = lazy(() => import('./pages/p1/RuleEditor'))
-const Lists = lazy(() => import('./pages/p1/Lists'))
-const Exports = lazy(() => import('./pages/p1/Exports'))
-const Effectiveness = lazy(() => import('./pages/p1/Effectiveness'))
-const DetectorConfig = lazy(() => import('./pages/p1/DetectorConfig'))
-const EffectConfig = lazy(() => import('./pages/p1/EffectConfig'))
-const ModelManager = lazy(() => import('./pages/v52/ModelManager'))
-const BehaviorProfile = lazy(() => import('./pages/v52/BehaviorProfile'))
-const ReputationManager = lazy(() => import('./pages/v52/ReputationManager'))
-const ReplayManager = lazy(() => import('./pages/v52/ReplayManager'))
-const DeviceFingerprint = lazy(() => import('./pages/v52/DeviceFingerprint'))
-const ApmMonitor = lazy(() => import('./pages/v54/ApmMonitor'))
-const SecurityAudit = lazy(() => import('./pages/v54/SecurityAudit'))
-const KeyManagement = lazy(() => import('./pages/v54/KeyManagement'))
 const DfScreen = lazy(() => import('./pages/df/DfScreen'))
-const DfAlertNoise = lazy(() => import('./pages/df/AlertNoise'))
-const DfAutomation = lazy(() => import('./pages/df/Automation'))
-const DfPluginRuntime = lazy(() => import('./pages/df/PluginRuntime'))
-const DfTenantQuota = lazy(() => import('./pages/df/TenantQuota'))
 const PlayerPortal = lazy(() => import('./pages/player/PlayerPortal'))
 const PlayerScreenShare = lazy(() => import('./pages/player/PlayerScreenShare'))
+const DesktopRedscreen = lazy(() => import('./pages/desktop/DesktopRedscreen'))
+const DesktopConsent = lazy(() => import('./pages/desktop/DesktopConsent'))
 
 /** 按需加载页面时的占位，避免切换路由时白屏 */
 function PageLoading() {
@@ -68,28 +32,34 @@ function PageLoading() {
   )
 }
 
+// 「文档与协议」分组（含内部技术资料）仅超级管理员可访问；非超管直接访问时重定向回数据大盘。
+// 前端重定向只是 UX 优化，真正的越权拦截在服务端（@SuperAdminOnly）。
+const GATED_DOCS = ['/detection41', '/countermeasure', '/v46', '/v47', '/openapi', '/bi']
+
 export default function App() {
   // 先声明 Hook（必须无条件、固定顺序），再做路径分支渲染，避免条件调用 Hook
   const { pathname } = useLocation()
-  const [authed, setAuthed] = useState<boolean | null>(null)
-  const [role, setRole] = useState<string>('')
+  const authed = useAuthStore((s) => s.authed)
+  const role = useAuthStore((s) => s.role)
+  const refresh = useAuthStore((s) => s.refresh)
 
   useEffect(() => {
-    let alive = true
-    api.adminSession
-      .me()
-      .then((d) => { if (alive) { setAuthed(true); setRole(d.role) } })
-      .catch(() => alive && setAuthed(false))
-    return () => {
-      alive = false
-    }
-  }, [])
+    void refresh()
+  }, [refresh])
 
-  // 「文档与协议」分组（含内部技术资料）仅超级管理员可访问；非超管直接访问时重定向回数据大盘
-  const gatedDocs = ['/detection41', '/countermeasure', '/v46', '/v47', '/openapi', '/bi']
-  const docGated = role !== 'super-admin' && gatedDocs.some((p) => pathname === p || pathname.startsWith(p + '/'))
+  const docGated = role !== 'super-admin' && GATED_DOCS.some((p) => pathname === p || pathname.startsWith(p + '/'))
 
   function renderRoute() {
+    // 桌面壳（Tauri）为红屏/协议确认窗口注入视图标记：这些窗口直接渲染专用视图，
+    // 不进入管理端鉴权与路由（窗口以静态资源根路径加载，没有可用的 pathname）。
+    const desktopView = (window as unknown as { __PACC_VIEW__?: string }).__PACC_VIEW__
+    if (desktopView === 'redscreen') {
+      return <DesktopRedscreen />
+    }
+    if (desktopView === 'consent') {
+      return <DesktopConsent />
+    }
+
     // 玩家自助门户独立于管理端鉴权，路径以 /portal 开头即进入
     if (pathname.startsWith('/portal')) {
       return <PlayerPortal />
@@ -126,56 +96,16 @@ export default function App() {
     }
 
     return (
-      <Layout role={role}>
+      <Layout>
         <TopProgressBar />
         <PageTransition>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/redscreen" element={<Redscreen />} />
-            <Route path="/inspect" element={<Inspect />} />
-            <Route path="/signatures" element={<SignatureLibrary />} />
-            <Route path="/accounts" element={<Accounts />} />
-            <Route path="/records" element={<CheatRecords />} />
-            <Route path="/competition" element={<Competition />} />
-            <Route path="/tournament" element={<Tournament />} />
-            <Route path="/maps" element={<MapPoolManager />} />
-            <Route path="/maps/bp" element={<BpSessions />} />
-            <Route path="/maps/bp/:bpId" element={<BpConsole />} />
-            <Route path="/stream-live" element={<StreamLive />} />
-            <Route path="/detection41" element={<Detection41 />} />
-            <Route path="/countermeasure" element={<Countermeasure />} />
-            <Route path="/v46" element={<V46Detection />} />
-            <Route path="/v47" element={<V47ThreatIntel />} />
-            <Route path="/compliance" element={<Compliance />} />
-            <Route path="/login-logs" element={<AdminLoginLogs />} />
-            <Route path="/audit" element={<Audit />} />
-            <Route path="/tenant" element={<Tenant />} />
-            <Route path="/admins" element={<Admins />} />
-            <Route path="/system" element={<System />} />
-            <Route path="/bi" element={<BiReport />} />
-            <Route path="/openapi" element={<OpenApi />} />
-            <Route path="/ab" element={<AbExperiment />} />
-            <Route path="/ops" element={<OpsCenter />} />
-            <Route path="/support" element={<SupportCenter />} />
-            <Route path="/releases" element={<Releases />} />
-            <Route path="/prl-editor" element={<RuleEditor />} />
-            <Route path="/lists" element={<Lists />} />
-            <Route path="/export" element={<Exports />} />
-            <Route path="/effectiveness" element={<Effectiveness />} />
-            <Route path="/config" element={<DetectorConfig />} />
-            <Route path="/motion" element={<EffectConfig />} />
-            <Route path="/v52/model" element={<ModelManager />} />
-            <Route path="/v52/profile" element={<BehaviorProfile />} />
-            <Route path="/v52/reputation" element={<ReputationManager />} />
-            <Route path="/v52/replay" element={<ReplayManager />} />
-            <Route path="/v52/devices" element={<DeviceFingerprint />} />
-            <Route path="/v54/apm" element={<ApmMonitor />} />
-            <Route path="/v54/security" element={<SecurityAudit />} />
-            <Route path="/v54/keys" element={<KeyManagement />} />
-            <Route path="/df/alerts-noise" element={<DfAlertNoise />} />
-            <Route path="/df/automation" element={<DfAutomation />} />
-            <Route path="/df/plugins" element={<DfPluginRuntime />} />
-            <Route path="/df/tenant-quota" element={<DfTenantQuota />} />
+            {coreRoutes}
+            {mapsRoutes}
+            {p1Routes}
+            {v52Routes}
+            {v54Routes}
+            {dfRoutes}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </PageTransition>
@@ -183,5 +113,10 @@ export default function App() {
     )
   }
 
-  return <Suspense fallback={<PageLoading />}>{renderRoute()}</Suspense>
+  // 错误边界放在 Suspense 外层：懒加载分块拉取失败也能落到降级页，而不是整站白屏。
+  return (
+    <AppErrorBoundary>
+      <Suspense fallback={<PageLoading />}>{renderRoute()}</Suspense>
+    </AppErrorBoundary>
+  )
 }

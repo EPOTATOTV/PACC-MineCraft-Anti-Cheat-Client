@@ -1,10 +1,16 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import pkg from './package.json'
 
 // PTV 管理后台前端。开发时通过代理将 /api 转发到后端（本地联调为 9090 的 local profile 实例）。
 export default defineConfig(() => ({
   plugins: [react()],
+  // 版本号以 package.json 为唯一来源（F-05）：页脚等处的展示读 __APP_VERSION__，禁止硬编码，
+  // 免得仓库升到 5.4.0 页脚还写着 v5.0.0。
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     // @potatotv/prl-editor 是 file: 依赖（软链到 pacc-rule-language/prl-editor），
     // 它自己的 node_modules 里也装了一份 react。不 dedupe 的话，编辑器产物里的

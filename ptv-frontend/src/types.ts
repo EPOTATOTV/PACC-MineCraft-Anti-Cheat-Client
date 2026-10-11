@@ -495,6 +495,19 @@ export interface RedScreenDetail {
   player?: { pteid: string; reputation: number; device: string }
 }
 
+/** 远程查端 ICE 服务器条目（GET /api/admin/webrtc/ice-servers → ice_servers）。 */
+export interface IceServerConfig {
+  urls: string[]
+  username?: string
+  credential?: string
+}
+
+/** ICE 服务器下发结果；turn_configured=false 表示未配置 TURN（企业 NAT/防火墙下可能连不通）。 */
+export interface IceServersResponse {
+  ice_servers: IceServerConfig[]
+  turn_configured: boolean
+}
+
 /** 通知中心条目 */
 export interface PlayerNotification {
   id: string

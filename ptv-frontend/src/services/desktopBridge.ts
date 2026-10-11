@@ -26,12 +26,25 @@ export interface DetectionStatus {
   last_event_type?: string
   redscreen_active?: boolean
   redscreen_level?: number
+  /** 当前红屏是否针对本机玩家：仅被检测者锁键盘、无「继续」按钮。 */
+  redscreen_is_target?: boolean
+  redscreen_cheat_type?: string
+  redscreen_risk_score?: string
+  keyboard_locked?: boolean
+  keyboard_backend?: string
+  driver_active?: boolean
 }
 
 export interface DetectionConfig {
   heartbeat_seconds?: number
   client_risk?: number
   enabled?: boolean
+}
+
+export interface ConsentStatus {
+  accepted: boolean
+  version: string
+  accepted_version?: string | null
 }
 
 /** 是否运行在桌面壳（Tauri WebView）内。 */
@@ -65,5 +78,9 @@ export const desktopBridge = {
   pteid: () => invoke<{ pteid: string }>('pteid_info'),
   openLogs: () => invoke<void>('open_logs'),
   setAutostart: (enabled: boolean) => invoke<void>('set_autostart', { enabled }),
+  /** 非被检测者的「继续」：仅关闭本机红屏窗口，不动键盘锁与服务端告警状态。 */
+  dismissRedscreen: () => invoke<void>('dismiss_redscreen'),
+  consentStatus: () => invoke<ConsentStatus>('consent_status'),
+  acceptConsent: (version: string) => invoke<Record<string, unknown>>('accept_consent', { version }),
   onEvent,
 }

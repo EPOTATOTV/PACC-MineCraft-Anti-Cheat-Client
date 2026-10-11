@@ -1,0 +1,27 @@
+# PACC Geyser 扩展配置。字段与 pacc-bukkit 保持一致，缺失的键一律走默认值。
+# 处置级别：0=仅告警（默认），1=踢出（断开本连接），2=封禁（Geyser 代理层不支持，仅断开）。
+punishment-mode: 0
+confidence-threshold: 60
+# 按连接设备类型（手机 / 主机 / VR 等）放宽阈值基线，降低跨平台误报。默认开启。
+device-threshold-adjust: true
+# 留空表示全部检查项启用。
+enabled-checks:
+  - MOVE
+  - COMBAT
+  - PACKET
+  - INVENTORY
+  - INTERACTION
+  - CLIENT_BRAND
+  - ADDON
+  - DATA_CONSISTENCY
+max-reach-distance: 3.1
+max-cps: 16
+max-horizontal-speed-per-tick: 0.42
+max-place-per-tick: 1
+fly-airborne-ticks-trigger: 20
+# 留空表示按 server-name:port 自动生成。
+server-id: ""
+ptv:
+  url: ""
+  secret: ""
+  server-id: ""

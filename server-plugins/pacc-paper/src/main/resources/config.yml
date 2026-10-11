@@ -1,0 +1,45 @@
+# PACC Paper 参考插件配置。
+# 本插件在本服务器内做本地检测与留痕；处置默认仅告警，可由运维显式配置踢出 / 封禁。
+
+# 本服务端标识。留空时由服务端名称 + 端口自动推导。
+server-id: ""
+
+# 处置级别：0=仅告警，1=告警+踢出，2=告警+封禁。默认 0。
+# 注意：1 / 2 只在本服务器内生效（踢出 / 名称封禁），不跨服务器，也不对接任何第三方封禁系统。
+punishment-mode: 0
+
+# 触发告警的最小置信度 [0,100]，低于该值只留痕不告警。
+confidence-threshold: 60
+
+# 攻击距离上限（格）。超过视为 REACH 违规。
+max-reach-distance: 3.1
+
+# 每秒点击上限（CPS）。超过视为 AUTO_CLICKER 违规。
+max-cps: 16
+
+# 每刻最大水平移动距离（格/刻）。超过视为 SPEED 违规。
+max-horizontal-speed-per-tick: 0.42
+
+# 同一刻最大放置次数。超过视为 FAST_PLACE 违规。
+max-place-per-tick: 1
+
+# 连续滞空且持续上升多少刻后判定 FLY 违规。
+fly-airborne-ticks-trigger: 20
+
+# 启用的检查项分类（CheckType 名称）。留空表示全部启用。
+enabled-checks:
+  - MOVE
+  - COMBAT
+  - PACKET
+  - INVENTORY
+  - INTERACTION
+  - CLIENT_BRAND
+  - ADDON
+  - DATA_CONSISTENCY
+
+# 上报到 PTV 管控后端。url 留空时不做任何网络请求（等同 Noop）。
+ptv:
+  url: ""
+  secret: ""
+  # 上报时使用的服务端标识；留空则回退到顶层 server-id。
+  server-id: ""

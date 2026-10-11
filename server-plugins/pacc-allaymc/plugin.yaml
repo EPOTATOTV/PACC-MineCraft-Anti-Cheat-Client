@@ -1,0 +1,13 @@
+# PACC AllayMC 插件元数据（基岩版，纯 Go 实现，v6.0.0）。
+#
+# 字段命名遵循 AllayMC 插件加载约定：main 指向插件包，entry 指向导出入口构造函数。
+# 注意：AllayMC 各版本的元数据键名可能不同（如 id / name / main / entry 的具体约定），
+# 需按实际使用的 AllayMC 版本文档校准；本文件是可直接加载的默认骨架。
+name: PACC
+id: pacc
+version: 6.0.0
+main: github.com/EPOTATOTV/PACC4_0/server-plugins/pacc-allaymc
+entry: New
+author: PotatoTV
+description: PACC 服务端本地检测与留痕插件（基岩版 / AllayMC），默认仅告警，可由运维配置踢出 / 封禁。
+api-version: "1.21"

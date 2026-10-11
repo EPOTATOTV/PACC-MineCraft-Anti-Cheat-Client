@@ -1,0 +1,7 @@
+# Geyser 扩展描述文件，放在 jar 的 resources 根目录。
+id: pacc-geyser
+name: PACC Geyser
+main: com.potatotv.pacc.geyser.PaccGeyserExtension
+api: 2.11.3
+version: 6.0.0
+authors: [PotatoTV]

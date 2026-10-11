@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "pacc",
+  "version": "${version}",
+  "name": "PACC ClientGuard (Fabric)",
+  "description": "PACC 玩家端本地检测模组。仅做本地检测、留痕与红屏强制警告，不含任何封禁 / 踢出能力。检测数据只来自玩家设备本机，经 PACC 独立通道上报 PTV 管控后端。",
+  "authors": [
+    "PotatoTV"
+  ],
+  "license": "Apache-2.0",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.potatotv.pacc.fabric.PaccFabricMod"
+    ]
+  },
+  "mixins": [
+    "pacc.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "${minecraft_version_range}",
+    "fabric-api": "*"
+  }
+}

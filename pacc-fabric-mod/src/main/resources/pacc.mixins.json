@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.potatotv.pacc.fabric.mixin",
+  "compatibilityLevel": "${java_compatibility}",
+  "client": [
+    "KeyboardMixin",
+    "MouseMixin",
+    "GameRendererMixin",
+    "ClientPlayerEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

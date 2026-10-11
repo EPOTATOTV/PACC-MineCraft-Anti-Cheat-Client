@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.potatotv.pacc</groupId>
+    <artifactId>pacc-client-core</artifactId>
+    <version>6.0.0</version>
+    <name>PACC Client Core</name>
+    <description>PACC 玩家端模式的客户端检测核心：与加载器无关的本地检测逻辑（Mod 列表扫描、移动与战斗检测）、
+        红屏 / 键盘锁定的加载器无关抽象、以及经 PTV 独立通道的上报边界。
+        纯 JDK 标准库实现，零第三方运行时依赖；具体渲染与吞键由 Forge/Fabric 加载器层实现。
+        玩家端只做本地检测、留痕与红屏强制警告，不含任何封禁 / 踢出能力。</description>
+
+    <url>https://github.com/EPOTATOTV/PACC4_0</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>potatotv</id>
+            <name>PotatoTV</name>
+            <organization>PotatoTV</organization>
+            <organizationUrl>https://github.com/EPOTATOTV</organizationUrl>
+        </developer>
+    </developers>
+    <scm>
+        <connection>scm:git:https://github.com/EPOTATOTV/PACC4_0.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/EPOTATOTV/PACC4_0.git</developerConnection>
+        <url>https://github.com/EPOTATOTV/PACC4_0</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+            <!-- 零依赖是硬约束：客户端核心只能被加载器层依赖，自身运行时只用 JDK 标准库。
+                 只允许 test 作用域（JUnit）。主代码一旦引入第三方依赖，构建直接失败。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <id>enforce-zero-dependencies</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+                                    <excludes>
+                                        <exclude>*:*:*:*:compile</exclude>
+                                        <exclude>*:*:*:*:runtime</exclude>
+                                    </excludes>
+                                    <message>pacc-client-core 运行时必须零第三方依赖（仅允许 test 作用域的 JUnit）。</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

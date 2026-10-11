@@ -1,0 +1,31 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "Apache-2.0"
+issueTrackerURL = "https://github.com/EPOTATOTV/PACC4_0/issues"
+
+[[mods]]
+modId = "${mod_id}"
+version = "${mod_version}"
+displayName = "PACC ClientGuard (Forge)"
+authors = "PotatoTV"
+description = '''
+PACC 玩家端本地检测模组。仅做本地检测、留痕与红屏强制警告，不含任何封禁 / 踢出能力。
+检测数据只来自玩家设备本机，经 PACC 独立通道上报 PTV 管控后端。
+'''
+displayTest = "IGNORE_ALL_VERSION"
+
+[[dependencies.${mod_id}]]
+modId = "forge"
+type = "required"
+mandatory = true
+versionRange = "${forge_version_range}"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.${mod_id}]]
+modId = "minecraft"
+type = "required"
+mandatory = true
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "CLIENT"

@@ -1,0 +1,9 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        // ForgeGradle 与 Sponge Mixin 插件的来源
+        maven { name = 'MinecraftForge'; url = 'https://maven.minecraftforge.net/' }
+    }
+}
+
+rootProject.name = 'pacc-forge-mod'

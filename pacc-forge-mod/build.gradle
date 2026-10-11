@@ -1,0 +1,95 @@
+plugins {
+    id 'net.minecraftforge.gradle' version '[6.0.24,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
+}
+
+// ---- MC 大版本矩阵：按 mcVersion 读取 gradle/versions/<mcVersion>.properties ----
+def mcVersion = providers.gradleProperty('mcVersion').getOrElse('1.20.1')
+def versionFile = file("gradle/versions/${mcVersion}.properties")
+if (!versionFile.exists()) {
+    throw new GradleException("不支持的 mcVersion=${mcVersion}，缺少 ${versionFile}")
+}
+def mc = new Properties()
+versionFile.withInputStream { mc.load(it) }
+
+def modVersionValue = providers.gradleProperty('modVersion').getOrElse('6.0.0')
+def clientCoreVersion = providers.gradleProperty('paccClientCoreVersion').getOrElse('6.0.0')
+
+version = "${modVersionValue}+mc${mcVersion}"
+group = 'com.potatotv.pacc'
+base.archivesName = 'pacc-forge'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(mc.getProperty('java_version') as int)
+    }
+}
+
+repositories {
+    // pacc-client-core 由本仓库 Maven 构建后 install 到本地仓库（见 CI）。
+    mavenLocal()
+    maven { name = 'MinecraftForge'; url = 'https://maven.minecraftforge.net/' }
+}
+
+minecraft {
+    mappings channel: mc.getProperty('mappings_channel'), version: mc.getProperty('minecraft_version')
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'info'
+            mods {
+                pacc {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+// jarJar 让 pacc-client-core 随模组一起打包。必须在 dependencies 里引用 jarJar 配置之前启用。
+jarJar.enable()
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${mc.getProperty('minecraft_version')}-${mc.getProperty('forge_version')}"
+    // 客户端检测核心：与加载器无关的纯 Java 内核，随模组一起打包（jarJar）。
+    implementation "com.potatotv.pacc:pacc-client-core:${clientCoreVersion}"
+    jarJar "com.potatotv.pacc:pacc-client-core:${clientCoreVersion}"
+    annotationProcessor "org.spongepowered:mixin:${mc.getProperty('mixin_processor_version')}:processor"
+}
+
+mixin {
+    add sourceSets.main, 'pacc.refmap.json'
+    config 'pacc.mixins.json'
+}
+
+// 把版本矩阵参数写进 mods.toml / pacc.mixins.json，避免手改资源里的版本号。
+tasks.named('processResources', ProcessResources).configure {
+    def props = [
+            mod_id                 : 'pacc',
+            mod_version            : modVersionValue,
+            minecraft_version      : mc.getProperty('minecraft_version'),
+            minecraft_version_range: mc.getProperty('minecraft_version_range'),
+            forge_version_range    : mc.getProperty('forge_version_range'),
+            loader_version_range   : mc.getProperty('loader_version_range'),
+            java_compatibility     : mc.getProperty('java_compatibility_level')
+    ]
+    inputs.properties props
+    filesMatching(['META-INF/mods.toml', 'pacc.mixins.json']) {
+        expand props
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : 'pacc',
+                'Specification-Vendor'    : 'PotatoTV',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.version,
+                'Implementation-Vendor'   : 'PotatoTV'
+        ])
+    }
+    finalizedBy 'reobfJar'
+}

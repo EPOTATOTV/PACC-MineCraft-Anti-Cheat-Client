@@ -13,7 +13,8 @@ import re
 import sys
 
 path = sys.argv[1]
-lines = open(path, encoding="utf-8").read().split("\n")
+with open(path, encoding="utf-8") as _f:
+    lines = _f.read().split("\n")
 
 errors = []
 conds = 0
@@ -81,7 +82,8 @@ if conds != 0:
 if defines != 0:
     errors.append(f"define 未闭合：深度={defines}")
 
-src = open(path, encoding="utf-8").read()
+with open(path, encoding="utf-8") as _f:
+    src = _f.read()
 evals = re.findall(r"\$\(eval \$\(call PACC_BPF_RULE,([\w-]+),", src)
 if len(evals) != 3:
     errors.append(f"期望 3 条 PACC_BPF_RULE 展开，实际 {len(evals)}")

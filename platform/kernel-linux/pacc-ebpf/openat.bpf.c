@@ -42,7 +42,7 @@ static __always_inline int pacc_ends_with_mem(const char *path, int len)
 	if (len < PACC_MEM_SUFFIX_LEN)
 		return 0;
 	tail = len - PACC_MEM_SUFFIX_LEN;
-	if (tail < 0 || tail > PACC_PAYLOAD_LEN - PACC_MEM_SUFFIX_LEN)
+	if (tail > PACC_PAYLOAD_LEN - PACC_MEM_SUFFIX_LEN)
 		return 0;
 #pragma unroll
 	for (int i = 0; i < PACC_MEM_SUFFIX_LEN; i++) {

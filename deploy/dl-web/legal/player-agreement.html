@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>玩家协议 | PACC</title>
+  <meta name="description" content="PACC 玩家协议：玩家端的检测方式、数据授权、红屏与申诉流程，以及服务端插件模式的说明。" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#050608" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f1ee" />
+
+  <script>
+    (function () {
+      try {
+        var v = localStorage.getItem('pacc-dl-theme');
+        if (v !== 'light' && v !== 'dark') {
+          v = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.dataset.theme = v;
+      } catch (e) {
+        document.documentElement.dataset.theme = 'dark';
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      try {
+        var KEY = 'pacc-dl-lang';
+        var q = new URLSearchParams(location.search).get('lang');
+        if (q === 'zh-CN' || q === 'en') {
+          localStorage.setItem(KEY, q);
+        } else {
+          q = localStorage.getItem(KEY);
+        }
+        document.documentElement.lang = q === 'en' ? 'en' : 'zh-CN';
+      } catch (e) { /* 保持 HTML 上的 lang */ }
+    })();
+  </script>
+
+  <link rel="icon" href="../favicon.ico" />
+  <link rel="preload" as="font" type="font/ttf" href="../fonts/RussoOne.ttf" crossorigin />
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="../index.html" aria-label="返回首页 / Back to home">
+        <img src="../logo.png" width="26" height="26" alt="" class="brand-logo" />
+        <span class="brand-font">PACC</span>
+      </a>
+      <nav>
+        <a href="?lang=zh-CN">中文</a>
+        <a href="?lang=en">EN</a>
+        <a class="dl mono" href="../index.html#download">下载 / Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="doc-wrap doc">
+    <div class="doc-top">
+      <a class="doc-back" href="../index.html">← 返回下载页 / Back</a>
+      <span class="doc-meta">PACC · POTATOTV</span>
+    </div>
+
+    <article lang="zh-CN">
+      <h1>玩家协议</h1>
+      <p class="doc-meta">最近更新：2026-10-11</p>
+
+      <h2>一、这份协议管什么</h2>
+      <p>本协议说明 PACC 在<strong>玩家端模式</strong>与<strong>服务端插件模式</strong>下分别做什么、检测依据是什么、你授权了哪些数据，以及当你被判定违规时有哪些流程。使用 PACC 相关软件即表示你接受本协议。</p>
+
+      <h2>二、玩家端模式做什么</h2>
+      <p>玩家端软件运行在你自己的设备上，只做本机检测、留痕与远程查端，<strong>不具备任何封禁或踢出能力</strong>，也不会为第三方封禁系统预留接口。也就是说，它不会替任何服务器对你执行封禁。</p>
+
+      <h2>三、检测依据与数据授权</h2>
+      <p>检测数据只来自你设备本机，不接入游戏服务器 API、不读取游戏服务器数据库。在你使用期间，客户端会采集：</p>
+      <ul>
+        <li>运行环境信息：进程与驱动清单、模块加载记录</li>
+        <li>硬件与系统指纹摘要（用于识别同设备异常重复）</li>
+        <li>运行时行为快照：输入时序统计、内存与调用完整性检查结果</li>
+        <li>对抗性环境信号：调试器、DMA 设备、虚拟化 / 沙箱迹象</li>
+      </ul>
+      <p>这些结果经 PACC 独立通道上报至管控后台，用于风险评分与证据留痕。我们不上报你的个人文件内容、聊天记录或浏览器历史，也不录屏。数据用途与保存期限见<a href="privacy.html">隐私政策</a>。</p>
+
+      <h2>四、红屏与查端</h2>
+      <p>当本机检测的综合风险评分达到阈值时，客户端会触发<strong>红屏强制警告</strong>，并进入待查验状态。管理后台可对高风险账号发起远程查端，采集运行态证据用于人工核验。红屏只是提示与留痕，本身不等于最终判定。</p>
+
+      <h2>五、申诉</h2>
+      <p>如果你认为判定有误，可通过管控台自助门户提交申诉。涉及赛事判定证据的部分，需先完成申诉流程后再处理数据查询 / 更正请求。我们鼓励先申诉、再结论。</p>
+
+      <h2>六、服务端插件模式说明</h2>
+      <p>部分服务器会自愿部署 PACC 服务端插件。该插件运行在<strong>服务器运营方自己的进程内</strong>，可读取本服务器的数据用于检测，并可依据运营方的配置在本服务器内执行告警、踢出或临时封禁，<strong>默认仅告警</strong>。这类处置只作用于该服务器，PACC 不支持跨服务器封禁，也不对接任何第三方封禁系统。</p>
+      <p>请注意：玩家端模式与服务端插件模式是两种独立部署形态，是否部署插件由各服务器自行决定，与本协议中玩家端不封禁的承诺并不冲突。</p>
+
+      <h2>七、公平使用</h2>
+      <p>你同意不通过调试、注入、篡改内存或伪造上报等方式规避检测。此类行为本身即构成违约，并可能被记录为作弊证据。</p>
+
+      <h2>八、联系我们</h2>
+      <p>邮箱：<a href="mailto:support@potatotv.asia">support@potatotv.asia</a></p>
+
+      <p class="doc-foot doc-meta"><a href="eula.html">最终用户许可协议 →</a> · <a href="privacy.html">隐私政策</a> · <a href="terms.html">服务协议</a></p>
+    </article>
+
+    <article lang="en">
+      <h1>Player Agreement</h1>
+      <p class="doc-meta">Last updated: 2026-10-11</p>
+
+      <h2>1. Scope</h2>
+      <p>This agreement explains what PACC does in <strong>client mode</strong> and <strong>server-plugin mode</strong>, what it detects, which data you authorise, and what happens if you are flagged. Using PACC software means you accept it.</p>
+
+      <h2>2. What client mode does</h2>
+      <p>The client runs on your own device and performs local detection, evidence logging and remote inspection only. <strong>It has no ban or kick capability</strong> and does not expose hooks for third-party ban systems. In other words, it will not ban you on behalf of any server.</p>
+
+      <h2>3. Detection basis and data you authorise</h2>
+      <p>Detection data comes only from your local device; we do not call game-server APIs or read game-server databases. While you use it, the client collects:</p>
+      <ul>
+        <li>Runtime environment: process and driver lists, module load records</li>
+        <li>Hardware and system fingerprint digests (to spot abnormal duplication on the same machine)</li>
+        <li>Runtime behaviour snapshots: input timing statistics, memory and call integrity check results</li>
+        <li>Adversarial environment signals: debuggers, DMA devices, virtualisation / sandbox traces</li>
+      </ul>
+      <p>These results are reported over PACC's own channel to the console for risk scoring and evidence logging. We do not report the contents of your personal files, chat history or browser history, and we do not record your screen. Uses and retention are covered by the <a href="privacy.html">Privacy Policy</a>.</p>
+
+      <h2>4. Red screen and inspection</h2>
+      <p>When the local composite risk score reaches the threshold, the client shows a <strong>mandatory red screen warning</strong> and enters a pending-inspection state. The console may start a remote inspection of a high-risk account to gather runtime evidence for manual review. A red screen is a prompt and a record, not a final determination.</p>
+
+      <h2>5. Appeals</h2>
+      <p>If you believe a decision is wrong, submit an appeal through the self-service portal. Where the data forms part of a tournament decision, the appeal must be completed before data access or correction requests are handled. We encourage appealing first, concluding second.</p>
+
+      <h2>6. About server-plugin mode</h2>
+      <p>Some servers voluntarily deploy the PACC server plugin. It runs <strong>inside the server operator's own process</strong>, may read that server's data for detection, and may — per the operator's configuration — alert, kick or temporarily ban within that server, with an <strong>alert-only default</strong>. Such actions apply to that server only. PACC does not support cross-server bans, nor integration with third-party ban systems.</p>
+      <p>Note: client mode and server-plugin mode are two independent deployment forms. Whether a server deploys the plugin is its own decision, and this does not conflict with the client mode's no-ban commitment.</p>
+
+      <h2>7. Fair use</h2>
+      <p>You agree not to evade detection by debugging, injecting, tampering with memory, or forging reports. Doing so is itself a breach and may be recorded as cheat evidence.</p>
+
+      <h2>8. Contact</h2>
+      <p>Email: <a href="mailto:support@potatotv.asia">support@potatotv.asia</a></p>
+
+      <p class="doc-foot doc-meta"><a href="eula.html">EULA →</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
+    </article>
+  </main>
+</body>
+</html>

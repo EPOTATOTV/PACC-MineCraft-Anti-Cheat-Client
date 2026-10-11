@@ -7,8 +7,18 @@
 window.PACC_CONFIG = (function () {
   var PACC_VERSION = '5.4.0';
 
+  // 渠道版本覆盖：缺省与 PACC_VERSION 一致，某渠道单独发版时在此登记，
+  // 未登记的渠道自动跟随主版本，不必改渲染逻辑。
+  var PLATFORM_VERSIONS = {};
+
+  function versionFor(id) {
+    return PLATFORM_VERSIONS[id] || PACC_VERSION;
+  }
+
   return {
     PACC_VERSION: PACC_VERSION,
+    platformVersions: PLATFORM_VERSIONS,
+    versionFor: versionFor,
     // 发布包目录，与 files/version.json 里的 URL 同源
     filesBase: '/files',
     // 下载站自身对外品牌版本，页脚等处引用

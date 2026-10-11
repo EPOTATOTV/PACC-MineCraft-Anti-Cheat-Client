@@ -215,6 +215,31 @@
     </div>
   </section>
 
+  <section class="platform-center" id="platforms">
+    <div class="section-head">
+      <h2 data-i18n="pc.title">平台选择</h2>
+      <span class="tag mono">13 CHANNELS</span>
+    </div>
+    <p class="sub" data-i18n="pc.sub">按平台与用途选择渠道。下载后请核对校验和，并通过签名校验确认文件来源。</p>
+
+    <div class="pc-tabs" id="pc-tabs" role="tablist" aria-label="平台分类"
+         data-i18n-attr="aria-label=pc.tabs.aria"></div>
+
+    <div class="pc-grid" id="pc-grid" role="tabpanel" aria-labelledby="pc-tab-all" tabindex="0"></div>
+
+    <div class="pc-matrix" id="pc-matrix"></div>
+
+    <p class="pc-note">
+      <span data-i18n="pc.verify.note">所有渠道均可核对 SHA-256，并通过 </span>
+      <a href="#checksums" data-i18n="pc.verify.link">签名与公钥校验</a>
+      <span data-i18n="pc.verify.note2"> 确认文件未被篡改。</span>
+    </p>
+
+    <noscript>
+      <p class="pc-noscript" data-i18n="pc.noscript">启用 JavaScript 后可浏览完整的多平台下载中心；当前仅展示上方的客户端下载。</p>
+    </noscript>
+  </section>
+
   <section class="visual-strip" aria-label="氛围图">
     <span class="strip-inner" aria-hidden="true">
       <img src="images/banner-720.webp" srcset="images/banner-720.webp 1x, images/banner.webp 2x"
@@ -449,6 +474,8 @@
           <h4 data-i18n="footer.legal">法律</h4>
           <a href="legal/privacy.html" data-i18n="footer.link.privacy">隐私政策</a>
           <a href="legal/terms.html" data-i18n="footer.link.terms">服务协议</a>
+          <a href="legal/eula.html" data-i18n="footer.link.eula">最终用户许可协议</a>
+          <a href="legal/player-agreement.html" data-i18n="footer.link.player">玩家协议</a>
         </div>
         <div class="footer-col">
           <h4 data-i18n="footer.community">社区</h4>
@@ -494,6 +521,8 @@
   <script src="js/i18n.js" defer></script>
   <script src="js/motion.js" defer></script>
   <script src="js/site.js" defer></script>
+  <script src="js/platforms.js" defer></script>
+  <script src="js/platform-center.js" defer></script>
   <script>
     // 版本徽标跟随 config.js，避免 HTML 里再写一份版本号导致两边不一致
     (function () {

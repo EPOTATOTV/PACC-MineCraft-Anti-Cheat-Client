@@ -21,6 +21,10 @@
 - **SSDT 完整性**：加载时定位并快照系统服务分派表条目，按需重读比对，报告分歧（内核 Hook 痕迹）。
 - **驱动枚举 + 签名核验**：遍历 `PsLoadedModuleList`，读取每个映像的 PE 证书目录，
   标记未签名 / 非 Microsoft 驱动（Rootkit 检测）。
+- **键盘过滤（输入暂停）**：kbfiltr 式键盘类过滤驱动，拦截
+  `IOCTL_INTERNAL_KEYBOARD_CONNECT` 包装 kbdclass 的 `KeyboardClassServiceCallback`；
+  红屏期间丢弃键盘输入包（鼠标保留，供管理员查端），支持令牌解锁与注册表持久化。
+  只做输入暂停，不具备封禁能力。
 
 ## 目录结构
 ```
@@ -36,6 +40,7 @@ kernel-windows/
   pacc_regmon.c     -> 注册表监控（IFEO / AppInit_DLLs）
   pacc_ssdt.c       -> SSDT 完整性校验（快照 + 比对）
   pacc_drivenum.c   -> 已加载驱动枚举 + 签名核验
+  pacc_kbdfilter.c  -> 键盘类过滤（输入暂停 / 令牌解锁 / 持久化）
   sources           -> WDK 构建清单
 ```
 
@@ -57,6 +62,8 @@ kernel-windows/
 | `+9` RESET_EVENT_COUNTERS | 无 | `PACC_EVENT_STATS` | 归零全部计数器并返回快照 |
 | `+10` QUERY_SSDT_STATUS | 无 | `PACC_SSDT_STATUS` | SSDT 条目数 / 分歧数 / 首个分歧项 |
 | `+11` QUERY_DRIVER_STATUS | `PACC_DRIVER_QUERY` | `PACC_DRIVER_REPORT` | 驱动枚举 + 签名核验（`Entries` 变长，分页） |
+| `+12` SET_KEYBOARD_LOCK | `PACC_KBD_LOCK_REQUEST` | 无 | 锁定/解锁键盘输入（解锁可要求令牌）；状态持久化到 `SOFTWARE\PACC` |
+| `+13` QUERY_KEYBOARD_LOCK | 无 | `ULONG`（1/0） | 查询键盘是否处于锁定态 |
 
 排空接口的用户侧 `MaxCount` 仅作上限参考，实际条数由输出缓冲与环形容量共同约束；
 输出缓冲必须容纳头部 + 至少一条 `PACC_EVENT`。驱动状态查询以 `StartIndex/MaxCount` 分页，
@@ -72,3 +79,6 @@ msbuild /t:build /p:Configuration=Release /p:TargetVersion=Win10
 ## 说明
 本源码为反作弊取证用途：仅当玩家显式安装反作弊系统且同意其条款时部署。
 拦截策略默认"记录优先、按需拦截"，避免误伤正常系统与开发工具。
+
+键盘过滤模块（`pacc_kbdfilter.c`）为 kbfiltr 式键盘类过滤，需 WDK 编译 + WHQL
+签名后在真机验证；本仓库当前未在 Windows 上编译验证（开发机无 WDK）。

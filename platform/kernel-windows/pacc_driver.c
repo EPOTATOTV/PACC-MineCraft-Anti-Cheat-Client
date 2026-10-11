@@ -8,6 +8,7 @@ volatile ULONG   g_paccProtectedPids[PACC_MAX_PROTECTED_PID] = {0};
 volatile ULONG64 g_paccBlockedOpCount = 0;
 volatile ULONG64 g_paccDeniedLogCount = 0;
 BOOLEAN          g_paccInitialized   = FALSE;
+PDRIVER_OBJECT   g_paccDriverObject  = NULL;
 
 // ---- 受保护进程集合操作 ----
 BOOLEAN
@@ -240,6 +241,30 @@ PaccDispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
         break;
     }
 
+    // ---- 键盘锁定（redscreen 暂停键盘输入；鼠标保留可用）----
+    case IOCTL_PACC_SET_KEYBOARD_LOCK: {
+        if (in != NULL && inLen >= sizeof(PACC_KBD_LOCK_REQUEST)) {
+            PPACC_KBD_LOCK_REQUEST req = (PPACC_KBD_LOCK_REQUEST)in;
+            PaccKbdSetLock(req->Lock != 0 ? TRUE : FALSE, req->Token, &status);
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        break;
+    }
+
+    case IOCTL_PACC_QUERY_KEYBOARD_LOCK: {
+        if (Irp->AssociatedIrp.SystemBuffer != NULL &&
+            irpSp->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(ULONG)) {
+            ULONG locked = PaccKbdIsLocked() ? 1 : 0;
+            RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &locked, sizeof(locked));
+            info = sizeof(locked);
+            status = STATUS_SUCCESS;
+        } else {
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        break;
+    }
+
     default:
         status = STATUS_INVALID_DEVICE_REQUEST;
         break;
@@ -282,6 +307,7 @@ PaccUnload(PDRIVER_OBJECT DriverObject)
     UNICODE_STRING link = RTL_CONSTANT_STRING(PACC_SYMLINK_NAME);
 
     // 按注册的逆序反注册，确保不泄漏任何回调。
+    PaccKbdFilterUninitialize();
     PaccObHookUninitialize();
     PaccRegMonUninitialize();
     PaccImageMonUninitialize();
@@ -306,6 +332,7 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     PaccClearProtectedPids();
     g_paccBlockedOpCount = 0;
     g_paccDeniedLogCount = 0;
+    g_paccDriverObject   = DriverObject;
 
     // 1) 事件环形缓冲是关键资源：分配失败即拒绝加载（fail closed），不留空缓冲。
     status = PaccEventInitialize();
@@ -348,6 +375,12 @@ DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     status = PaccObHookInitialize();
     if (!NT_SUCCESS(status)) {
         DbgPrint("[PACC] ObRegisterCallbacks failed %x (继续以内存扫描/IOCTL 工作)\n", status);
+    }
+
+    // 4) 键盘过滤：redscreen 时暂停键盘输入（鼠标保留）。最佳努力，失败不影响其余能力。
+    status = PaccKbdFilterInitialize();
+    if (!NT_SUCCESS(status)) {
+        DbgPrint("[PACC] keyboard filter unavailable %x\n", status);
     }
 
     g_paccInitialized = TRUE;

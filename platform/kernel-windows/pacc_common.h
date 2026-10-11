@@ -59,6 +59,14 @@
 #define IOCTL_PACC_QUERY_DRIVER_STATUS \
     CTL_CODE(FILE_DEVICE_UNKNOWN, PACC_IOCTL_BASE + 11, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+// 设置键盘锁定（输入 PACC_KBD_LOCK_REQUEST；redscreen 时暂停键盘输入，鼠标保留）
+#define IOCTL_PACC_SET_KEYBOARD_LOCK \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, PACC_IOCTL_BASE + 12, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+// 查询键盘锁定状态（输出 ULONG：1=锁定，0=未锁定）
+#define IOCTL_PACC_QUERY_KEYBOARD_LOCK \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, PACC_IOCTL_BASE + 13, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
 // ---- 数据结构 ----
 typedef struct _PACC_SCAN_REQUEST {
     ULONG Pid;                  // 目标进程
@@ -184,11 +192,18 @@ typedef struct _PACC_DRIVER_REPORT {
     PACC_DRIVER_ENTRY Entries[1];   // 变长
 } PACC_DRIVER_REPORT, *PPACC_DRIVER_REPORT;
 
+// ---- 键盘锁定请求（redscreen 时暂停键盘输入）----
+typedef struct _PACC_KBD_LOCK_REQUEST {
+    ULONG Lock;    // 1=锁定键盘，0=解锁
+    ULONG Token;   // 解锁令牌；驱动持有非零令牌时，解锁必须匹配，否则拒绝
+} PACC_KBD_LOCK_REQUEST, *PPACC_KBD_LOCK_REQUEST;
+
 // 保护进程集合（全局，共用）
 extern volatile ULONG  g_paccProtectedPids[PACC_MAX_PROTECTED_PID];
 extern volatile ULONG64 g_paccBlockedOpCount;     // 被拦截的越权访问计数
 extern volatile ULONG64 g_paccDeniedLogCount;
 extern BOOLEAN          g_paccInitialized;
+extern PDRIVER_OBJECT   g_paccDriverObject;       // 本驱动对象（过滤设备创建 / PnP 通知用）
 
 BOOLEAN PaccIsProtectedPid(ULONG pid);
 VOID    PaccAddProtectedPid(ULONG pid);
@@ -230,3 +245,9 @@ NTSTATUS PaccSsdtQuery(PPACC_SSDT_STATUS out);
 
 // ---- 已加载驱动枚举 + 签名核验（pacc_drivenum.c）----
 NTSTATUS PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT out, ULONG outLen);
+
+// ---- 键盘类过滤 / 锁定（pacc_kbdfilter.c）----
+NTSTATUS PaccKbdFilterInitialize(VOID);   // 附着键盘类设备栈 + 恢复持久化锁状态
+VOID     PaccKbdFilterUninitialize(VOID); // 脱链 + 注销 PnP 通知 + 持久化
+VOID     PaccKbdSetLock(BOOLEAN lock, ULONG token, NTSTATUS *outStatus); // 供 IOCTL 调用
+BOOLEAN  PaccKbdIsLocked(VOID);

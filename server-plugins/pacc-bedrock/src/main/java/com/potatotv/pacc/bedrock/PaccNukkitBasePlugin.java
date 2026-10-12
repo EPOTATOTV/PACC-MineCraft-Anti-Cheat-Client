@@ -14,7 +14,9 @@ import com.potatotv.pacc.server.core.check.InventoryCheck;
 import com.potatotv.pacc.server.core.check.MoveCheck;
 import com.potatotv.pacc.server.core.check.PacketCheck;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.detection.threatintel.CheatCatalog;
 import com.potatotv.pacc.server.core.engine.DetectionEngine;
+import com.potatotv.pacc.server.core.intel.IntelChecks;
 import com.potatotv.pacc.server.core.model.ServerPluginConfig;
 import com.potatotv.pacc.server.core.model.ServerType;
 import com.potatotv.pacc.server.core.report.NoopPtvServerReporter;
@@ -24,6 +26,7 @@ import cn.nukkit.Server;
 import cn.nukkit.event.Listener;
 import cn.nukkit.plugin.PluginBase;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -58,7 +61,7 @@ public abstract class PaccNukkitBasePlugin extends PluginBase implements Listene
 
         NukkitPlatformAdapter adapter = createProtocolAdapter(loader);
 
-        List<ServerCheck> checks = List.of(
+        List<ServerCheck> checks = new ArrayList<>(List.of(
                 new MoveCheck(pluginConfig),
                 new CombatCheck(pluginConfig),
                 new PacketCheck(),
@@ -66,7 +69,10 @@ public abstract class PaccNukkitBasePlugin extends PluginBase implements Listene
                 new InteractionCheck(pluginConfig),
                 new ClientBrandCheck(pluginConfig),
                 new AddonCheck(pluginConfig),
-                new DataConsistencyCheck());
+                new DataConsistencyCheck()));
+        // 引擎升级（技术文档 §4.2）：追加物理预测 / 行为 / 战斗 / 数据包四类 intel 检查；
+        // 以 PTV 上报密钥派生证据链密钥（§8.2），过短自动降级为不启用链式哈希
+        checks.addAll(IntelChecks.defaults(IntelChecks.chainKeyFrom(loader.ptvSecret())));
 
         PtvServerReporter reporter = loader.ptvUrl().isBlank()
                 ? NoopPtvServerReporter.INSTANCE
@@ -80,8 +86,10 @@ public abstract class PaccNukkitBasePlugin extends PluginBase implements Listene
         server.getPluginManager().registerEvents(new NukkitConnectionListener(engine, adapter), this);
 
         reporter.register(loader.serverInfo());
+        CheatCatalog catalog = IntelChecks.builtinCatalog();
         getLogger().info("PACC 服务端检测已启用（" + serverType()
-                + "，处置级别 " + pluginConfig.punishmentMode() + "）");
+                + "，处置级别 " + pluginConfig.punishmentMode()
+                + "，指纹库 " + catalog.total() + " 条，覆盖全类别=" + catalog.coversAllCategories() + "）");
     }
 
     @Override

@@ -14,7 +14,9 @@ import com.potatotv.pacc.server.core.check.InventoryCheck;
 import com.potatotv.pacc.server.core.check.MoveCheck;
 import com.potatotv.pacc.server.core.check.PacketCheck;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.detection.threatintel.CheatCatalog;
 import com.potatotv.pacc.server.core.engine.DetectionEngine;
+import com.potatotv.pacc.server.core.intel.IntelChecks;
 import com.potatotv.pacc.server.core.model.ServerPluginConfig;
 import com.potatotv.pacc.server.core.report.NoopPtvServerReporter;
 import com.potatotv.pacc.server.core.report.PtvServerReporter;
@@ -35,6 +37,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -57,6 +60,7 @@ public final class PaccGeyserExtension implements Extension {
     private volatile DetectionEngine engine;
     private volatile boolean deviceAdjust;
     private volatile ServerPluginConfig baseConfig;
+    private volatile byte[] evidenceChainKey;
     private volatile DeviceThresholds.DeviceClass effectiveClass = DeviceThresholds.DeviceClass.UNKNOWN;
 
     private final Map<String, DeviceThresholds.DeviceClass> playerDevices = new ConcurrentHashMap<>();
@@ -83,6 +87,8 @@ public final class PaccGeyserExtension implements Extension {
                 ? NoopPtvServerReporter.INSTANCE
                 : new PtvHttpReporter(config.ptvUrl(), config.ptvSecret());
         this.effectiveClass = DeviceThresholds.DeviceClass.UNKNOWN;
+        // 证据链密钥（§8.2）从 PTV 上报密钥派生，过短自动降级为不启用
+        this.evidenceChainKey = IntelChecks.chainKeyFrom(config.ptvSecret());
         this.engine = createEngine(config.serverPluginConfig());
 
         PacketHandlerRegistrar packetRegistrar = new PacketHandlerRegistrar.Unsupported(logger()::warning);
@@ -91,7 +97,9 @@ public final class PaccGeyserExtension implements Extension {
         new ProxyDetectionBridge.Noop(logger()::info).onConfirmation(confirmation -> { });
 
         reporter.register(config.serverInfo());
-        logger().info("PACC 服务端检测已启用（GEYSER，处置级别 " + config.serverPluginConfig().punishmentMode() + "）");
+        CheatCatalog catalog = IntelChecks.builtinCatalog();
+        logger().info("PACC 服务端检测已启用（GEYSER，处置级别 " + config.serverPluginConfig().punishmentMode()
+                + "，指纹库 " + catalog.total() + " 条，覆盖全类别=" + catalog.coversAllCategories() + "）");
     }
 
     @Subscribe
@@ -127,7 +135,7 @@ public final class PaccGeyserExtension implements Extension {
     }
 
     private DetectionEngine createEngine(ServerPluginConfig config) {
-        List<ServerCheck> checks = List.of(
+        List<ServerCheck> checks = new ArrayList<>(List.of(
                 new MoveCheck(config),
                 new CombatCheck(config),
                 new PacketCheck(),
@@ -135,7 +143,9 @@ public final class PaccGeyserExtension implements Extension {
                 new InteractionCheck(config),
                 new ClientBrandCheck(config),
                 new AddonCheck(config),
-                new DataConsistencyCheck());
+                new DataConsistencyCheck()));
+        // 引擎升级（技术文档 §4.2）：追加物理预测 / 行为 / 战斗 / 数据包四类 intel 检查
+        checks.addAll(IntelChecks.defaults(evidenceChainKey));
         return new DetectionEngine(config, adapter, checks, reporter);
     }
 

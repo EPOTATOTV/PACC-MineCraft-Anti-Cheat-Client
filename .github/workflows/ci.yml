@@ -124,7 +124,9 @@ jobs:
       - name: 构建并安装规则语言 pacc-rule-language
         working-directory: pacc-rule-language
         run: mvn -B -q install
-      # ptv-client 依赖它（玩家端六层检测 + 指纹库）
+      # ptv-client 依赖它（玩家端六层检测 + 指纹库）。
+      # 走 install 而非 verify：install 生命周期本就包含 verify 阶段，jacoco 绑在 verify 的
+      # LINE 覆盖率 check 会一并强制执行；再用 verify 会让下游解析不到这个内部依赖。
       - name: 构建并安装检测引擎 pacc-detection-engine
         working-directory: pacc-detection-engine
         run: mvn -B -q install
@@ -298,7 +300,9 @@ jobs:
       - name: 安装内部依赖（检测引擎 / 检测内核 / Addon 扫描 / 共享适配层）
         run: |
           set -euo pipefail
-          # 检测内核 pacc-server-core 依赖 pacc-detection-engine，必须先装引擎
+          # 检测内核 pacc-server-core 依赖 pacc-detection-engine，必须先装引擎。
+          # 两个模块都用 install：install 已包含 verify 阶段，jacoco 的 LINE 覆盖率 check 在此强制执行；
+          # 后面的平台插件也要从本地仓库解析这两个内部依赖，不能降级成 verify。
           ( cd pacc-detection-engine && mvn -B -q install )
           ( cd pacc-server-core   && mvn -B -q install )
           ( cd pacc-addon-scanner && mvn -B -q install )

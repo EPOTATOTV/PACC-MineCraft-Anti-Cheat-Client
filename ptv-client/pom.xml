@@ -22,6 +22,9 @@
         <pacc.pbp.version>1.0.0</pacc.pbp.version>
         <!-- PRL 自研规则语言运行时，版本同样独立于 PACC；bump-version.sh 只做一致性断言，不改它 -->
         <pacc.prl.version>1.0.0</pacc.prl.version>
+        <!-- PDE 自研检测引擎（指纹库/画像/六层检测/融合判定），版本跟随 server-core（6.0.0）；
+             bump-version.sh 只做一致性断言，不改它 -->
+        <pacc.pde.version>6.0.0</pacc.pde.version>
     </properties>
 
     <!-- 玩家端运行时依赖：只有自研二进制协议（WSS 查端信令信封，定义见 pacc-binary-protocol/mdl/pacc_wire.mdl），
@@ -38,6 +41,13 @@
             <groupId>com.potatotv</groupId>
             <artifactId>pacc-rule-language</artifactId>
             <version>${pacc.prl.version}</version>
+        </dependency>
+        <!-- 自研检测引擎（PDE，com.potatotv.pacc 组）：作弊指纹库 + 行为画像 + 融合判定。
+             同样纯 JDK 标准库实现（用到 javax.crypto 做 HMAC 证据链），零第三方依赖。 -->
+        <dependency>
+            <groupId>com.potatotv.pacc</groupId>
+            <artifactId>pacc-detection-engine</artifactId>
+            <version>${pacc.pde.version}</version>
         </dependency>
         <!-- 自研跨平台更新核心（PCU）。它与 PACC 同版本、不做独立协议版本，所以这里直接跟随
              ${project.version}：bump-version.sh 改一次版本号，两边同时对齐，不需要再多一个版本字段。

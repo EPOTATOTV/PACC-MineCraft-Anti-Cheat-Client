@@ -50,6 +50,7 @@ type Plugin struct {
 	engine   *detect.Engine
 	reporter report.Reporter
 	server   ServerConn
+	events   EventSource
 	logger   *log.Logger
 }
 
@@ -68,6 +69,11 @@ func New(cfg config.Config, server ServerConn) *Plugin {
 	}
 }
 
+// AttachEventSource 注入平台事件源（由 AllayMC 宿主实现）。必须在 OnEnable 之前调用。
+func (p *Plugin) AttachEventSource(src EventSource) {
+	p.events = src
+}
+
 // Init 插件初始化：上报服务端注册信息。
 func (p *Plugin) Init() error {
 	p.reporter.Register(model.ServerInfo{
@@ -82,10 +88,16 @@ func (p *Plugin) Init() error {
 	return nil
 }
 
-// OnEnable 插件启用：此处登记平台事件监听（需按 AllayMC 实际事件 API 校准）。
+// OnEnable 插件启用：把移动 / 战斗 / 退出事件登记到平台事件源上，使检测真正生效。
+//
+// 未注入事件源时返回错误：宁可让宿主看到明确的启用失败，也不要出现「已启用但从不检测」的静默失效。
 func (p *Plugin) OnEnable() error {
-	// TODO(AllayMC): 在此注册移动 / 战斗事件监听，把事件转成量之后调用
-	//   p.OnPlayerMove(...) 与 p.OnPlayerAttack(...)。
+	if p.events == nil {
+		return fmt.Errorf("未注入事件源（EventSource），检测不会运行；请先调用 AttachEventSource")
+	}
+	p.events.OnPlayerMove(p.OnPlayerMove)
+	p.events.OnPlayerAttack(p.OnPlayerAttack)
+	p.events.OnPlayerQuit(p.OnPlayerLeave)
 	p.logger.Printf("PACC 服务端检测已启用（ALLAYMC，处置级别 %d）", p.cfg.PunishmentMode)
 	return nil
 }

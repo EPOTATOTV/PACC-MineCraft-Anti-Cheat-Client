@@ -3,6 +3,10 @@
 # 字段命名遵循 AllayMC 插件加载约定：main 指向插件包，entry 指向导出入口构造函数。
 # 注意：AllayMC 各版本的元数据键名可能不同（如 id / name / main / entry 的具体约定），
 # 需按实际使用的 AllayMC 版本文档校准；本文件是可直接加载的默认骨架。
+#
+# 宿主接入要求：New(config, ServerConn) 之后、OnEnable 之前，必须构造一个实现 EventSource
+# （见 events.go）的对象并调用 Plugin.AttachEventSource 注入。未注入时 OnEnable 会返回错误，
+# 以避免「插件已启用但从不检测」的静默失效。
 name: PACC
 id: pacc
 version: 6.0.0

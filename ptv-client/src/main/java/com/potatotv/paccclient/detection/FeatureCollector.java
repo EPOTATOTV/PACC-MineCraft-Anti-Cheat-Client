@@ -786,8 +786,6 @@ public final class FeatureCollector {
     }
 
     private static double switches(int[] runs) {
-        int total = 0;
-        for (int r : runs) total += r;
         return Math.max(0, runs.length - 1);
     }
 

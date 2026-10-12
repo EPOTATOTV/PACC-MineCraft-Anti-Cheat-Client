@@ -40,7 +40,9 @@ public final class MemoryPatternMatcher {
             if ("??".equals(t) || "?".equals(t)) {
                 bytes[i] = -1;
             } else if (t.length() == 2 && isHex(t)) {
-                bytes[i] = Integer.parseInt(t, 16);
+                // 用 Character.digit 手算，避免 Integer.parseInt 的异常路径（模式串来自指纹库，
+                // 不该有任何可能抛出的分支）
+                bytes[i] = Character.digit(t.charAt(0), 16) * 16 + Character.digit(t.charAt(1), 16);
             } else {
                 return null;
             }

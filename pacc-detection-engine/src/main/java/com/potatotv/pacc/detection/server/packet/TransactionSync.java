@@ -49,8 +49,8 @@ public final class TransactionSync {
             double ackRate = (double) acked / sent;
             if (ackRate < ACK_RATE_THRESHOLD) {
                 String detail = String.format(Locale.ROOT,
-                        "Disabler 疑似 事务ack率=%.2f（%d/%d）低于阈值%.2f",
-                        ackRate, acked, sent, ACK_RATE_THRESHOLD);
+                        "Disabler 疑似 玩家=%s 事务ack率=%.2f（%d/%d）低于阈值%.2f",
+                        playerId, ackRate, acked, sent, ACK_RATE_THRESHOLD);
                 return Optional.of(Evidence.of(DETECTOR_ID, Layer.NETWORK, DISABLER_CONFIDENCE, detail));
             }
         }

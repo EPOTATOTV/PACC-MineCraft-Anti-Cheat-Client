@@ -212,15 +212,18 @@ public final class StreamDetectionPipeline implements AutoCloseable {
                     try {
                         if (running && ring.size() == 0) {
                             parkedCount++;
-                            wakeup.await(PARK_MILLIS, TimeUnit.MILLISECONDS);
+                            // await 返回 false 表示超时或虚假唤醒：回到循环顶部重新判定。
+                            if (!wakeup.await(PARK_MILLIS, TimeUnit.MILLISECONDS)) {
+                                continue;
+                            }
                         }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
                     } finally {
                         lock.unlock();
                     }
                 }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
             } catch (RuntimeException e) {
                 failures++;
             }

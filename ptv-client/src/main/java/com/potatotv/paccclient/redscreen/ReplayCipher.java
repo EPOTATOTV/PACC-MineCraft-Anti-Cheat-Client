@@ -24,6 +24,9 @@ final class ReplayCipher {
     private static final int IV_BYTES = 12;
     private static final int TAG_BITS = 128;
 
+    /** 共享的强随机源；SecureRandom 线程安全，避免每次调用都新建实例。 */
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private ReplayCipher() {
     }
 
@@ -38,7 +41,7 @@ final class ReplayCipher {
             gen.init(KEY_BITS, new SecureRandom());
             SecretKey key = gen.generateKey();
             byte[] iv = new byte[IV_BYTES];
-            new SecureRandom().nextBytes(iv);
+            RANDOM.nextBytes(iv);
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
             return new Sealed(cipher.doFinal(plain), key.getEncoded(), iv);

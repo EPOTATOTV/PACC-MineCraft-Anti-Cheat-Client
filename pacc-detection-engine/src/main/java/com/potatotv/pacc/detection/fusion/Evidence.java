@@ -13,6 +13,9 @@ import java.util.Objects;
  */
 public record Evidence(String detectorId, Layer layer, double confidence, String detail, long timestampMs) {
 
+    /** detail 落库/入日志的长度上限，防止超长外部数据灌进证据链。 */
+    private static final int MAX_DETAIL_CHARS = 4096;
+
     public Evidence {
         Objects.requireNonNull(detectorId, "detectorId");
         Objects.requireNonNull(layer, "layer");
@@ -25,10 +28,19 @@ public record Evidence(String detectorId, Layer layer, double confidence, String
         detail = sanitize(detail);
     }
 
-    /** 剥离控制字符（含换行），防止证据内容注入日志流。 */
+    /**
+     * 剥离控制字符（含换行），防止证据内容注入日志流；{@code null} 视为空串，超长截断到
+     * {@value #MAX_DETAIL_CHARS} 字符。
+     *
+     * <p>与 ptv-backend 的 {@code LogSanitizer.clean} 同一字符口径（CR/LF 及其余控制字符一并清掉）。
+     * 入参可能直接来自探针读到的进程名 / 窗口标题 / 文件名，null 是现实输入，故这里显式兜底。
+     */
     public static String sanitize(String s) {
-        StringBuilder sb = new StringBuilder(s.length());
-        s.chars().limit(4096).forEach(c -> {
+        if (s == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(Math.min(s.length(), MAX_DETAIL_CHARS));
+        s.chars().limit(MAX_DETAIL_CHARS).forEach(c -> {
             if (c >= 0x20 && c != 0x7F) {
                 sb.append((char) c);
             }

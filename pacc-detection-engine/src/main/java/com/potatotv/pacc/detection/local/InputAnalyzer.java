@@ -75,11 +75,11 @@ public final class InputAnalyzer implements LocalDetector {
         if (!hasNewData) {
             return List.of();
         }
-        return analyze(ctx == null ? "" : ctx.playerId());
+        return analyze();
     }
 
     /** 对当前窗口产出点击画像证据；30 秒节流，窗口样本不足返回空。 */
-    public synchronized List<Evidence> analyze(String playerId) {
+    public synchronized List<Evidence> analyze() {
         List<Evidence> out = new ArrayList<>();
         try {
             long now = System.currentTimeMillis();

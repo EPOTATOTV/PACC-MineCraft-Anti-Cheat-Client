@@ -279,19 +279,20 @@ class PrlDetectionEngineTest {
         Map<String, List<String>> golden = new LinkedHashMap<>();
         try (InputStream in = PrlDetectionEngineTest.class.getResourceAsStream("/cheat-rule-golden.txt")) {
             assertTrue(in != null, "缺少金标文件 cheat-rule-golden.txt");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isBlank() || line.startsWith("#")) {
-                    continue;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank() || line.startsWith("#")) {
+                        continue;
+                    }
+                    String[] parts = line.split("\t", -1);
+                    String caseName = parts[0];
+                    List<String> findings = golden.computeIfAbsent(caseName, key -> new ArrayList<>());
+                    if (parts.length == 2 && "-".equals(parts[1])) {
+                        continue;
+                    }
+                    findings.add(parts[1] + "\t" + parts[2] + "\t" + parts[3] + "\t" + parts[4]);
                 }
-                String[] parts = line.split("\t", -1);
-                String caseName = parts[0];
-                List<String> findings = golden.computeIfAbsent(caseName, key -> new ArrayList<>());
-                if (parts.length == 2 && "-".equals(parts[1])) {
-                    continue;
-                }
-                findings.add(parts[1] + "\t" + parts[2] + "\t" + parts[3] + "\t" + parts[4]);
             }
         }
         return golden;

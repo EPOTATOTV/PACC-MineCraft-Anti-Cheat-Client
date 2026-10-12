@@ -89,9 +89,12 @@ public final class LocalControlServer {
         return Path.of(home, ".config", "pacc");
     }
 
+    /** 本地控制通道令牌；SecureRandom 线程安全，进程内共用一个实例即可。 */
+    private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
+
     private static String newToken() {
         byte[] b = new byte[16];
-        new SecureRandom().nextBytes(b);
+        TOKEN_RANDOM.nextBytes(b);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
     }
 
@@ -124,16 +127,14 @@ public final class LocalControlServer {
     }
 
     private void start(HttpExchange ex) throws IOException {
-        if (!controller.isRunning()) {
-            controller.start();
-        }
+        // start()/stop() 自身幂等（内部已判 scheduler 是否为空），不必先查 isRunning()——
+        // 分开“查—用”两次同步调用会引入 TOCTOU 窗口
+        controller.start();
         respond(ex, 200, Json.encode(Map.of("running", controller.isRunning())));
     }
 
     private void stop(HttpExchange ex) throws IOException {
-        if (controller.isRunning()) {
-            controller.stop();
-        }
+        controller.stop();
         respond(ex, 200, Json.encode(Map.of("running", false)));
     }
 
@@ -164,7 +165,7 @@ public final class LocalControlServer {
             if (en instanceof Boolean b) {
                 boolean was = cfg.enabled;
                 cfg.enabled = b;
-                if (!was && b && !controller.isRunning()) controller.start();
+                if (!was && b) controller.start();
                 if (was && !b) controller.stop();
             }
             respond(ex, 200, configJson());

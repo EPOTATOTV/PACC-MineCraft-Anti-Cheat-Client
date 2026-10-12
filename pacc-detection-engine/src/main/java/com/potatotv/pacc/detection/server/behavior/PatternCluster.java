@@ -168,7 +168,9 @@ public final class PatternCluster {
                 break;
             }
             int matches = 0;
-            for (int i = 0; i < comparisons; i++) {
+            // 循环条件直接写成 i + period < n（而不是 i < comparisons），把下标上界写进条件里，
+            // 静态分析无需再推导 comparisons 与 n 的关系即可证明不越界
+            for (int i = 0; i + period < n; i++) {
                 if (signatures[i] == signatures[i + period]) {
                     matches++;
                 }

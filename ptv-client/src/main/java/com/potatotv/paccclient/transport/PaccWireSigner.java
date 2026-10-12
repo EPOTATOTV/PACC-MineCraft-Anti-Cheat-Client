@@ -67,7 +67,8 @@ public final class PaccWireSigner {
     }
 
     private static String hex(byte[] b) {
-        StringBuilder sb = new StringBuilder(b.length * 2);
+        // 容量只是提示，不按 2*b.length 预分配：长度来自不受控的入参，乘法可能溢出
+        StringBuilder sb = new StringBuilder(b.length);
         for (byte v : b) sb.append(String.format("%02x", v));
         return sb.toString();
     }

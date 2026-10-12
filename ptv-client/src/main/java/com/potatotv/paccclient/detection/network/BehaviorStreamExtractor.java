@@ -61,19 +61,23 @@ public final class BehaviorStreamExtractor {
         }
         packetCount++;
         lastTimestamp = timestampNanos;
-        switch (packet) {
-            case ParsedPacket.MovePlayer mp -> onMove(mp, timestampNanos);
-            case ParsedPacket.PlayerAuthInput pi -> onAuthInput(pi, timestampNanos);
-            case ParsedPacket.PlayerAction pa -> onPlayerAction(pa.actionType(), timestampNanos);
-            case ParsedPacket.Attack ignored -> addAction(timestampNanos, ActionKind.ATTACK);
-            case ParsedPacket.UseItem ignored -> addAction(timestampNanos, ActionKind.PLACE);
-            case ParsedPacket.ServerCorrection ignored -> {
-                correctionTimes.addLast(timestampNanos);
-                prune(correctionTimes, timestampNanos, WINDOW_60S);
-            }
-            case ParsedPacket.Unknown ignored -> {
-            }
+        // Java 21 的 switch 类型模式必须绑定变量；不消费匹配对象的三个分支改用无绑定的 instanceof，
+        // 否则会留下从未读取的变量（CodeQL local-variable-is-never-read）。
+        if (packet instanceof ParsedPacket.MovePlayer mp) {
+            onMove(mp, timestampNanos);
+        } else if (packet instanceof ParsedPacket.PlayerAuthInput pi) {
+            onAuthInput(pi, timestampNanos);
+        } else if (packet instanceof ParsedPacket.PlayerAction pa) {
+            onPlayerAction(pa.actionType(), timestampNanos);
+        } else if (packet instanceof ParsedPacket.Attack) {
+            addAction(timestampNanos, ActionKind.ATTACK);
+        } else if (packet instanceof ParsedPacket.UseItem) {
+            addAction(timestampNanos, ActionKind.PLACE);
+        } else if (packet instanceof ParsedPacket.ServerCorrection) {
+            correctionTimes.addLast(timestampNanos);
+            prune(correctionTimes, timestampNanos, WINDOW_60S);
         }
+        // ParsedPacket.Unknown：无可提取的行为信息，忽略。
     }
 
     /** 登记一个 RakNet 序号（供丢包率统计）。 */

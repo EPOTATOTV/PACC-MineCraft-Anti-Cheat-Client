@@ -19,7 +19,7 @@ public record FingerprintMatch(CheatFingerprint fingerprint, FingerprintType cha
         if (confidence < 0.0 || confidence > 1.0) {
             throw new IllegalArgumentException("confidence 必须在 [0,1]");
         }
-        // matchedValue 来自进程名 / 窗口标题 / 文件名等 OS 侧数据，剥离控制字符防日志注入
-        matchedValue = Evidence.sanitize(matchedValue == null ? "" : matchedValue);
+        // matchedValue 来自进程名 / 窗口标题 / 文件名等 OS 侧数据，剥离控制字符防日志注入（null 归一为空串）
+        matchedValue = Evidence.sanitize(matchedValue);
     }
 }

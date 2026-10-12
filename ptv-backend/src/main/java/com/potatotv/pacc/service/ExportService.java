@@ -194,12 +194,13 @@ public class ExportService {
     private Path dirs() throws IOException {
         Path dir = Paths.get(System.getProperty("java.io.tmpdir"), "pacc-export");
         if (!Files.exists(dir)) {
-            Files.createDirectories(dir);
-            // 导出物含玩家证据，仅属主可读写，避免同机其他用户读取临时目录内容
+            // 导出物含玩家证据：创建时就带上 0700 属主权限，避免建目录与改权限之间被同机其他用户读走
             try {
-                Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
-            } catch (UnsupportedOperationException ignored) {
-                // 非 POSIX 文件系统（如 Windows）无此语义
+                Files.createDirectories(dir,
+                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            } catch (UnsupportedOperationException e) {
+                // 非 POSIX 文件系统（如 Windows）无此语义，退回普通创建
+                Files.createDirectories(dir);
             }
         }
         return dir;

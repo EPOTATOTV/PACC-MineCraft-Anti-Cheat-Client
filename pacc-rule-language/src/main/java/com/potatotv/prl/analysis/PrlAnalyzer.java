@@ -211,7 +211,9 @@ public final class PrlAnalyzer {
      * {@code emit_alert(confidence = 0.9, type = "X")} 是同一件事，不排序就会漏掉真冲突。</p>
      */
     static String canonical(Expression expression) {
-        if (expression == null) {
+        // NullLiteral 打印结果与 null 一致，一并前置处理；这样 switch 里无需再为它绑定一个
+        // 从不读取的模式变量（CodeQL local-variable-is-never-read）。
+        if (expression == null || expression instanceof Expression.NullLiteral) {
             return "null";
         }
         return switch (expression) {
@@ -220,7 +222,6 @@ public final class PrlAnalyzer {
             case Expression.StringLiteral literal -> '"' + literal.value() + '"';
             case Expression.InterpolatedString literal -> "f\"" + join(literal.parts()) + '"';
             case Expression.BoolLiteral literal -> Boolean.toString(literal.value());
-            case Expression.NullLiteral ignored -> "null";
             case Expression.SeverityLiteral literal -> literal.value().name().toLowerCase(Locale.ROOT);
             case Expression.UnitLiteral literal -> trimNumber(literal.magnitude()) + literal.unitText();
             case Expression.Identifier literal -> literal.name();
@@ -242,6 +243,8 @@ public final class PrlAnalyzer {
             case Expression.PipeExpr pipe -> canonical(pipe.left()) + " |> " + canonical(pipe.right());
             case Expression.IfExpr ifExpr -> "(" + canonical(ifExpr.condition()) + " ? "
                     + canonical(ifExpr.thenExpr()) + " : " + canonical(ifExpr.elseExpr()) + ")";
+            // NullLiteral 已在入口处理，这里是 sealed 层穷尽性的兜底，正常不可达。
+            default -> throw new IllegalStateException("未覆盖的表达式类型: " + expression.getClass().getName());
         };
     }
 

@@ -136,7 +136,9 @@ public class BruteForceCheatDetector {
         double v = fv.get("feature_" + t.code() + "_mean");
         // 端侧上报值可能为非有限值，先拦掉再参与减法，避免下溢
         if (!Double.isFinite(v)) return 0;
-        return (v - baseline) / Math.max(baseline * 0.3, 1e-6);
+        // 上报值再夹到有限区间：特征量级本就在 0~1e6 内，这样算术不会溢出/下溢
+        double bounded = Math.max(0.0, Math.min(v, 1_000_000.0));
+        return (bounded - baseline) / Math.max(baseline * 0.3, 1e-6);
     }
 
     // ---------- L3 物理层 ----------

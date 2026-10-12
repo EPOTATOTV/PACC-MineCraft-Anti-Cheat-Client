@@ -35,7 +35,8 @@ final class CheatRuleCases {
     /** 带点击判定 / 时序异常的用例；重载会与 {@link #of(String, Object...)} 撞，所以单独起个名。 */
     private static Case withContext(String name, Verdict verdict, double temporal, Object... featurePairs) {
         FeatureVector fv = new FeatureVector();
-        for (int i = 0; i < featurePairs.length; i += 2) {
+        // 成对读取，条件写成 i + 1 < length：传入奇数个参数时不会越界（原先靠调用方自觉传偶数个）
+        for (int i = 0; i + 1 < featurePairs.length; i += 2) {
             fv.put((String) featurePairs[i], ((Number) featurePairs[i + 1]).doubleValue());
         }
         return new Case(name, fv, verdict, temporal);

@@ -27,7 +27,7 @@ class InputAnalyzerTest {
             analyzer.recordClick(t + i * 50L);
         }
 
-        List<Evidence> out = analyzer.analyze("player-1");
+        List<Evidence> out = analyzer.analyze();
 
         assertEquals(2, out.size());
         assertEquals(Layer.INPUT, out.get(0).layer());
@@ -51,7 +51,7 @@ class InputAnalyzerTest {
             analyzer.recordClick(t);
         }
 
-        List<Evidence> out = analyzer.analyze("player-1");
+        List<Evidence> out = analyzer.analyze();
 
         assertTrue(out.isEmpty());
     }
@@ -64,7 +64,7 @@ class InputAnalyzerTest {
             analyzer.recordClick(t + i * 50L);
         }
 
-        List<Evidence> out = analyzer.analyze("player-1");
+        List<Evidence> out = analyzer.analyze();
 
         assertTrue(out.isEmpty());
     }
@@ -83,14 +83,14 @@ class InputAnalyzerTest {
         for (int i = 0; i < 20; i++) {
             analyzer.recordClick(t + i * 50L);
         }
-        assertEquals(2, analyzer.analyze("player-1").size());
+        assertEquals(2, analyzer.analyze().size());
 
         // 下一窗口的新数据在节流期内不重复产出
         t += 31_000;
         for (int i = 0; i < 20; i++) {
             analyzer.recordClick(t + i * 50L);
         }
-        assertTrue(analyzer.analyze("player-1").isEmpty());
+        assertTrue(analyzer.analyze().isEmpty());
     }
 
     @Test

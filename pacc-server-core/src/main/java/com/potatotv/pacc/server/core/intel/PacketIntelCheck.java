@@ -51,7 +51,7 @@ public final class PacketIntelCheck implements ServerCheck {
         if (isMovementPacket(type)) {
             runtime.packetTiming().recordMovement(playerId, packet.timestampMs());
             // Timer / Blink（§5.2：tick 速率 > 1.005 倍，服务器 TPS 归一化由 SERVER_TICK_MS 承担）
-            checkAndCollect(results, playerId,
+            checkAndCollect(results,
                     runtime.packetTiming().check(playerId, (long) SERVER_TICK_MS));
             if (perPlayerPackets.computeIfAbsent(playerId, unused -> new AtomicInteger())
                     .incrementAndGet() % TRANSACTION_EVERY == 0) {
@@ -67,15 +67,15 @@ public final class PacketIntelCheck implements ServerCheck {
                 }
             }
         } else if (type.contains("brand")) {
-            checkAndCollect(results, playerId,
+            checkAndCollect(results,
                     runtime.brandValidator().check(playerId, packet.str("brand"), List.of()));
         }
 
         if (packet.has("sequence")) {
-            checkAndCollect(results, playerId,
+            checkAndCollect(results,
                     runtime.packetOrder().check(playerId, packet.packetType(), (long) packet.num("sequence", 0)));
         }
-        checkAndCollect(results, playerId,
+        checkAndCollect(results,
                 runtime.transactionSync().check(playerId, runtime.latencyCompensator()));
 
         runtime.fuse(playerId, type(), runtime.latencyCompensator().estimatedLatencyMs(), false)
@@ -93,7 +93,7 @@ public final class PacketIntelCheck implements ServerCheck {
         return type.contains("position") || type.contains("move") || type.contains("fly");
     }
 
-    private static void checkAndCollect(List<DetectionResult> results, String playerId, Optional<Evidence> evidence) {
+    private static void checkAndCollect(List<DetectionResult> results, Optional<Evidence> evidence) {
         evidence.ifPresent(ev -> results.add(PacketIntelCheck.toResult(ev)));
     }
 

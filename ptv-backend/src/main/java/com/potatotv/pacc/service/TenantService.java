@@ -111,7 +111,7 @@ public class TenantService {
     }
 
     @Transactional
-    public void delete(String role, String actor, String tenantId) {
+    public void delete(String role, String tenantId) {
         requirePlatform(role);
         tenantRepository.deleteById(tenantId);
         // 级联删除租户管理员绑定
@@ -128,7 +128,7 @@ public class TenantService {
     }
 
     @Transactional
-    public TenantAdmin addAdmin(String role, String actor, String tenantId,
+    public TenantAdmin addAdmin(String role, String tenantId,
                                 String identity, String adminRole) {
         requirePlatform(role);
         Tenant t = tenantRepository.findById(tenantId).orElseThrow(() -> new IllegalArgumentException("租户不存在"));
@@ -148,13 +148,13 @@ public class TenantService {
     }
 
     @Transactional
-    public void removeAdmin(String role, String actor, String tenantId, String identity) {
+    public void removeAdmin(String role, String tenantId, String identity) {
         requirePlatform(role);
         tenantAdminRepository.deleteByTenantIdAndAdminIdentity(tenantId, identity);
     }
 
     @Transactional
-    public void setAdminEnabled(String role, String actor, String tenantId, String identity, boolean enabled) {
+    public void setAdminEnabled(String role, String tenantId, String identity, boolean enabled) {
         requirePlatform(role);
         tenantAdminRepository.findByTenantIdAndAdminIdentity(tenantId, identity)
                 .ifPresent(ta -> {

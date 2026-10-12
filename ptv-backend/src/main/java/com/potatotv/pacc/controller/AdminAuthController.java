@@ -46,6 +46,9 @@ public class AdminAuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AdminAuthController.class);
 
+    /** 复用同一实例生成 TOTP 密钥，避免每次新建 SecureRandom。 */
+    private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
+
     private final LoginThrottle throttle;
     private final LoginLockout lockout;
     private final AdminLoginLogRepository loginLogRepository;
@@ -352,7 +355,7 @@ public class AdminAuthController {
         }
         String key = totpKey(identity);
         byte[] seed = new byte[20];
-        new java.security.SecureRandom().nextBytes(seed);
+        SECURE_RANDOM.nextBytes(seed);
         String b32 = base32Encode(seed);
         String otpauth = "otpauth://totp/PACC:" + identity + "?secret=" + b32 + "&issuer=PACC&period=30&digits=6";
         totpRepository.findById(key).ifPresentOrElse(x -> {

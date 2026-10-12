@@ -167,33 +167,33 @@ public class MapController {
 
     @PostMapping("/api/admin/maps/bp/{bpId}/start")
     public ResponseEntity<?> start(@PathVariable String bpId, @RequestBody(required = false) Map<String, String> body) {
-        return lifecycle(bpId, () -> bpService.start(bpId, operator(body)));
+        return lifecycle(() -> bpService.start(bpId));
     }
 
     @PostMapping("/api/admin/maps/bp/{bpId}/pause")
     public ResponseEntity<?> pause(@PathVariable String bpId, @RequestBody(required = false) Map<String, String> body) {
-        return lifecycle(bpId, () -> bpService.pause(bpId, operator(body)));
+        return lifecycle(() -> bpService.pause(bpId));
     }
 
     @PostMapping("/api/admin/maps/bp/{bpId}/resume")
     public ResponseEntity<?> resume(@PathVariable String bpId, @RequestBody(required = false) Map<String, String> body) {
-        return lifecycle(bpId, () -> bpService.resume(bpId, operator(body)));
+        return lifecycle(() -> bpService.resume(bpId));
     }
 
     @PostMapping("/api/admin/maps/bp/{bpId}/reset")
     public ResponseEntity<?> reset(@PathVariable String bpId, @RequestBody(required = false) Map<String, String> body) {
-        return lifecycle(bpId, () -> bpService.reset(bpId, operator(body)));
+        return lifecycle(() -> bpService.reset(bpId));
     }
 
     @PostMapping("/api/admin/maps/bp/{bpId}/cancel")
     public ResponseEntity<?> cancel(@PathVariable String bpId, @RequestBody(required = false) Map<String, String> body) {
         String reason = body == null ? null : body.getOrDefault("reason", "裁判取消");
-        return lifecycle(bpId, () -> bpService.cancel(bpId, reason, operator(body)));
+        return lifecycle(() -> bpService.cancel(bpId, reason));
     }
 
     @PostMapping("/api/admin/maps/bp/{bpId}/complete")
     public ResponseEntity<?> complete(@PathVariable String bpId, @RequestBody(required = false) Map<String, String> body) {
-        return lifecycle(bpId, () -> bpService.complete(bpId, operator(body)));
+        return lifecycle(() -> bpService.complete(bpId));
     }
 
     /** 裁判强制操作：action=BAN/PICK，map_id 可空（为空则系统随机选图）。 */
@@ -207,7 +207,7 @@ public class MapController {
         }
     }
 
-    private ResponseEntity<?> lifecycle(String bpId, java.util.function.Supplier<?> task) {
+    private ResponseEntity<?> lifecycle(java.util.function.Supplier<?> task) {
         try {
             return ResponseEntity.ok(task.get());
         } catch (IllegalArgumentException e) {

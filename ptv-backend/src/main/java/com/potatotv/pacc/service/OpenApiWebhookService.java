@@ -69,7 +69,7 @@ public class OpenApiWebhookService {
                     headers.setContentType(MediaType.APPLICATION_JSON);
                     if (!signature.isBlank()) headers.set("X-PTV-Signature", signature);
                     HttpEntity<String> entity = new HttpEntity<>(payload, headers);
-                    restTemplate.postForEntity(UriComponentsBuilder.fromHttpUrl(url).build().toUri(), entity, String.class);
+                    restTemplate.postForEntity(UriComponentsBuilder.fromUriString(url).build().toUri(), entity, String.class);
                     return;
                 } catch (Exception e) {
                     log.warn("Webhook 重试 {}/{} url={} err={}", i + 1, maxRetry, url, e.getMessage());

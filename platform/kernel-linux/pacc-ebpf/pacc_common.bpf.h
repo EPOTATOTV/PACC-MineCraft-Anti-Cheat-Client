@@ -192,7 +192,7 @@ static __always_inline int pacc_basename_off(const char *path)
 		if (c == '/')
 			off = i + 1;
 	}
-	if (off < 0 || off > PACC_PAYLOAD_LEN - PACC_NAME_MATCH_MAX)
+	if (off > PACC_PAYLOAD_LEN - PACC_NAME_MATCH_MAX)
 		return -1;
 	return off;
 }

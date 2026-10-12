@@ -13,7 +13,9 @@ import com.potatotv.pacc.server.core.check.InventoryCheck;
 import com.potatotv.pacc.server.core.check.MoveCheck;
 import com.potatotv.pacc.server.core.check.PacketCheck;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.detection.threatintel.CheatCatalog;
 import com.potatotv.pacc.server.core.engine.DetectionEngine;
+import com.potatotv.pacc.server.core.intel.IntelChecks;
 import com.potatotv.pacc.server.core.model.ServerPluginConfig;
 import com.potatotv.pacc.server.core.model.ServerType;
 import com.potatotv.pacc.server.core.report.NoopPtvServerReporter;
@@ -23,6 +25,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -57,7 +60,7 @@ public final class PaccBukkitPlugin extends JavaPlugin {
         brandTracker = new ClientBrandTracker();
         BukkitPlatformAdapter adapter = new BukkitPlatformAdapter(this, loader, brandTracker);
 
-        List<ServerCheck> checks = List.of(
+        List<ServerCheck> checks = new ArrayList<>(List.of(
                 new MoveCheck(pluginConfig),
                 new CombatCheck(pluginConfig),
                 new PacketCheck(),
@@ -65,7 +68,10 @@ public final class PaccBukkitPlugin extends JavaPlugin {
                 new InteractionCheck(pluginConfig),
                 new ClientBrandCheck(pluginConfig),
                 new AddonCheck(pluginConfig),
-                new DataConsistencyCheck());
+                new DataConsistencyCheck()));
+        // 引擎升级（技术文档 §4.2）：追加物理预测 / 行为 / 战斗 / 数据包四类 intel 检查；
+        // 以 PTV 上报密钥派生证据链密钥（§8.2），过短自动降级为不启用链式哈希
+        checks.addAll(IntelChecks.defaults(IntelChecks.chainKeyFrom(loader.ptvSecret())));
 
         PtvServerReporter reporter = loader.ptvUrl().isBlank()
                 ? NoopPtvServerReporter.INSTANCE
@@ -80,7 +86,9 @@ public final class PaccBukkitPlugin extends JavaPlugin {
         Bukkit.getMessenger().registerIncomingPluginChannel(this, REGISTER_CHANNEL, brandTracker);
 
         reporter.register(loader.serverInfo());
-        getLogger().info("PACC 服务端检测已启用（" + serverType + "，处置级别 " + pluginConfig.punishmentMode() + "）");
+        CheatCatalog catalog = IntelChecks.builtinCatalog();
+        getLogger().info("PACC 服务端检测已启用（" + serverType + "，处置级别 " + pluginConfig.punishmentMode()
+                + "，指纹库 " + catalog.total() + " 条，覆盖全类别=" + catalog.coversAllCategories() + "）");
     }
 
     @Override

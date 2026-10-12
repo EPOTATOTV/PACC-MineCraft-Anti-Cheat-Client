@@ -32,8 +32,8 @@ final class ReportServer {
      * @return 启动是否成功；任何异常均返回 false，绝不抛出
      */
     static boolean start(Findings findings, java.util.concurrent.atomic.AtomicLong loaded, int captured) {
-        int port = Integer.parseInt(System.getProperty("pacc.agent.server.port", "17020"));
         try {
+            int port = Integer.parseInt(System.getProperty("pacc.agent.server.port", "17020"));
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
             server.createContext("/health", ex -> {
                 Map<String, Object> body = new LinkedHashMap<>();

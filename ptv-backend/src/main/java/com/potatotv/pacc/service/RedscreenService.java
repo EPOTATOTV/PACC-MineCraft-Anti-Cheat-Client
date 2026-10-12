@@ -154,22 +154,20 @@ public class RedscreenService {
         }
 
         // 查端入队
-        int queuePosition;
         try {
-            queuePosition = inspectService.enqueue(pteid, alertId, level);
+            inspectService.enqueue(pteid, alertId);
         } catch (Exception e) {
             log.warn("查端入队失败，降级仅记录 pteid={} err={}", pteid, e.getMessage());
-            queuePosition = 0;
         }
 
         // 全在线广播
-        long ack = broadcast(alert, account);
+        long ack = broadcast(alert);
         alert.setBroadcastAck(ack);
         alertRepository.save(alert);
 
         // Webhook 推送
         try {
-            webhookDispatcher.onRedscreen(alert, queuePosition);
+            webhookDispatcher.onRedscreen(alert);
         } catch (Exception e) {
             log.warn("Webhook 推送失败 alert={} err={}", alertId, e.getMessage());
         }
@@ -193,7 +191,7 @@ public class RedscreenService {
         suspicionFlagRepository.save(flag);
     }
 
-    private long broadcast(RedscreenAlert alert, Account cheater) {
+    private long broadcast(RedscreenAlert alert) {
         Map<String, Object> msg = new LinkedHashMap<>();
         msg.put("event_type", "redscreen_alert");
         msg.put("alert_id", alert.getAlertId());

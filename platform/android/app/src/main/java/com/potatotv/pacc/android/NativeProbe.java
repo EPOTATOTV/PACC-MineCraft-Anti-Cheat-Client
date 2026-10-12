@@ -69,7 +69,7 @@ public final class NativeProbe {
             case 2:  score = 70; break;
             default: score = 100; break;
         }
-        String severity = score >= 70 ? "high" : score > 0 ? "medium" : "ok";
+        String severity = score >= 70 ? "high" : "medium";
         return new DetectionResult(score, severity, hits.toArray(new String[0]));
     }
 

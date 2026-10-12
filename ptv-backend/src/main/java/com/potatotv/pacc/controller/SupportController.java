@@ -71,7 +71,7 @@ public class SupportController {
         if (reply == null || reply.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "reply 不能为空"));
         }
-        Map<String, Object> result = supportService.replyTicket(id, reply, body.get("responder"));
+        Map<String, Object> result = supportService.replyTicket(id, body.get("responder"));
         if (result == null) {
             return ResponseEntity.notFound().build();
         }
@@ -80,9 +80,8 @@ public class SupportController {
 
     /** 解决工单。 */
     @PostMapping("/tickets/{id}/resolve")
-    public ResponseEntity<?> resolve(@PathVariable String id, @RequestBody(required = false) Map<String, String> body) {
-        String responder = body == null ? null : body.get("responder");
-        SupportTicket t = supportService.resolveTicket(id, responder);
+    public ResponseEntity<?> resolve(@PathVariable String id) {
+        SupportTicket t = supportService.resolveTicket(id);
         if (t == null) {
             return ResponseEntity.notFound().build();
         }
@@ -94,7 +93,7 @@ public class SupportController {
 
     /** 智能回复：body {question}，命中返回官方回答，未命中返回已转人工占位。 */
     @PostMapping("/tickets/{id}/smart")
-    public ResponseEntity<?> smart(@PathVariable String id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> smart(@RequestBody Map<String, String> body) {
         String question = body.get("question");
         if (question == null || question.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "question 不能为空"));

@@ -1,6 +1,7 @@
 package com.potatotv.pacc.service;
 
 import lombok.extern.slf4j.Slf4j;
+import com.potatotv.pacc.util.LogSanitizer;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
@@ -46,7 +47,8 @@ public class InspectSignalBus {
         }
         if (playerSession != null) {
             sessionIdByWss.put(playerSession.getId(), sessionId);
-            log.info("信令总线注册玩家腿 sessionId={} pteid={} playerWs={}", sessionId, pteid, playerSession.getId());
+            log.info("信令总线注册玩家腿 sessionId={} pteid={} playerWs={}", LogSanitizer.clean(sessionId),
+                    LogSanitizer.clean(pteid), LogSanitizer.clean(playerSession.getId()));
         }
     }
 

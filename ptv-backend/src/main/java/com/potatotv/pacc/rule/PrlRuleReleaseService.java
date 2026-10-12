@@ -1,6 +1,7 @@
 package com.potatotv.pacc.rule;
 
 import com.potatotv.pacc.service.PcuUpdateService;
+import com.potatotv.pacc.util.LogSanitizer;
 import com.potatotv.prl.PrlException;
 import com.potatotv.prl.analysis.AnalysisResult;
 import com.potatotv.prl.bytecode.PrlcFormat;
@@ -107,7 +108,8 @@ public class PrlRuleReleaseService {
         RuleVersion active = releases.approve(ruleName, version, approver);
         store.setRolloutPercent(ruleName, FULL_ROLLOUT_PERCENT);
         ruleEngine.reload();
-        log.info("[PRL] 规则已发布 {} v{}，审批人 {}", ruleName, version, approver);
+        log.info("[PRL] 规则已发布 {} v{}，审批人 {}", LogSanitizer.clean(ruleName), LogSanitizer.clean(version),
+                LogSanitizer.clean(approver));
         return active;
     }
 
@@ -132,7 +134,8 @@ public class PrlRuleReleaseService {
         RuleVersion restored = releases.rollback(ruleName);
         store.setRolloutPercent(ruleName, FULL_ROLLOUT_PERCENT);
         ruleEngine.reload();
-        log.warn("[PRL] 规则已回滚 {} v{} → v{}", ruleName, current.version(), restored.version());
+        log.warn("[PRL] 规则已回滚 {} v{} → v{}", LogSanitizer.clean(ruleName), LogSanitizer.clean(current.version()),
+                LogSanitizer.clean(restored.version()));
         return restored;
     }
 

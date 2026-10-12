@@ -18,6 +18,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -45,6 +46,8 @@ public class MapBanPickService {
 
     private static final int BANS_PER_SIDE = 2;
     private static final Duration MIN_OP_INTERVAL = Duration.ofSeconds(1);
+    /** 复用同一实例：自动落子选图用，要求不可预测。 */
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final MapBanPickSessionRepository sessionRepository;
     private final MapBanPickActionRepository actionRepository;
@@ -133,7 +136,7 @@ public class MapBanPickService {
 
     /** 开始：置 ACTIVE 并派生首个回合与截止时间。 */
     @Transactional
-    public MapBanPickSession start(String bpId, String operator) {
+    public MapBanPickSession start(String bpId) {
         return withLock(bpId, () -> {
             MapBanPickSession s = require(bpId);
             if (s.getStatus() != MapBanPickSession.Status.PENDING) {
@@ -151,7 +154,7 @@ public class MapBanPickService {
     }
 
     @Transactional
-    public MapBanPickSession pause(String bpId, String operator) {
+    public MapBanPickSession pause(String bpId) {
         return withLock(bpId, () -> {
             MapBanPickSession s = require(bpId);
             if (s.getStatus() != MapBanPickSession.Status.ACTIVE) {
@@ -167,7 +170,7 @@ public class MapBanPickService {
     }
 
     @Transactional
-    public MapBanPickSession resume(String bpId, String operator) {
+    public MapBanPickSession resume(String bpId) {
         return withLock(bpId, () -> {
             MapBanPickSession s = require(bpId);
             if (s.getStatus() != MapBanPickSession.Status.PAUSED) {
@@ -184,7 +187,7 @@ public class MapBanPickService {
 
     /** 重置为待开始，清空全部操作。 */
     @Transactional
-    public MapBanPickSession reset(String bpId, String operator) {
+    public MapBanPickSession reset(String bpId) {
         return withLock(bpId, () -> {
             MapBanPickSession s = require(bpId);
             actionRepository.deleteAll(actionRepository.findByBpSessionIdOrderByRoundNoAscCreatedAtAsc(bpId));
@@ -206,7 +209,7 @@ public class MapBanPickService {
     }
 
     @Transactional
-    public MapBanPickSession cancel(String bpId, String reason, String operator) {
+    public MapBanPickSession cancel(String bpId, String reason) {
         return withLock(bpId, () -> {
             MapBanPickSession s = require(bpId);
             if (s.getStatus() == MapBanPickSession.Status.COMPLETED) {
@@ -225,7 +228,7 @@ public class MapBanPickService {
 
     /** 手动完成：把当前已 Pick 地图落定为最终选图并写入对局。 */
     @Transactional
-    public MapBanPickSession complete(String bpId, String operator) {
+    public MapBanPickSession complete(String bpId) {
         return withLock(bpId, () -> {
             MapBanPickSession s = require(bpId);
             if (s.getStatus() != MapBanPickSession.Status.ACTIVE
@@ -567,7 +570,7 @@ public class MapBanPickService {
         if (pool.isEmpty()) {
             throw new IllegalStateException("地图池可用图不足，无法自动落子");
         }
-        return pool.get(new java.security.SecureRandom().nextInt(pool.size()));
+        return pool.get(SECURE_RANDOM.nextInt(pool.size()));
     }
 
     private MapBanPickSession require(String bpId) {

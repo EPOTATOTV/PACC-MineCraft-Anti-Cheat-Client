@@ -96,7 +96,7 @@ public final class Argon2 {
         long[] memory = new long[memoryBlocks * WORDS_PER_BLOCK];
         // 复用工作区：fillBlock 每块都会被调用一次，按调用分配会产出数百 MB 短命数组
         Scratch scratch = new Scratch();
-        fillFirstBlocks(memory, password, salt, memoryBlocks, laneLength);
+        fillFirstBlocks(memory, password, salt, laneLength);
 
         for (int pass = 0; pass < iterations; pass++) {
             for (int slice = 0; slice < SYNC_POINTS; slice++) {
@@ -240,7 +240,7 @@ public final class Argon2 {
     // ---------------- 初始化 ----------------
 
     private void fillFirstBlocks(long[] memory, byte[] password, byte[] salt,
-                                 int memoryBlocks, int laneLength) {
+                                 int laneLength) {
         byte[] h0 = Blake2b.digest(64,
                 le32(parallelism), le32(hashLength), le32(memoryKib), le32(iterations),
                 le32(VERSION), le32(ARGON2_ID),

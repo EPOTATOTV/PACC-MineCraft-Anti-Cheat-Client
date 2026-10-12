@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -192,7 +193,15 @@ public class ExportService {
 
     private Path dirs() throws IOException {
         Path dir = Paths.get(System.getProperty("java.io.tmpdir"), "pacc-export");
-        if (!Files.exists(dir)) Files.createDirectories(dir);
+        if (!Files.exists(dir)) {
+            Files.createDirectories(dir);
+            // 导出物含玩家证据，仅属主可读写，避免同机其他用户读取临时目录内容
+            try {
+                Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
+            } catch (UnsupportedOperationException ignored) {
+                // 非 POSIX 文件系统（如 Windows）无此语义
+            }
+        }
         return dir;
     }
 

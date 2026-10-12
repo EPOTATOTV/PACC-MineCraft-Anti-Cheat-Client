@@ -22,7 +22,7 @@ import { PbpException } from "./PbpException.js";
  * <p>本类只负责布局与长度校验，不碰密码学：签名计算在 PbpCrypto，这样帧解析可以在
  * 没有密钥的场景（如抓包分析）下单独使用。</p>
  */
-const MASK64 = 0xffffffffffffffffn;
+const MASK64 = (1n << 64n) - 1n;
 
 export class PbpFrame {
   static readonly MAGIC = 0x5042;

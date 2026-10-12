@@ -2,6 +2,7 @@ package com.potatotv.pacc.service.security;
 
 import com.potatotv.pacc.domain.KnownGoodHash;
 import com.potatotv.pacc.repository.KnownGoodHashRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -101,7 +102,8 @@ public class KnownGoodHashService {
                 .orElseThrow(() -> new NoSuchElementException("摘要记录不存在: " + id));
         row.setActive(false);
         repository.save(row);
-        log.info("下线已知good摘要 id={} hash={} 操作者={}", id, row.getHash(), operator);
+        log.info("下线已知good摘要 id={} hash={} 操作者={}", LogSanitizer.clean(id),
+                LogSanitizer.clean(row.getHash()), LogSanitizer.clean(operator));
     }
 
     /** 归一摘要种类；未知/空退到 CODE_SEGMENT。 */

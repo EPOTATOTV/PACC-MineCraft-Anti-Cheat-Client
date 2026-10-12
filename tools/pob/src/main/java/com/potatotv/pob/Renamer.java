@@ -35,7 +35,11 @@ final class Renamer {
     /** 参与混淆的自研命名空间。列表之外的一律不碰。 */
     private static final List<String> OBFUSCATABLE_PREFIXES = List.of(
             "com/potatotv/paccclient/", "com/potatotv/pbp/",
-            "com/potatotv/prl/", "com/potatotv/pcu/");
+            "com/potatotv/prl/", "com/potatotv/pcu/",
+            // 检测引擎（PDE）：零依赖、无反射，随包拍平一起被重命名。
+            // 不并入会以原始包名 com/potatotv/pacc/detection/** 留在发行件里，
+            // 等于把检测器类名（FusionEngine / ReachCheck / EvidenceChain…）直接交给逆向者。
+            "com/potatotv/pacc/");
 
     /** JVM / 序列化按名字回调的方法，改了名字就会失效。 */
     private static final Set<String> RESERVED_METHODS = Set.of(

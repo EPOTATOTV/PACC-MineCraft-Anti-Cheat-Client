@@ -260,6 +260,30 @@ if [ "$MODE" = "--check" ]; then
   fi
 fi
 
+if [ "$MODE" = "--check" ]; then
+  echo
+  echo "-- PDE 检测引擎版本一致性（只读断言）--"
+  PDE_POM="pacc-detection-engine/pom.xml"
+  if [ ! -f "$PDE_POM" ]; then
+    printf '  [缺失] %s（跳过）\n' "$PDE_POM"
+  else
+    PDE_RUNTIME_VERSION="$(perl -0777 -ne \
+      'print $1 if m{<artifactId>pacc-detection-engine</artifactId>\s*<version>([^<]+)}' "$PDE_POM")"
+    PDE_SERVER_VERSION="$(perl -0777 -ne \
+      'print $1 if m{<artifactId>pacc-detection-engine</artifactId>\s*<version>([^<]+)}' pacc-server-core/pom.xml)"
+    PDE_CLIENT_VERSION="$(perl -0777 -ne \
+      'print $1 if m{<pacc\.pde\.version>([^<]+)}' ptv-client/pom.xml)"
+    printf '  runtime=%s server=%s client=%s\n' \
+      "${PDE_RUNTIME_VERSION:-缺失}" "${PDE_SERVER_VERSION:-缺失}" "${PDE_CLIENT_VERSION:-缺失}"
+    if [ -z "$PDE_RUNTIME_VERSION" ] \
+      || [ "$PDE_RUNTIME_VERSION" != "$PDE_SERVER_VERSION" ] \
+      || [ "$PDE_RUNTIME_VERSION" != "$PDE_CLIENT_VERSION" ]; then
+      echo "PDE 版本不一致：检测引擎与消费方（pacc-server-core / ptv-client）pin 的版本必须相同。" >&2
+      exit 2
+    fi
+  fi
+fi
+
 if [ "$MODE" = "--check" ] && [ "$CHANGED" -gt 0 ]; then
   echo "存在版本号不一致，未通过校验。" >&2
   exit 2

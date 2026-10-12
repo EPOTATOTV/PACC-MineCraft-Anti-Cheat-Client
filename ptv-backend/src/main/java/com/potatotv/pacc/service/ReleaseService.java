@@ -103,7 +103,7 @@ public class ReleaseService {
         r.setStatus("PUBLISHED");
         r.setPublishedAt(Instant.now());
         releaseRepository.save(r);
-        log.info("发布版本 {}/{} {}={} by={}", r.getPlatform(), r.getChannel(), r.getVersion(), operator);
+        log.info("发布版本 {}/{} version={} by={}", r.getPlatform(), r.getChannel(), r.getVersion(), operator);
         return r;
     }
 

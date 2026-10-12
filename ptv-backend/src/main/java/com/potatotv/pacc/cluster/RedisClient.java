@@ -70,7 +70,7 @@ public final class RedisClient implements Closeable {
         return switch (b) {
             case '+' -> readLine(in);                     // Simple String
             case '-' -> throw new IllegalStateException("Redis 错误: " + readLine(in));
-            case ':' -> Long.parseLong(readLine(in));     // Integer
+            case ':' -> readLong(readLine(in));           // Integer
             case '$' -> readBulk(in);                     // Bulk String
             case '*' -> readArray(in);                    // Array
             default -> throw new IOException("未知 RESP 前缀: " + (char) b);
@@ -78,7 +78,7 @@ public final class RedisClient implements Closeable {
     }
 
     private String readBulk(DataInputStream in) throws IOException {
-        long len = Long.parseLong(readLine(in));
+        long len = readLong(readLine(in));
         if (len < 0) return null;
         byte[] buf = in.readNBytes((int) len);
         in.skipNBytes(2); // trailing CRLF
@@ -86,7 +86,7 @@ public final class RedisClient implements Closeable {
     }
 
     private java.util.List<Object> readArray(DataInputStream in) throws IOException {
-        long n = Long.parseLong(readLine(in));
+        long n = readLong(readLine(in));
         java.util.List<Object> list = new java.util.ArrayList<>();
         for (long i = 0; i < n; i++) list.add(readReply(in));
         return list;
@@ -99,6 +99,15 @@ public final class RedisClient implements Closeable {
             if (c != '\r') sb.append((char) c);
         }
         return sb.toString();
+    }
+
+    /** RESP 整数解析：对端返回非数字时按协议错误处理，不向调用方抛 NFE。 */
+    private static long readLong(String line) throws IOException {
+        try {
+            return Long.parseLong(line);
+        } catch (NumberFormatException e) {
+            throw new IOException("Redis 协议整数非法: " + line);
+        }
     }
 
     @Override

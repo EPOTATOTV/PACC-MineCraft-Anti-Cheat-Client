@@ -100,7 +100,7 @@ class WssMessageGuardTest {
     void validSignedMessageAccepted() throws Exception {
         WssMessageGuard guard = new WssMessageGuard(new ObjectMapper(), SECRET);
         long ts = System.currentTimeMillis() / 1000;
-        long randomNonce = Math.abs(java.util.concurrent.ThreadLocalRandom.current().nextLong());
+        long randomNonce = java.util.concurrent.ThreadLocalRandom.current().nextLong() >>> 1;
         String nonce = String.format("%016x", randomNonce);
         String wire = clientSign(samplePayload(), ts, nonce);
         JsonNode node = new ObjectMapper().readTree(wire);

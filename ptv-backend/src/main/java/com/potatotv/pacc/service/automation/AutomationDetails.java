@@ -53,12 +53,23 @@ final class AutomationDetails {
 
     private static double firstNumber(String s) {
         String num = capture(s, true);
-        return num == null ? Double.NaN : Double.parseDouble(num);
+        return parseOrNaN(num);
     }
 
     private static double lastNumber(String s) {
         String num = capture(s, false);
-        return num == null ? Double.NaN : Double.parseDouble(num);
+        return parseOrNaN(num);
+    }
+
+    private static double parseOrNaN(String num) {
+        if (num == null) {
+            return Double.NaN;
+        }
+        try {
+            return Double.parseDouble(num);
+        } catch (NumberFormatException e) {
+            return Double.NaN;
+        }
     }
 
     private static String capture(String s, boolean first) {

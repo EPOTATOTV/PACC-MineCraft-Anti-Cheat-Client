@@ -8,6 +8,7 @@ import com.potatotv.pacc.repository.FederatedModelRepository;
 import com.potatotv.pacc.repository.FederatedRoundRepository;
 import com.potatotv.pacc.repository.FederatedUpdateRepository;
 import com.potatotv.pacc.repository.ModelVersionRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -249,7 +250,7 @@ public class FederatedLearningService {
         if (!FederatedRound.STATUS_OPEN.equals(round.getStatus())) {
             throw new IllegalStateException("轮次 " + roundId + " 已关闭");
         }
-        log.info("联邦轮次手动关闭 id={} operator={}", roundId, operator);
+        log.info("联邦轮次手动关闭 id={} operator={}", LogSanitizer.clean(roundId), LogSanitizer.clean(operator));
         return aggregateAndClose(round);
     }
 

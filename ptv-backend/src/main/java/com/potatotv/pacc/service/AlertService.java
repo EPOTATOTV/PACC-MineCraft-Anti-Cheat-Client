@@ -58,7 +58,6 @@ public class AlertService {
     }
 
     private void evaluate(AlertRule rule) {
-        int threshold = rule.getThreshold() == null ? 0 : rule.getThreshold();
         double actual = metricValue(rule);
         boolean breach = metricBreached(rule, actual);
         if (breach) {

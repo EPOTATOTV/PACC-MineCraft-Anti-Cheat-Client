@@ -106,7 +106,15 @@ public final class StringProtectorGenerator {
         for (int i = 4; i < args.length; i++) {
             literals.add(args[i]);
         }
-        write(outFile, args[1], args[2], Integer.decode(args[3]), literals);
+        int key;
+        try {
+            key = Integer.decode(args[3]);
+        } catch (NumberFormatException e) {
+            System.err.println("密钥必须是整数（支持 0x 前缀）: " + args[3]);
+            System.exit(2);
+            return;
+        }
+        write(outFile, args[1], args[2], key, literals);
         System.out.println("已生成 " + outFile + "（" + literals.size() + " 条字面量）");
     }
 }

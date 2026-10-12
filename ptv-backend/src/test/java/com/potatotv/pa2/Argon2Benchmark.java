@@ -40,6 +40,9 @@ public class Argon2Benchmark {
     private static final int PARALLELISM = 1;
     private static final int HASH_BYTES = 32;
 
+    /** 复用同一实例生成基准盐；盐值本身不影响耗时对比。 */
+    private static final Random SALT_RANDOM = new Random();
+
     private Argon2 pa2;
     private Argon2BytesGenerator bouncyCastle;
     private byte[] password;
@@ -51,7 +54,7 @@ public class Argon2Benchmark {
         pa2 = new Argon2(ITERATIONS, MEMORY_KIB, PARALLELISM, HASH_BYTES);
         password = "Pacc@Test123".getBytes(StandardCharsets.UTF_8);
         salt = new byte[16];
-        new Random(42L).nextBytes(salt);
+        SALT_RANDOM.nextBytes(salt);
         bouncyCastle = new Argon2BytesGenerator();
         bouncyCastle.init(new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
                 .withVersion(Argon2Parameters.ARGON2_VERSION_13)

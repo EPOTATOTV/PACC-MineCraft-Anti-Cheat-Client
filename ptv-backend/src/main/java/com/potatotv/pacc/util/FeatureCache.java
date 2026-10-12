@@ -23,7 +23,7 @@ public final class FeatureCache<K, V> {
         this.map = new LinkedHashMap<>(Math.max(16, capacity), LOAD_FACTOR, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-                return size() > FeatureCache.this.capacity;
+                return super.size() > FeatureCache.this.capacity;
             }
         };
     }

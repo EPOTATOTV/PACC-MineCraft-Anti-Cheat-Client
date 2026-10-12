@@ -4,7 +4,6 @@ import com.potatotv.pacc.domain.plugin.PluginRuntime;
 import com.potatotv.pacc.repository.PluginRepository;
 import com.potatotv.pacc.security.RequirePermission;
 import com.potatotv.pacc.service.plugin.PluginManager;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,8 +43,7 @@ public class PluginRuntimeController {
     @PostMapping("/{id}/load")
     @RequirePermission("system:update")
     public ResponseEntity<?> load(@PathVariable String id,
-                                  @RequestBody(required = false) Map<String, Object> body,
-                                  HttpServletRequest request) {
+                                  @RequestBody(required = false) Map<String, Object> body) {
         try {
             String path = body == null ? null : str(body.get("path"));
             if (path == null) {

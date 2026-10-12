@@ -44,6 +44,13 @@
     </properties>
 
     <dependencies>
+        <!-- 同仓库检测引擎（纯 JDK 零依赖）：提供物理预测、战斗/数据包/行为检测与融合判定。
+             enforcer 门禁放行同组依赖，第三方依赖仍然禁止（见下方规则）。 -->
+        <dependency>
+            <groupId>com.potatotv.pacc</groupId>
+            <artifactId>pacc-detection-engine</artifactId>
+            <version>6.0.0</version>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -64,7 +71,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
             </plugin>
-            <!-- 零依赖是硬约束：运行时只用 JDK 标准库。
+            <!-- 第三方零依赖是硬约束：运行时只用 JDK 标准库 + 同仓库 com.potatotv.pacc 兄弟模块。
                  只允许 test 作用域（JUnit）。主代码一旦引入第三方依赖，构建直接失败。 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -85,7 +92,12 @@
                                         <exclude>*:*:*:*:compile</exclude>
                                         <exclude>*:*:*:*:runtime</exclude>
                                     </excludes>
-                                    <message>pacc-server-core 运行时必须零第三方依赖（仅允许 test 作用域的 JUnit）。</message>
+                                    <includes>
+                                        <!-- 同仓库检测引擎是自研零依赖模块，不属于第三方 -->
+                                        <include>com.potatotv.pacc:*:*:*:compile</include>
+                                        <include>com.potatotv.pacc:*:*:*:runtime</include>
+                                    </includes>
+                                    <message>pacc-server-core 运行时只允许 JDK 标准库与同仓库 com.potatotv.pacc 模块，禁止第三方依赖（test 作用域的 JUnit 除外）。</message>
                                 </bannedDependencies>
                             </rules>
                         </configuration>

@@ -39,7 +39,7 @@ class UpdateApplierTest {
         return target;
     }
 
-    private static PcuConfig.Builder base(Path install, Path temp, Path backup, StubAdapter adapter) {
+    private static PcuConfig.Builder base(Path backup, StubAdapter adapter) {
         return PcuConfig.builder()
                 .currentVersion("5.4.0")
                 .adapter(adapter)
@@ -56,7 +56,7 @@ class UpdateApplierTest {
         write(artifact, "新版本");
 
         StubAdapter adapter = new StubAdapter(install, temp);
-        PcuConfig config = base(install, temp, root.resolve("backup"), adapter)
+        PcuConfig config = base(root.resolve("backup"), adapter)
                 .mainArtifact(jar)
                 .build();
         BackupManager backups = new BackupManager(config);
@@ -85,7 +85,7 @@ class UpdateApplierTest {
         Path artifact = zip(root.resolve("pkg.zip"), entries);
 
         StubAdapter adapter = new StubAdapter(install, temp);
-        PcuConfig config = base(install, temp, root.resolve("backup"), adapter).build();
+        PcuConfig config = base(root.resolve("backup"), adapter).build();
         UpdateApplier applier = new UpdateApplier(config, new BackupManager(config));
 
         applier.apply(artifact, "5.5.0");
@@ -107,7 +107,7 @@ class UpdateApplierTest {
 
         StubAdapter adapter = new StubAdapter(install, temp);
         adapter.failStart = true;
-        PcuConfig config = base(install, temp, root.resolve("backup"), adapter)
+        PcuConfig config = base(root.resolve("backup"), adapter)
                 .mainArtifact(jar)
                 .build();
         UpdateApplier applier = new UpdateApplier(config, new BackupManager(config));
@@ -129,7 +129,7 @@ class UpdateApplierTest {
 
         StubAdapter adapter = new StubAdapter(install, temp);
         adapter.failStop = true;
-        PcuConfig config = base(install, temp, root.resolve("backup"), adapter)
+        PcuConfig config = base(root.resolve("backup"), adapter)
                 .mainArtifact(jar)
                 .build();
         UpdateApplier applier = new UpdateApplier(config, new BackupManager(config));
@@ -152,7 +152,7 @@ class UpdateApplierTest {
         Path artifact = zip(root.resolve("pkg.zip"), entries);
 
         StubAdapter adapter = new StubAdapter(install, temp);
-        PcuConfig config = base(install, temp, root.resolve("backup"), adapter).build();
+        PcuConfig config = base(root.resolve("backup"), adapter).build();
         UpdateApplier applier = new UpdateApplier(config, new BackupManager(config));
 
         PcuException e = assertThrows(PcuException.class, () -> applier.apply(artifact, "5.5.0"));
@@ -171,7 +171,7 @@ class UpdateApplierTest {
         write(artifact, "这根本不是 zip");
 
         StubAdapter adapter = new StubAdapter(install, temp);
-        PcuConfig config = base(install, temp, root.resolve("backup"), adapter).build();
+        PcuConfig config = base(root.resolve("backup"), adapter).build();
         UpdateApplier applier = new UpdateApplier(config, new BackupManager(config));
 
         PcuException e = assertThrows(PcuException.class, () -> applier.apply(artifact, "5.5.0"));

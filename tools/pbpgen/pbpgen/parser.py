@@ -198,7 +198,7 @@ class Parser:
         )
 
     def _parse_reserved(self) -> list[int]:
-        keyword = self._expect_ident()
+        self._expect_ident()
         numbers = [_parse_int_required(self, "保留字段编号")]
         while self._at_punct(","):
             self._next()

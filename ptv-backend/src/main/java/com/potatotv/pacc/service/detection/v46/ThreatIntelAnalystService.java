@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -107,7 +106,6 @@ public class ThreatIntelAnalystService {
         int sev = 40;
         int seedRisk = matches.stream().mapToInt(SignatureExpansionService.Matched::riskLevel).max().orElse(0);
         sev += seedRisk * 8;
-        Locale lo = Locale.ROOT;
         if (tokens.stream().anyMatch(t -> t.contains("ghost") || t.contains("inject"))) sev += 18;
         if (tokens.stream().anyMatch(t -> t.endsWith(".sys") || t.endsWith(".dll") || t.contains("driver"))) sev += 14;
         if (tokens.stream().anyMatch(t -> t.contains("killaura") || t.contains("aimbot"))) sev += 12;

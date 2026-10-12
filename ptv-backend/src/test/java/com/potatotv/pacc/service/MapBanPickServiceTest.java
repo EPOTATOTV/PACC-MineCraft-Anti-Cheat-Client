@@ -97,7 +97,7 @@ class MapBanPickServiceTest {
         MapBanPickSession s = service.create(format, POOL, "T-1", null, null,
                 "E-BLUE", "E-RED", "蓝队", "红队", 60, "裁判", "admin");
         when(sessionRepository.findById(s.getBpSessionId())).thenReturn(Optional.of(s));
-        return service.start(s.getBpSessionId(), "admin");
+        return service.start(s.getBpSessionId());
     }
 
     @Test

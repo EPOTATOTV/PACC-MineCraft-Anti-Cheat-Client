@@ -101,6 +101,10 @@ public class AbExperimentController {
         if (o instanceof Number n) {
             return n.longValue();
         }
-        return Long.parseLong(o.toString());
+        try {
+            return Long.parseLong(o.toString().trim());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 }

@@ -61,7 +61,7 @@ class SupportServiceTest {
         when(ticketRepo.findById("t1")).thenReturn(Optional.of(t));
         when(ticketRepo.save(any(SupportTicket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Map<String, Object> result = service.replyTicket("t1", "已处理", "小王");
+        Map<String, Object> result = service.replyTicket("t1", "小王");
 
         @SuppressWarnings("unchecked")
         SupportTicket saved = (SupportTicket) result.get("ticket");
@@ -87,7 +87,7 @@ class SupportServiceTest {
         when(ticketRepo.findById("t2")).thenReturn(Optional.of(t));
         when(ticketRepo.save(any(SupportTicket.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Map<String, Object> result = service.replyTicket("t2", "来晚了", "admin");
+        Map<String, Object> result = service.replyTicket("t2", "admin");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> slaInfo = (Map<String, Object>) result.get("sla_info");

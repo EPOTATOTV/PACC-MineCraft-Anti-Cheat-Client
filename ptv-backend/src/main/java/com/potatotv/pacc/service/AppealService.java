@@ -50,7 +50,7 @@ public class AppealService {
                 .createdAt(Instant.now())
                 .build();
 
-        String evidenceSnapshot = snapshot(pteid, alertId, reason);
+        String evidenceSnapshot = snapshot(alertId, reason);
         a.setEvidenceJson(evidenceSnapshot);
         a.setPrescreenScore(prescreenScore(pteid, alertId));
         if (a.getPrescreenScore() >= PRESCREEN_AUTO_APPROVE) {
@@ -195,7 +195,7 @@ public class AppealService {
     }
 
     /** 抓取关联作弊记录生成证据快照 JSON。 */
-    private String snapshot(String pteid, String alertId, String reason) {
+    private String snapshot(String alertId, String reason) {
         if (alertId == null || alertId.isBlank()) return null;
         try {
             Map<String, Object> ev = new LinkedHashMap<>();

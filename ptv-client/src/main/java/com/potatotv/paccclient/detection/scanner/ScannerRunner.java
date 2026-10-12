@@ -1,6 +1,7 @@
 package com.potatotv.paccclient.detection.scanner;
 
 import com.potatotv.paccclient.detection.DetectionEvent;
+import com.potatotv.paccclient.detection.engine.PdeLocalScanner;
 import com.potatotv.paccclient.detection.input.InputTimingScanner;
 import com.potatotv.paccclient.detection.network.NetworkBehaviorScanner;
 import com.potatotv.paccclient.detection.vision.ScreenVisionScanner;
@@ -65,7 +66,11 @@ public final class ScannerRunner {
                 new DllSignatureScanner(),
                 new InjectionScanner(),
                 new UnsignedExecutableScanner(),
-                new KernelCallbackScanner()));
+                new KernelCallbackScanner(),
+                // ---- 引擎指纹库通道（技术文档 §6.1）：PDE 内置指纹 + 进程/窗口双通道 ----
+                new EngineFingerprintDetector(),
+                // ---- 引擎玩家端六层检测桥（技术文档 §四 L1-L4，默认关闭）----
+                new PdeLocalScanner()));
     }
 
     /** 内置检测器 + 插件注册的检测器（文档 §2.4 步骤 7）。 */

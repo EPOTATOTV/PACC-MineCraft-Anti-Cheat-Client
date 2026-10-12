@@ -9,7 +9,7 @@ import py_compile
 import tempfile
 import unittest
 
-import pbp_gen
+import importlib.util
 from pbp_gen import (
     ApmSnapshot,
     DetectionEvent,
@@ -369,7 +369,7 @@ class CoreSelfCheckTest(unittest.TestCase):
         self.assertEqual(PbpErrorCode.BAD_FORMAT, ctx.exception.code)
 
     def test_all_generated_modules_compile(self):
-        package_dir = pathlib.Path(pbp_gen.__file__).resolve().parent
+        package_dir = pathlib.Path(importlib.util.find_spec("pbp_gen").origin).resolve().parent
         sources = sorted(package_dir.glob("*.py"))
         self.assertTrue(sources)
         with tempfile.TemporaryDirectory() as tmp:

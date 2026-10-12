@@ -99,7 +99,7 @@ public class AdminAuditController {
             status.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
         }
         long error = status.entrySet().stream()
-                .filter(e -> Integer.parseInt(e.getKey()) >= 400)
+                .filter(e -> parseStatus(e.getKey()) >= 400)
                 .mapToLong(Map.Entry::getValue).sum();
         long total = status.values().stream().mapToLong(Long::longValue).sum();
         List<Map<String, Object>> top = new ArrayList<>();
@@ -114,5 +114,14 @@ public class AdminAuditController {
         m.put("by_status", status);
         m.put("top_actions", top);
         return m;
+    }
+
+    /** 状态码解析：非数字归类为 -1（不计入错误率分子）。 */
+    private static int parseStatus(String s) {
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 }

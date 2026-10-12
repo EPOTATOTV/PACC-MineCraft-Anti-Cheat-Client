@@ -22,6 +22,9 @@ class PbpZstdTest {
 
     private static final int MAX = PbpFrame.MAX_PAYLOAD_SIZE;
 
+    /** 复用的随机源；每次用 {@code setSeed} 复位，输出仍只由种子决定。 */
+    private static final Random RANDOM = new Random();
+
     // ------------------------------------------------------------ 往返
 
     @Test
@@ -56,7 +59,8 @@ class PbpZstdTest {
     @Test
     void roundTripIncompressibleDataFallsBackToRaw() {
         byte[] data = new byte[8_000];
-        new Random(7).nextBytes(data);
+        RANDOM.setSeed(7);
+        RANDOM.nextBytes(data);
         byte[] frame = PbpZstd.compress(data);
         assertArrayEquals(data, PbpZstd.decompress(frame, MAX));
     }

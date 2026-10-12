@@ -22,6 +22,9 @@ class Argon2BouncyCastleCompatibilityTest {
 
     private static final int VECTORS = 100;
 
+    /** 复用同一实例生成测试盐；盐值本身对断言无影响。 */
+    private static final Random SALT_RANDOM = new Random();
+
     @Test
     void matchesBouncyCastleAcrossHundredVectors() {
         Random random = new Random(20261002L);
@@ -57,7 +60,7 @@ class Argon2BouncyCastleCompatibilityTest {
         // 随机向量只覆盖 p<=2：跨 lane 的引用路径在高并行度下才被充分走到
         byte[] password = "Pacc@Test123".getBytes(StandardCharsets.UTF_8);
         byte[] salt = new byte[16];
-        new Random(11L).nextBytes(salt);
+        SALT_RANDOM.nextBytes(salt);
         assertMatchesBouncyCastle(3, 256, 4, 32, password, salt);
         assertMatchesBouncyCastle(2, 1024, 8, 64, password, salt);
         assertMatchesBouncyCastle(1, 8192, 16, 32, password, salt);
@@ -67,7 +70,7 @@ class Argon2BouncyCastleCompatibilityTest {
     void matchesBouncyCastleAtParameterBoundaries() {
         byte[] password = "Pacc@Test123".getBytes(StandardCharsets.UTF_8);
         byte[] salt = new byte[8];
-        new Random(13L).nextBytes(salt);
+        SALT_RANDOM.nextBytes(salt);
         // 内存下限：m = 8*p，每 lane 恰好 2 个块
         assertMatchesBouncyCastle(1, 8, 1, 4, password, salt);
         assertMatchesBouncyCastle(1, 64, 8, 32, password, salt);
@@ -81,7 +84,7 @@ class Argon2BouncyCastleCompatibilityTest {
         // 256 MiB：把内存块数量拉高，验证块索引算术不溢出
         byte[] password = "Pacc@Test123".getBytes(StandardCharsets.UTF_8);
         byte[] salt = new byte[16];
-        new Random(17L).nextBytes(salt);
+        SALT_RANDOM.nextBytes(salt);
         assertMatchesBouncyCastle(1, 262144, 4, 32, password, salt);
     }
 
@@ -108,7 +111,7 @@ class Argon2BouncyCastleCompatibilityTest {
         // 生产参数：PA2 必须能验证由 BC 摘要在标准格式下组装的存量哈希
         Argon2BytesGenerator generator = new Argon2BytesGenerator();
         byte[] salt = new byte[16];
-        new Random(7L).nextBytes(salt);
+        SALT_RANDOM.nextBytes(salt);
         byte[] password = "Pacc@Test123".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         generator.init(new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
                 .withVersion(Argon2Parameters.ARGON2_VERSION_13)

@@ -714,7 +714,7 @@ export function tokenize(source: string): PrlTokenLine[] {
 export function stripComment(line: string, tokens?: readonly PrlToken[]): string {
   const list = tokens ?? tokenizeLine(line)
   const comment = list.find((t) => t.type === 'comment')
-  return (comment ? line.slice(0, comment.start) : line).replace(/\s+$/, '')
+  return (comment ? line.slice(0, comment.start) : line).trimEnd()
 }
 
 /** 代码部分（去注释 + trim），结构判断用。 */
@@ -735,7 +735,7 @@ export interface PrlDeclaration {
 }
 
 const LET_PATTERN = /^let\s+([A-Za-z_][A-Za-z0-9_]*)/
-const INPUT_FIELD_PATTERN = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+)$/
+const INPUT_FIELD_PATTERN = /^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\S.*)$/
 
 /**
  * 提取 `let` 局部变量与 `input {}` 字段声明。

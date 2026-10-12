@@ -28,23 +28,23 @@ public class StealthCheatDetector {
                           List<LayerHit> hits, String summary) {}
 
     /** 五层全量判定：按置信度降序返回所有命中结论。 */
-    public List<Verdict> evaluateAll(FeatureVector fv, Map<String, Object> ctx) {
+    public List<Verdict> evaluateAll(FeatureVector fv) {
         List<Verdict> out = new ArrayList<>();
         for (CheatType.Stealth t : CheatType.Stealth.values()) {
-            evaluate(t, fv, ctx).ifPresent(out::add);
+            evaluate(t, fv).ifPresent(out::add);
         }
         out.sort((a, b) -> Double.compare(b.confidence(), a.confidence()));
         return out;
     }
 
-    public Optional<Verdict> evaluate(CheatType.Stealth type, FeatureVector fv, Map<String, Object> ctx) {
+    public Optional<Verdict> evaluate(CheatType.Stealth type, FeatureVector fv) {
         List<LayerHit> hits = new ArrayList<>();
 
-        hardwareLayer(type, fv, ctx).ifPresent(hits::add);
-        kernelLayer(type, fv, ctx).ifPresent(hits::add);
-        memoryLayer(type, fv, ctx).ifPresent(hits::add);
-        networkLayer(type, fv, ctx).ifPresent(hits::add);
-        behaviorLayer(type, fv, ctx).ifPresent(hits::add);
+        hardwareLayer(type, fv).ifPresent(hits::add);
+        kernelLayer(type, fv).ifPresent(hits::add);
+        memoryLayer(type, fv).ifPresent(hits::add);
+        networkLayer(type, fv).ifPresent(hits::add);
+        behaviorLayer(type, fv).ifPresent(hits::add);
 
         if (hits.isEmpty()) {
             return Optional.empty();
@@ -57,7 +57,7 @@ public class StealthCheatDetector {
     }
 
     // ---------- 硬件层：PCIe DMA / IOMMU / 硬件性能计数器 ----------
-    private Optional<LayerHit> hardwareLayer(CheatType.Stealth t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> hardwareLayer(CheatType.Stealth t, FeatureVector fv) {
         if (t != CheatType.Stealth.DMA_CHEAT) return Optional.empty();
         double pcie = fv.get("feature_pcie_dma_present");
         double iommu = fv.get("feature_iommu_disabled");
@@ -68,18 +68,18 @@ public class StealthCheatDetector {
     }
 
     // ---------- 内核层：作弊驱动 / 钩子 / 内核对象 ----------
-    private Optional<LayerHit> kernelLayer(CheatType.Stealth t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> kernelLayer(CheatType.Stealth t, FeatureVector fv) {
         double unknownDrivers = fv.get("feature_unknown_kernel_drivers");
         double hooks = fv.get("feature_ssdt_hooks");
         if (t == CheatType.Stealth.KERNEL_DRIVER && (unknownDrivers >= 1 || hooks >= 1)) {
             return Optional.of(new LayerHit(2, "内核层", t,
-                    "未知内核驱动 " + (int) unknownDrivers + " / SSDT 钩子 " + (int) hooks, 0.35));
+                    "未知内核驱动 " + boundedCount(unknownDrivers) + " / SSDT 钩子 " + boundedCount(hooks), 0.35));
         }
         return Optional.empty();
     }
 
     // ---------- 内存层：幽灵客户端 / 反射式注入 / 异常线程 ----------
-    private Optional<LayerHit> memoryLayer(CheatType.Stealth t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> memoryLayer(CheatType.Stealth t, FeatureVector fv) {
         double ghost = fv.get("feature_ghost_client_mem");
         double remoteThreads = fv.get("feature_remote_threads");
         double nonImage = fv.get("feature_non_image_mem_ratio");
@@ -92,8 +92,8 @@ public class StealthCheatDetector {
             case REFLECTIVE_DLL -> {
                 if (remoteThreads >= 1 || nonImage >= 0.3) {
                     return Optional.of(new LayerHit(3, "内存层", t,
-                            "远程线程 " + (int) remoteThreads + " / 非映像内存占比 "
-                                    + String.format("%.0f%%", nonImage * 100), 0.35));
+                            "远程线程 " + boundedCount(remoteThreads) + " / 非映像内存占比 "
+                                    + String.format("%.0f%%", boundedRatioPct(nonImage)), 0.35));
                 }
             }
             default -> {
@@ -104,14 +104,14 @@ public class StealthCheatDetector {
     }
 
     // ---------- 网络层：数据包级 / 延迟 / 云作弊 ----------
-    private Optional<LayerHit> networkLayer(CheatType.Stealth t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> networkLayer(CheatType.Stealth t, FeatureVector fv) {
         double packetRatio = fv.get("feature_packet_anomaly_ratio");
         double proxy = fv.get("feature_proxy_detected");
         double latency = fv.get("feature_abnormal_latency");
         switch (t) {
             case PACKET_CHEAT -> {
                 if (packetRatio >= 0.5) {
-                    return Optional.of(new LayerHit(4, "网络层", t, "数据包异常比例 " + String.format("%.0f%%", packetRatio * 100), 0.3));
+                    return Optional.of(new LayerHit(4, "网络层", t, "数据包异常比例 " + String.format("%.0f%%", boundedRatioPct(packetRatio)), 0.3));
                 }
             }
             case LAG_CHEAT -> {
@@ -132,7 +132,7 @@ public class StealthCheatDetector {
     }
 
     // ---------- 行为层：微自瞄 / 慢加速 / 虚拟化 / AI 驱动 ----------
-    private Optional<LayerHit> behaviorLayer(CheatType.Stealth t, FeatureVector fv, Map<String, Object> ctx) {
+    private Optional<LayerHit> behaviorLayer(CheatType.Stealth t, FeatureVector fv) {
         double humanLikeness = fv.get("feature_human_likeness"); // 人类行为模拟度 0-1
         double aimPull = fv.get("feature_aim_target_attraction");
         double slowDrift = fv.get("feature_slow_accel_drift");
@@ -166,6 +166,22 @@ public class StealthCheatDetector {
             }
         }
         return Optional.empty();
+    }
+
+    /** 特征计数取整：端侧上报值可能为极端/非有限值，先夹到 [0, Integer.MAX_VALUE]。 */
+    private static int boundedCount(double v) {
+        if (!Double.isFinite(v) || v <= 0) {
+            return 0;
+        }
+        return v >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) v;
+    }
+
+    /** 比例转百分比：先夹到 [0,1] 再乘 100，避免异常值造成溢出。 */
+    private static double boundedRatioPct(double ratio) {
+        if (!Double.isFinite(ratio)) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, ratio)) * 100.0;
     }
 
     /** 构造默认空上下文。 */

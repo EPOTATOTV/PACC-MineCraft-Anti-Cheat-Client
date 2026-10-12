@@ -78,7 +78,7 @@ public class ApiV1AuthFilter extends OncePerRequestFilter {
 
         long start = System.currentTimeMillis();
         if (keyId == null || ts == null || sig == null || nonce == null) {
-            auditAndReject(request, keyId, "缺请求头", HttpServletResponse.SC_UNAUTHORIZED, start);
+            auditAndReject(request, keyId, HttpServletResponse.SC_UNAUTHORIZED, start);
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, "{\"error\":\"缺少 API 鉴权头\"}");
             return;
         }
@@ -86,7 +86,7 @@ public class ApiV1AuthFilter extends OncePerRequestFilter {
         // 1) 密钥存在且启用
         ApiKey key = keyRepository.findFirstByKeyId(keyId).orElse(null);
         if (key == null || !key.isEnabled()) {
-            auditAndReject(request, keyId, "密钥无效或已禁用", HttpServletResponse.SC_UNAUTHORIZED, start);
+            auditAndReject(request, keyId, HttpServletResponse.SC_UNAUTHORIZED, start);
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, "{\"error\":\"无效的 API 密钥\"}");
             return;
         }
@@ -96,19 +96,19 @@ public class ApiV1AuthFilter extends OncePerRequestFilter {
         try {
             tsMs = Long.parseLong(ts);
         } catch (NumberFormatException e) {
-            auditAndReject(request, keyId, "时间戳非法", HttpServletResponse.SC_UNAUTHORIZED, start);
+            auditAndReject(request, keyId, HttpServletResponse.SC_UNAUTHORIZED, start);
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, "{\"error\":\"时间戳非法\"}");
             return;
         }
         if (Math.abs(System.currentTimeMillis() - tsMs) > WINDOW_MS) {
-            auditAndReject(request, keyId, "请求过期", HttpServletResponse.SC_UNAUTHORIZED, start);
+            auditAndReject(request, keyId, HttpServletResponse.SC_UNAUTHORIZED, start);
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, "{\"error\":\"请求时间戳过期\"}");
             return;
         }
 
         // 3) nonce 防重放
         if (!consumeNonce(nonce)) {
-            auditAndReject(request, keyId, "重复 nonce", HttpServletResponse.SC_UNAUTHORIZED, start);
+            auditAndReject(request, keyId, HttpServletResponse.SC_UNAUTHORIZED, start);
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, "{\"error\":\"重复请求\"}");
             return;
         }
@@ -116,7 +116,7 @@ public class ApiV1AuthFilter extends OncePerRequestFilter {
         // 4) IP 白名单
         String ip = clientIp(request);
         if (!ipAllowed(key, ip)) {
-            auditAndReject(request, keyId, "IP 不在白名单", HttpServletResponse.SC_FORBIDDEN, start);
+            auditAndReject(request, keyId, HttpServletResponse.SC_FORBIDDEN, start);
             writeJson(response, HttpServletResponse.SC_FORBIDDEN, "{\"error\":\"调用来源受限\"}");
             return;
         }
@@ -129,14 +129,14 @@ public class ApiV1AuthFilter extends OncePerRequestFilter {
         String secret = ApiCrypto.decrypt(key.getSecretEnc(), masterSecret);
         String candidate = ApiSignature.hmacHex(secret, canonical);
         if (!ApiSignature.constantTimeEquals(sig, candidate)) {
-            auditAndReject(request, keyId, "签名不匹配", HttpServletResponse.SC_UNAUTHORIZED, start);
+            auditAndReject(request, keyId, HttpServletResponse.SC_UNAUTHORIZED, start);
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, "{\"error\":\"签名校验失败\"}");
             return;
         }
 
         // 6) 分级限流（超出 429）
         if (keyService.rateExceeded(key)) {
-            auditAndReject(request, keyId, "超限流", 429, start);
+            auditAndReject(request, keyId, 429, start);
             writeJson(response, 429, "{\"error\":\"API 调用超限\"}");
             return;
         }
@@ -181,7 +181,7 @@ public class ApiV1AuthFilter extends OncePerRequestFilter {
         return bytes == null || bytes.length == 0 ? "" : new String(bytes, StandardCharsets.UTF_8);
     }
 
-    private void auditAndReject(HttpServletRequest request, String keyId, String cause, int status, long start) {
+    private void auditAndReject(HttpServletRequest request, String keyId, int status, long start) {
         recordUsage(request, keyId, status, start);
     }
 

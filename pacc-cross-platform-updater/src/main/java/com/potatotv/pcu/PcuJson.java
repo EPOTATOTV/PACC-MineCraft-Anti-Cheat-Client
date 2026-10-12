@@ -301,24 +301,16 @@ public final class PcuJson {
     // ------------------------------------------------------------------ 序列化
 
     private static void writeValue(StringBuilder sb, Object value) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String s) {
-            writeString(sb, s);
-        } else if (value instanceof Boolean b) {
-            sb.append(b);
-        } else if (value instanceof Double d) {
-            writeDouble(sb, d);
-        } else if (value instanceof Float f) {
-            writeDouble(sb, f.doubleValue());
-        } else if (value instanceof Number n) {
-            sb.append(n.longValue());
-        } else if (value instanceof Map<?, ?> map) {
-            writeObject(sb, map);
-        } else if (value instanceof Iterable<?> it) {
-            writeArray(sb, it);
-        } else {
-            throw new PcuException("PcuJson 不支持的类型：" + value.getClass().getName());
+        switch (value) {
+            case null -> sb.append("null");
+            case String s -> writeString(sb, s);
+            case Boolean b -> sb.append(b);
+            case Double d -> writeDouble(sb, d);
+            case Float f -> writeDouble(sb, f.doubleValue());
+            case Number n -> sb.append(n.longValue());
+            case Map<?, ?> map -> writeObject(sb, map);
+            case Iterable<?> it -> writeArray(sb, it);
+            default -> throw new PcuException("PcuJson 不支持的类型：" + value.getClass().getName());
         }
     }
 

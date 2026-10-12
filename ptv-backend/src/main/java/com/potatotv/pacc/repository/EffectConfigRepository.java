@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface EffectConfigRepository extends JpaRepository<EffectConfig, String> {
 
+    @Override
     Optional<EffectConfig> findById(String id);
 }

@@ -13,7 +13,7 @@ import type { PbpMessage } from "./PbpMessage.js";
 
 const UTF8_ENCODER = new TextEncoder();
 const FLOAT_SCRATCH = new DataView(new ArrayBuffer(8));
-const MASK64 = 0xffffffffffffffffn;
+const MASK64 = (1n << 64n) - 1n;
 
 export class PbpEncoder {
   /** VarInt 最多 10 字节（每 7 位一组，64 位需要 10 组）。 */

@@ -214,7 +214,6 @@ PaccDispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     // ---- 已加载驱动枚举 + 签名核验（分页）----
     case IOCTL_PACC_QUERY_DRIVER_STATUS: {
         ULONG outLen = irpSp->Parameters.DeviceIoControl.OutputBufferLength;
-        ULONG inLen  = irpSp->Parameters.DeviceIoControl.InputBufferLength;
         PVOID sysBuf = Irp->AssociatedIrp.SystemBuffer;
         ULONG headerSize = (ULONG)FIELD_OFFSET(PACC_DRIVER_REPORT, Entries);
 

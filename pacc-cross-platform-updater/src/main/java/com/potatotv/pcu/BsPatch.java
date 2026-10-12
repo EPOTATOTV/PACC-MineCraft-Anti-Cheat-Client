@@ -94,7 +94,7 @@ public final class BsPatch {
         int diffPos = 0;
         int extraPos = 0;
 
-        while (newPos < newSize) {
+        while ((long) newPos < newSize) {
             // 三元组必须完整；这条检查同时也是死循环的出口
             if (ctrlPos + CTRL_TUPLE_SIZE > ctrl.length) {
                 throw new PcuException("差分补丁的 CTRL 块不完整，缺少三元组");
@@ -119,7 +119,7 @@ public final class BsPatch {
                 if (oldPos < 0 || oldPos + copyLen > oldData.length) {
                     throw new PcuException("差分补丁的复制区间超出旧文件范围");
                 }
-                for (int i = 0; i < copyLen; i++) {
+                for (int i = 0; (long) i < copyLen; i++) {
                     out[newPos + i] = (byte) (diff[diffPos + i] + oldData[(int) (oldPos + i)]);
                 }
             }

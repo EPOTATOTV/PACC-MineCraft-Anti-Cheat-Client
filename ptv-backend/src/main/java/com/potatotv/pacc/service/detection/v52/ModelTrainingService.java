@@ -5,6 +5,7 @@ import com.potatotv.pacc.domain.ZeroDayFinding;
 import com.potatotv.pacc.repository.ModelVersionRepository;
 import com.potatotv.pacc.repository.ZeroDayFindingRepository;
 import com.potatotv.pacc.service.NotificationService;
+import com.potatotv.pacc.util.LogSanitizer;
 import com.potatotv.pacc.util.ml.AutoencoderModel;
 import com.potatotv.pacc.util.ml.PaccModelFormat;
 import com.potatotv.pacc.util.ml.XGBoostModel;
@@ -398,7 +399,8 @@ public class ModelTrainingService {
             target.setPublishedAt(Instant.now());
         }
         versions.save(target);
-        log.info("模型全量上线 id={} type={} version={}", id, target.getModelType(), target.getVersion());
+        log.info("模型全量上线 id={} type={} version={}", LogSanitizer.clean(id),
+                LogSanitizer.clean(target.getModelType()), LogSanitizer.clean(target.getVersion()));
         return target;
     }
 
@@ -441,7 +443,8 @@ public class ModelTrainingService {
         }
         versions.save(target);
         log.info("模型回退到指定版本 id={} type={} version={}",
-                versionId, target.getModelType(), target.getVersion());
+                LogSanitizer.clean(versionId), LogSanitizer.clean(target.getModelType()),
+                LogSanitizer.clean(target.getVersion()));
         return target;
     }
 

@@ -55,8 +55,9 @@ keep class com.potatotv.paccclient.security.SecurityReporter$Challenge all
 keep class com.potatotv.paccclient.protect.PaccSecretStrings public
 
 # ---------------------------------------------------------------------------
-# 二进制协议（PBP）/ 规则语言（PRL）/ 更新核心（PCU）运行时与生成类不设任何 keep：
-# 它们零依赖、无反射（无 Class.forName / ServiceLoader），随包拍平一起被重命名。
+# 二进制协议（PBP）/ 规则语言（PRL）/ 更新核心（PCU）/ 检测引擎（PDE）运行时与生成类
+# 不设任何 keep：它们零依赖、无反射（无 Class.forName / ServiceLoader），
+# 随包拍平一起被重命名。PDE 的覆盖前缀见 tools/pob Renamer.OBFUSCATABLE_PREFIXES。
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------

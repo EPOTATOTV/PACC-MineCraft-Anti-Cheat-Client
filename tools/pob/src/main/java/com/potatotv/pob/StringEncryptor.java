@@ -68,6 +68,9 @@ final class StringEncryptor {
     private static final String CONCAT_FACTORY_METHOD = "makeConcatWithConstants";
     private static final String CONCAT_BOOTSTRAP_NAME = "bootstrap";
 
+    /** 加解密用同一份随机源：每次 new SecureRandom 会重新播种，既低效也没有必要。 */
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final PobRules rules;
     private final String vaultClassName;
     private final String concatClassName;
@@ -86,7 +89,7 @@ final class StringEncryptor {
         this.vaultClassName = targetPackage + '/' + VaultNames.STRING_VAULT_SIMPLE;
         this.concatClassName = targetPackage + '/' + VaultNames.CONCAT_BOOTSTRAP_SIMPLE;
         this.classNameForms = collectClassNameForms(renamer, rules);
-        new SecureRandom().nextBytes(salt);
+        RANDOM.nextBytes(salt);
     }
 
     /**
@@ -450,7 +453,7 @@ final class StringEncryptor {
     private String encodeRecipe(String recipe) {
         try {
             byte[] iv = new byte[16];
-            new SecureRandom().nextBytes(iv);
+            RANDOM.nextBytes(iv);
             byte[] cipher = aes(salt, iv, 0, recipe.getBytes(StandardCharsets.UTF_8), Cipher.ENCRYPT_MODE);
             return hex(iv) + hex(cipher);
         } catch (Exception e) {
@@ -635,7 +638,7 @@ final class StringEncryptor {
             sb.append(hex(salt));
             for (int i = 0; i < values.size(); i++) {
                 byte[] iv = new byte[16];
-                new SecureRandom().nextBytes(iv);
+                RANDOM.nextBytes(iv);
                 byte[] cipher = aes(salt, iv, i, values.get(i).getBytes(StandardCharsets.UTF_8), Cipher.ENCRYPT_MODE);
                 sb.append(';').append(hex(iv)).append(hex(cipher));
             }
@@ -973,7 +976,7 @@ final class StringEncryptor {
     }
 
     private static String hex(byte[] data) {
-        StringBuilder sb = new StringBuilder(data.length * 2);
+        StringBuilder sb = new StringBuilder(Math.multiplyExact(data.length, 2));
         for (byte b : data) {
             sb.append(Character.forDigit((b >> 4) & 0xF, 16));
             sb.append(Character.forDigit(b & 0xF, 16));

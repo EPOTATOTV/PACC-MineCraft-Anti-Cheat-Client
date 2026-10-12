@@ -30,11 +30,11 @@ public class DetectionAnalysisService {
         out.put("feature_dims", fv.size());
 
         List<BruteForceCheatDetector.Verdict> brute =
-                bruteForceCheatDetector.evaluateAll(fv, ctx);
+                bruteForceCheatDetector.evaluateAll(fv);
         out.put("brute_force", brute);
 
         List<StealthCheatDetector.Verdict> stealth =
-                stealthCheatDetector.evaluateAll(fv, ctx);
+                stealthCheatDetector.evaluateAll(fv);
         out.put("stealth", stealth);
 
         // AI 行为画像（128 维）

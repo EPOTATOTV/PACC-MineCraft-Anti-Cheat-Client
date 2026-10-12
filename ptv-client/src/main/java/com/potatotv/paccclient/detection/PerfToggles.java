@@ -39,6 +39,8 @@ public final class PerfToggles {
     public static final String NET_PROXY = "net_proxy";
     /** 屏幕与输入层开关（三层架构 §3：截屏视觉分析 / 输入时序 / 板载宏；默认关闭）。 */
     public static final String VISION = "vision";
+    /** 检测引擎（PDE）玩家端六层检测器开关（技术文档 §四 L1-L4；默认关闭）。 */
+    public static final String PDE_LOCAL = "pde_local";
 
     private static final Map<String, String> ENV = Map.of(
             FEATURE_COLLECTION, "PACC_FEATURE_COLLECTION",
@@ -48,10 +50,11 @@ public final class PerfToggles {
             SYSTEM_SCANNERS, "PACC_SYSTEM_SCANNERS",
             SYSTEM_DEEP, "PACC_SYSTEM_DEEP_ENABLED",
             NET_PROXY, "PACC_NET_PROXY_ENABLED",
-            VISION, "PACC_VISION_ENABLED");
+            VISION, "PACC_VISION_ENABLED",
+            PDE_LOCAL, "PACC_PDE_LOCAL_ENABLED");
 
     /** 默认关闭的开关（文档 §7 注意事项 7：默认只开系统层增强）。 */
-    private static final Set<String> DEFAULT_OFF = Set.of(NET_PROXY, VISION);
+    private static final Set<String> DEFAULT_OFF = Set.of(NET_PROXY, VISION, PDE_LOCAL);
 
     private static final ConcurrentHashMap<String, Boolean> STATE = new ConcurrentHashMap<>();
 

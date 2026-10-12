@@ -9,6 +9,7 @@ import com.potatotv.pacc.domain.plugin.PluginRuntime;
 import com.potatotv.pacc.df.DfProperties;
 import com.potatotv.pacc.repository.PluginRepository;
 import com.potatotv.pacc.repository.PluginRuntimeRepository;
+import com.potatotv.pacc.util.LogSanitizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -117,7 +118,8 @@ public class PluginManager {
                 closeQuietly(prior);
             }
             loaded.put(id, new Loaded(instance, loader, runtime, meta));
-            log.info("插件已加载 id={} version={} path={}", id, runtime.getVersion(), path);
+            log.info("插件已加载 id={} version={} path={}", LogSanitizer.clean(id),
+                    LogSanitizer.clean(runtime.getVersion()), LogSanitizer.clean(path));
             return runtimeRepository.save(runtime);
         } catch (Exception e) {
             // 加载失败时类加载器不能留着：它持有 jar 文件句柄，反复失败会积压

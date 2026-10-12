@@ -142,16 +142,16 @@ class DfAlphaEndToEndTest {
     }
 
     @Test
-    void 调度器登记17个内置检测器并可追加插件检测器() {
+    void 调度器登记19个内置检测器并可追加插件检测器() {
         ScannerRunner runner = ScannerRunner.withBuiltinDetectors();
-        assertEquals(17, runner.detectors().size(), "系统专项 10 个 + 三层架构 7 个");
+        assertEquals(19, runner.detectors().size(), "系统专项 10 个 + 三层架构 7 个 + 引擎指纹库 1 个 + 引擎六层桥 1 个");
         assertEquals(Set.of("process_scanner", "module_scanner", "driver_scanner",
                         "file_scanner", "registry_scanner", "input_device_scanner",
                         "network_scanner", "memory_scanner", "behavior_ai_scanner",
                         "signature_matcher",
                         "network_behavior_scanner", "screen_vision_scanner", "input_timing_scanner",
                         "dll_signature_scanner", "injection_scanner", "unsigned_executable_scanner",
-                        "kernel_callback_scanner"),
+                        "kernel_callback_scanner", "engine-fingerprint", "pde_local_scanner"),
                 runner.detectors().stream().map(Detector::id).collect(Collectors.toSet()));
 
         Detector pluginDetector = new Detector() {
@@ -171,7 +171,7 @@ class DfAlphaEndToEndTest {
             }
         };
         ScannerRunner withPlugins = ScannerRunner.withBuiltinDetectors(List.of(pluginDetector));
-        assertEquals(18, withPlugins.detectors().size(), "插件检测器应追加进调度器（文档 §2.4 步骤 7）");
+        assertEquals(20, withPlugins.detectors().size(), "插件检测器应追加进调度器（文档 §2.4 步骤 7）");
     }
 
     @Test

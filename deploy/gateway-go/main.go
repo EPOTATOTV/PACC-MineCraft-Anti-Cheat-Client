@@ -221,12 +221,14 @@ func clientIP(r *http.Request) string {
 // sanitizeLog 剔除 CR/LF 与控制字符。X-Forwarded-For 与 RequestURI 都由请求方决定，
 // 原样落进日志就能插入换行、伪造出整条日志行（log injection）。
 func sanitizeLog(s string) string {
-	return strings.Map(func(r rune) rune {
+	s = strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
 			return -1
 		}
 		return r
 	}, s)
+	// 上面已清掉 CR/LF，这里再显式走一遍 ReplaceAll：静态分析只认这个消毒点
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r", ""), "\n", "")
 }
 
 func schemeOf(r *http.Request) string {

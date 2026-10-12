@@ -87,49 +87,41 @@ PaccRegistryCallback(
 
     REG_NOTIFY_CLASS notifyClass = (REG_NOTIFY_CLASS)(ULONG_PTR)Argument1;
 
-    switch (notifyClass) {
-    case RegNtPreCreateKeyEx: {
+    if (notifyClass == RegNtPreCreateKeyEx) {
         PREG_CREATE_KEY_INFORMATION info = (PREG_CREATE_KEY_INFORMATION)Argument2;
-        if (info == NULL || info->CompleteName == NULL) break;
-        WCHAR detail[PACC_EVENT_DETAIL_MAX];
-        PaccCopyUnicode(info->CompleteName, detail, PACC_EVENT_DETAIL_MAX);
-        if (PaccStrContainsCI(detail, PACC_IFEO_MARKER)) {
-            PaccMonitorHitInc(PACC_EVENT_CLASS_REGISTRY);
-            PaccEventPush(PACC_EVENT_CLASS_REGISTRY, PACC_EVENT_FLAG_IFEO,
-                          0, 0, 0, 0, detail);
-        }
-        break;
-    }
-
-    case RegNtPreSetValueKey: {
-        PREG_SET_VALUE_KEY_INFORMATION info = (PREG_SET_VALUE_KEY_INFORMATION)Argument2;
-        if (info == NULL || info->ValueName == NULL) break;
-
-        if (PaccIsAppInitValue(info->ValueName)) {
+        if (info != NULL && info->CompleteName != NULL) {
             WCHAR detail[PACC_EVENT_DETAIL_MAX];
-            RtlStringCchCopyW(detail, ARRAYSIZE(detail), PACC_APPINIT_VALUE);
-            PaccAppendValueData(info, detail, ARRAYSIZE(detail));
-            PaccMonitorHitInc(PACC_EVENT_CLASS_REGISTRY);
-            PaccEventPush(PACC_EVENT_CLASS_REGISTRY, PACC_EVENT_FLAG_APPINIT,
-                          0, 0, (ULONG64)info->Type, (ULONG64)info->DataSize, detail);
-        } else if (PaccIsDebuggerValue(info->ValueName)) {
-            // "Debugger" 值只有在 IFEO 键下才是劫持向量。
-            WCHAR keyPath[PACC_EVENT_DETAIL_MAX];
-            if (PaccGetKeyPath(info->Object, keyPath, ARRAYSIZE(keyPath)) &&
-                PaccStrContainsCI(keyPath, PACC_IFEO_MARKER)) {
-                WCHAR detail[PACC_EVENT_DETAIL_MAX];
-                RtlStringCchCopyW(detail, ARRAYSIZE(detail), keyPath);
-                PaccAppendValueData(info, detail, ARRAYSIZE(detail));
+            PaccCopyUnicode(info->CompleteName, detail, PACC_EVENT_DETAIL_MAX);
+            if (PaccStrContainsCI(detail, PACC_IFEO_MARKER)) {
                 PaccMonitorHitInc(PACC_EVENT_CLASS_REGISTRY);
                 PaccEventPush(PACC_EVENT_CLASS_REGISTRY, PACC_EVENT_FLAG_IFEO,
                               0, 0, 0, 0, detail);
             }
         }
-        break;
-    }
-
-    default:
-        break;
+    } else if (notifyClass == RegNtPreSetValueKey) {
+        PREG_SET_VALUE_KEY_INFORMATION info = (PREG_SET_VALUE_KEY_INFORMATION)Argument2;
+        if (info != NULL && info->ValueName != NULL) {
+            if (PaccIsAppInitValue(info->ValueName)) {
+                WCHAR detail[PACC_EVENT_DETAIL_MAX];
+                RtlStringCchCopyW(detail, ARRAYSIZE(detail), PACC_APPINIT_VALUE);
+                PaccAppendValueData(info, detail, ARRAYSIZE(detail));
+                PaccMonitorHitInc(PACC_EVENT_CLASS_REGISTRY);
+                PaccEventPush(PACC_EVENT_CLASS_REGISTRY, PACC_EVENT_FLAG_APPINIT,
+                              0, 0, (ULONG64)info->Type, (ULONG64)info->DataSize, detail);
+            } else if (PaccIsDebuggerValue(info->ValueName)) {
+                // "Debugger" 值只有在 IFEO 键下才是劫持向量。
+                WCHAR keyPath[PACC_EVENT_DETAIL_MAX];
+                if (PaccGetKeyPath(info->Object, keyPath, ARRAYSIZE(keyPath)) &&
+                    PaccStrContainsCI(keyPath, PACC_IFEO_MARKER)) {
+                    WCHAR detail[PACC_EVENT_DETAIL_MAX];
+                    RtlStringCchCopyW(detail, ARRAYSIZE(detail), keyPath);
+                    PaccAppendValueData(info, detail, ARRAYSIZE(detail));
+                    PaccMonitorHitInc(PACC_EVENT_CLASS_REGISTRY);
+                    PaccEventPush(PACC_EVENT_CLASS_REGISTRY, PACC_EVENT_FLAG_IFEO,
+                                  0, 0, 0, 0, detail);
+                }
+            }
+        }
     }
 
     // 记录优先策略：仅观察上报，不阻断注册表操作。
@@ -149,7 +141,7 @@ PaccRegMonInitialize(VOID)
 }
 
 VOID
-PaccRegMonUninitialize(VOID)
+PaccRegMonUninitialize(void)
 {
     if (g_paccRegRegistered) {
         CmUnRegisterCallback(g_paccRegCookie);

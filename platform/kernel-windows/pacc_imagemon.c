@@ -112,7 +112,7 @@ PaccImageMonInitialize(VOID)
 }
 
 VOID
-PaccImageMonUninitialize(VOID)
+PaccImageMonUninitialize(void)
 {
     if (g_paccImageNotifyRegistered) {
         PsRemoveLoadImageNotifyRoutine((PVOID)PaccImageNotify);

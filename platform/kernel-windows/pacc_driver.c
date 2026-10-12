@@ -37,7 +37,7 @@ PaccAddProtectedPid(ULONG pid)
 }
 
 VOID
-PaccClearProtectedPids(VOID)
+PaccClearProtectedPids(void)
 {
     for (ULONG i = 0; i < PACC_MAX_PROTECTED_PID; i++) {
         InterlockedExchange((volatile LONG *)&g_paccProtectedPids[i], 0);
@@ -115,10 +115,11 @@ PaccDispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
         }
         break;
     }
-    case IOCTL_PACC_CLEAR_PROTECTED_PIDS:
+    case IOCTL_PACC_CLEAR_PROTECTED_PIDS: {
         PaccClearProtectedPids();
         status = STATUS_SUCCESS;
         break;
+    }
 
     case IOCTL_PACC_SCAN_MEMORY: {
         if (inLen >= sizeof(PACC_SCAN_REQUEST)) {
@@ -166,18 +167,22 @@ PaccDispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     }
 
     // ---- 事件排空：进程 / 镜像 / 线程 / 注册表 ----
-    case IOCTL_PACC_DRAIN_PROCESS_EVENTS:
+    case IOCTL_PACC_DRAIN_PROCESS_EVENTS: {
         status = PaccDrainEvents(PACC_EVENT_CLASS_PROCESS, Irp, irpSp, &info);
         break;
-    case IOCTL_PACC_DRAIN_IMAGE_EVENTS:
+    }
+    case IOCTL_PACC_DRAIN_IMAGE_EVENTS: {
         status = PaccDrainEvents(PACC_EVENT_CLASS_IMAGE, Irp, irpSp, &info);
         break;
-    case IOCTL_PACC_DRAIN_THREAD_EVENTS:
+    }
+    case IOCTL_PACC_DRAIN_THREAD_EVENTS: {
         status = PaccDrainEvents(PACC_EVENT_CLASS_THREAD, Irp, irpSp, &info);
         break;
-    case IOCTL_PACC_DRAIN_REGISTRY_EVENTS:
+    }
+    case IOCTL_PACC_DRAIN_REGISTRY_EVENTS: {
         status = PaccDrainEvents(PACC_EVENT_CLASS_REGISTRY, Irp, irpSp, &info);
         break;
+    }
 
     // ---- 计数器归零（返回归零后的快照）----
     case IOCTL_PACC_RESET_EVENT_COUNTERS: {

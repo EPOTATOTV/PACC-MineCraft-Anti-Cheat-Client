@@ -135,7 +135,7 @@ PaccSsdtInitialize(VOID)
 }
 
 VOID
-PaccSsdtUninitialize(VOID)
+PaccSsdtUninitialize(void)
 {
     if (g_paccSsdtSnapshot != NULL) {
         ExFreePoolWithTag(g_paccSsdtSnapshot, 'ccap');

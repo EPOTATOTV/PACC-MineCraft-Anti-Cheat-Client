@@ -85,7 +85,7 @@ PaccObHookInitialize(VOID)
 }
 
 VOID
-PaccObHookUninitialize(VOID)
+PaccObHookUninitialize(void)
 {
     if (g_paccObRegistration != NULL) {
         ObUnRegisterCallbacks(g_paccObRegistration);

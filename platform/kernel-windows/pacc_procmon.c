@@ -111,7 +111,7 @@ PaccProcessMonInitialize(VOID)
 }
 
 VOID
-PaccProcessMonUninitialize(VOID)
+PaccProcessMonUninitialize(void)
 {
     if (g_paccThreadNotifyRegistered) {
         PsRemoveCreateThreadNotifyRoutine((PVOID)PaccThreadNotify);

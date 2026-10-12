@@ -75,9 +75,9 @@ PaccScanMemory(PPACC_SCAN_REQUEST req, PPACC_SCAN_RESULT result)
     if (NT_SUCCESS(status)) {
         for (ULONG_PTR va = scanFrom; va + PACC_SCAN_CHUNK <= scanTo; va += PACC_SCAN_CHUNK) {
             SIZE_T copied = 0;
-            NTSTATUS rs = MmCopyVirtualMemory(
-                target, (PVOID)va, PsGetCurrentProcess(), buffer,
-                PACC_SCAN_CHUNK, KernelMode, &copied);
+            NTSTATUS rs;
+            rs = MmCopyVirtualMemory(target, (PVOID)va, PsGetCurrentProcess(), buffer,
+                                     PACC_SCAN_CHUNK, KernelMode, &copied);
             if (NT_SUCCESS(rs) && copied >= req->PatternLength) {
                 SIZE_T hit = PaccScanChunk(buffer, copied, (const UCHAR *)req->Pattern, req->PatternLength);
                 if (hit != (SIZE_T)-1) {

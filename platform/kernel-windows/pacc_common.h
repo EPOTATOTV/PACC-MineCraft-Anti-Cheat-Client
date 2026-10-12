@@ -207,7 +207,7 @@ extern PDRIVER_OBJECT   g_paccDriverObject;       // 本驱动对象（过滤设
 
 BOOLEAN PaccIsProtectedPid(ULONG pid);
 VOID    PaccAddProtectedPid(ULONG pid);
-VOID    PaccClearProtectedPids(VOID);
+VOID    PaccClearProtectedPids(void);
 
 // ---- 内核侧字符串工具（pacc_event.c）----
 BOOLEAN PaccStrEqualCI(PCWSTR a, PCWSTR b);
@@ -216,38 +216,38 @@ VOID    PaccCopyUnicode(PCUNICODE_STRING src, PWCHAR dst, ULONG cchDst);
 
 // ---- 有界事件环形缓冲（pacc_event.c）----
 NTSTATUS PaccEventInitialize(VOID);
-VOID     PaccEventUninitialize(VOID);
+VOID     PaccEventUninitialize(void);
 VOID     PaccEventPush(ULONG eventClass, ULONG flags, ULONG pid, ULONG parentPid,
                        ULONG64 aux1, ULONG64 aux2, PCWSTR detail);
 ULONG    PaccEventDrain(ULONG eventClass, PPACC_EVENT out, ULONG maxCount);
-VOID     PaccEventResetCounters(VOID);
+VOID     PaccEventResetCounters(void);
 VOID     PaccEventGetStats(PPACC_EVENT_STATS out);
 VOID     PaccMonitorHitInc(ULONG eventClass);
 
 // 各子模块实现
 NTSTATUS PaccObHookInitialize(VOID);
-VOID     PaccObHookUninitialize(VOID);
+VOID     PaccObHookUninitialize(void);
 NTSTATUS PaccScanMemory(PPACC_SCAN_REQUEST, PPACC_SCAN_RESULT);
 BOOLEAN  PaccDeviceIsAllowed(PCWSTR devInstanceId, ULONG deviceIdLength);
 
 // ---- 监视器（pacc_procmon.c / pacc_imagemon.c / pacc_regmon.c）----
 NTSTATUS PaccProcessMonInitialize(VOID);
-VOID     PaccProcessMonUninitialize(VOID);
+VOID     PaccProcessMonUninitialize(void);
 NTSTATUS PaccImageMonInitialize(VOID);
-VOID     PaccImageMonUninitialize(VOID);
+VOID     PaccImageMonUninitialize(void);
 NTSTATUS PaccRegMonInitialize(VOID);
-VOID     PaccRegMonUninitialize(VOID);
+VOID     PaccRegMonUninitialize(void);
 
 // ---- SSDT 完整性（pacc_ssdt.c）----
 NTSTATUS PaccSsdtInitialize(VOID);
-VOID     PaccSsdtUninitialize(VOID);
+VOID     PaccSsdtUninitialize(void);
 NTSTATUS PaccSsdtQuery(PPACC_SSDT_STATUS out);
 
 // ---- 已加载驱动枚举 + 签名核验（pacc_drivenum.c）----
-NTSTATUS PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT out, ULONG outLen);
+NTSTATUS PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT report, ULONG outLen);
 
 // ---- 键盘类过滤 / 锁定（pacc_kbdfilter.c）----
 NTSTATUS PaccKbdFilterInitialize(VOID);   // 附着键盘类设备栈 + 恢复持久化锁状态
-VOID     PaccKbdFilterUninitialize(VOID); // 脱链 + 注销 PnP 通知 + 持久化
+VOID     PaccKbdFilterUninitialize(void); // 脱链 + 注销 PnP 通知 + 持久化
 VOID     PaccKbdSetLock(BOOLEAN lock, ULONG token, NTSTATUS *outStatus); // 供 IOCTL 调用
 BOOLEAN  PaccKbdIsLocked(VOID);

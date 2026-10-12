@@ -103,7 +103,7 @@ PaccEventInitialize(VOID)
 }
 
 VOID
-PaccEventUninitialize(VOID)
+PaccEventUninitialize(void)
 {
     if (g_paccEventRing.Entries != NULL) {
         ExFreePoolWithTag(g_paccEventRing.Entries, 'ccap');
@@ -185,7 +185,7 @@ PaccEventDrain(ULONG eventClass, PPACC_EVENT out, ULONG maxCount)
 }
 
 VOID
-PaccEventResetCounters(VOID)
+PaccEventResetCounters(void)
 {
     InterlockedExchange64(&g_paccEventRing.Pushed, 0);
     InterlockedExchange64(&g_paccEventRing.Dropped, 0);

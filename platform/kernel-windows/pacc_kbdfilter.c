@@ -449,7 +449,7 @@ PaccKbdFilterInitialize(VOID)
 }
 
 VOID
-PaccKbdFilterUninitialize(VOID)
+PaccKbdFilterUninitialize(void)
 {
     if (!g_paccKbdInitialized) return;
 

@@ -17,7 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class EvidenceChainTest {
 
-    private static final byte[] KEY = "0123456789abcdef".getBytes(StandardCharsets.UTF_8);
+    /** 测试用固定密钥，非真实凭据。 */
+    private static final byte[] KEY = "test-fixture-key".getBytes(StandardCharsets.UTF_8); //gitleaks:allow
 
     @Test
     void appendBuildsChainWithContiguousIndexes() {
@@ -90,7 +91,7 @@ class EvidenceChainTest {
     void wrongKeyFailsVerification() {
         EvidenceChain chain = new EvidenceChain(KEY);
         chain.append("e1");
-        byte[] otherKey = "fedcba9876543210".getBytes(StandardCharsets.UTF_8);
+        byte[] otherKey = "other-test-fixture-key".getBytes(StandardCharsets.UTF_8); //gitleaks:allow
         assertFalse(EvidenceChain.verify(otherKey, chain.entries()));
     }
 

@@ -300,12 +300,13 @@ jobs:
       - name: 安装内部依赖（检测引擎 / 检测内核 / Addon 扫描 / 共享适配层）
         run: |
           set -euo pipefail
-          # 检测内核 pacc-server-core 依赖 pacc-detection-engine，必须先装引擎。
-          # 两个模块都用 install：install 已包含 verify 阶段，jacoco 的 LINE 覆盖率 check 在此强制执行；
-          # 后面的平台插件也要从本地仓库解析这两个内部依赖，不能降级成 verify。
+          # 依赖顺序：引擎 → addon 扫描 → 检测内核。pacc-server-core 同时依赖前两者，
+          # 必须先把它们装进本地仓库，否则 server-core 解析依赖直接失败。
+          # 三个模块都用 install：install 已包含 verify 阶段，jacoco 的 LINE 覆盖率 check 在此强制执行；
+          # 后面的平台插件也要从本地仓库解析这些内部依赖，不能降级成 verify。
           ( cd pacc-detection-engine && mvn -B -q install )
-          ( cd pacc-server-core   && mvn -B -q install )
           ( cd pacc-addon-scanner && mvn -B -q install )
+          ( cd pacc-server-core   && mvn -B -q install )
           ( cd server-plugins/pacc-bukkit  && mvn -B -q install )
           ( cd server-plugins/pacc-bedrock && mvn -B -q install )
       - name: 构建并测试各平台服务端插件

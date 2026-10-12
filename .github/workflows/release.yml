@@ -192,10 +192,10 @@ jobs:
       - name: 安装内部依赖（检测引擎 / 检测内核 / 共享适配层 / Addon 扫描）
         run: |
           set -euo pipefail
-          # 检测内核依赖检测引擎，先装引擎
+          # 依赖顺序：引擎 → addon 扫描 → 检测内核（server-core 同时依赖前两者）
           ( cd pacc-detection-engine && mvn -B -q -DskipTests install )
-          ( cd pacc-server-core   && mvn -B -q -DskipTests install )
           ( cd pacc-addon-scanner && mvn -B -q -DskipTests install )
+          ( cd pacc-server-core   && mvn -B -q -DskipTests install )
           # 两个共享适配层要先 install：Java 版平台插件依赖 pacc-bukkit，
           # 基岩版平台插件（Nukkit / Nukkit-MOT）依赖 pacc-bedrock。
           ( cd server-plugins/pacc-bukkit  && mvn -B -q -DskipTests install )

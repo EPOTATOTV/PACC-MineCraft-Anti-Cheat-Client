@@ -49,6 +49,11 @@ public interface ServerCheck {
         return List.of();
     }
 
+    /** Mod 文件哈希检查；引擎会从适配层取 {@code pacc:mods} 上报的哈希后路由到这里。 */
+    default List<DetectionResult> onModHashes(String playerId, List<String> hashes) {
+        return List.of();
+    }
+
     default List<DetectionResult> onAddons(String playerId, List<AddonInfo> addons) {
         return List.of();
     }

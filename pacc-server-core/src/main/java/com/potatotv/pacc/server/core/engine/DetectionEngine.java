@@ -116,10 +116,12 @@ public final class DetectionEngine {
             return List.of();
         }
         List<String> mods = safeMods(playerId);
+        List<String> modHashes = safeModHashes(playerId);
         List<DetectionResult> raw = new ArrayList<>();
         for (ServerCheck check : checksFor(CheckType.CLIENT_BRAND)) {
             raw.addAll(check.onClientBrand(playerId, brand));
             raw.addAll(check.onMods(playerId, mods));
+            raw.addAll(check.onModHashes(playerId, modHashes));
         }
         return finish(CheckType.CLIENT_BRAND, playerId, raw);
     }
@@ -195,6 +197,16 @@ public final class DetectionEngine {
             return mods == null ? List.of() : mods;
         } catch (RuntimeException ex) {
             LOG.log(Logger.Level.WARNING, "适配层 getInstalledMods 失败，已忽略", ex);
+            return List.of();
+        }
+    }
+
+    private List<String> safeModHashes(String playerId) {
+        try {
+            List<String> hashes = adapter.getInstalledModHashes(playerId);
+            return hashes == null ? List.of() : hashes;
+        } catch (RuntimeException ex) {
+            LOG.log(Logger.Level.WARNING, "适配层 getInstalledModHashes 失败，已忽略", ex);
             return List.of();
         }
     }

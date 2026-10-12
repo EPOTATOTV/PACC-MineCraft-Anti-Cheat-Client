@@ -52,4 +52,11 @@ class ServerPluginConfigTest {
         assertEquals(20, config.flyAirborneTicksTrigger());
         assertEquals(60, config.confidenceThreshold());
     }
+
+    @Test
+    void cheatModHashesDefaultEmptyAndSettable() {
+        assertTrue(ServerPluginConfig.defaults().cheatModHashes().isEmpty());
+        Set<String> hashes = Set.of("a".repeat(64));
+        assertEquals(hashes, ServerPluginConfig.builder().cheatModHashes(hashes).build().cheatModHashes());
+    }
 }

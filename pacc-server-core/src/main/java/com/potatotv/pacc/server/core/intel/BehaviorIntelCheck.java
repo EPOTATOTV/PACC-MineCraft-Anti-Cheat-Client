@@ -41,7 +41,9 @@ public final class BehaviorIntelCheck implements ServerCheck {
         Optional<Evidence> outlier = runtime.statOutlier().check(playerId);
         outlier.ifPresent(ev -> results.add(toResult(ev)));
 
-        runtime.patternCluster().record(playerId, speed, 0.0, false, false, to.timestampMs());
+        // 传真实朝向变化量：直线度启发式靠它区分「持续转向的正常行走」与「恒定朝向的机器人轨迹」，
+        // 写死 0 会让任何持续直线移动都被判成 Baritone（合法玩家误报）。
+        runtime.patternCluster().record(playerId, speed, yawDelta(from, to), false, false, to.timestampMs());
         Optional<Evidence> pattern = runtime.patternCluster().check(playerId);
         pattern.ifPresent(ev -> {
             results.add(toResult(ev));
@@ -69,5 +71,17 @@ public final class BehaviorIntelCheck implements ServerCheck {
                 (int) Math.round(evidence.confidence() * 100),
                 evidence.detail(),
                 evidence.timestampMs());
+    }
+
+    /**
+     * 两个位置快照之间的朝向变化量（度，范围 [0,180]）。
+     * 没有前一帧时返回 180，表示「无法判定为直线」——宁可打断直线累计，也不制造误报。
+     */
+    private static double yawDelta(PlayerPosition from, PlayerPosition to) {
+        if (from == null) {
+            return 180.0;
+        }
+        double delta = ((to.yaw() - from.yaw()) % 360.0 + 540.0) % 360.0 - 180.0;
+        return Math.abs(delta);
     }
 }

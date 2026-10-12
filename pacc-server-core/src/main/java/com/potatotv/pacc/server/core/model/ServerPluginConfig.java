@@ -24,6 +24,7 @@ public final class ServerPluginConfig {
     private final int punishmentMode;
     private final Set<String> cheatClientBrands;
     private final Set<String> cheatModNames;
+    private final Set<String> cheatModHashes;
     private final Set<String> cheatAddonUuids;
     private final Set<String> cheatAddonKeywords;
 
@@ -40,6 +41,7 @@ public final class ServerPluginConfig {
         this.punishmentMode = b.punishmentMode;
         this.cheatClientBrands = Set.copyOf(b.cheatClientBrands);
         this.cheatModNames = Set.copyOf(b.cheatModNames);
+        this.cheatModHashes = Set.copyOf(b.cheatModHashes);
         this.cheatAddonUuids = Set.copyOf(b.cheatAddonUuids);
         this.cheatAddonKeywords = Set.copyOf(b.cheatAddonKeywords);
     }
@@ -101,6 +103,11 @@ public final class ServerPluginConfig {
         return cheatModNames;
     }
 
+    /** 作弊 Mod 文件哈希黑名单（小写 sha256）。改名无法绕过，见 {@code pacc:mods} 协议。 */
+    public Set<String> cheatModHashes() {
+        return cheatModHashes;
+    }
+
     public Set<String> cheatAddonUuids() {
         return cheatAddonUuids;
     }
@@ -137,6 +144,7 @@ public final class ServerPluginConfig {
         private int punishmentMode = 0;
         private Set<String> cheatClientBrands = Set.of();
         private Set<String> cheatModNames = Set.of();
+        private Set<String> cheatModHashes = Set.of();
         private Set<String> cheatAddonUuids = Set.of();
         private Set<String> cheatAddonKeywords = Set.of();
 
@@ -200,6 +208,11 @@ public final class ServerPluginConfig {
 
         public Builder cheatModNames(Set<String> v) {
             this.cheatModNames = Objects.requireNonNull(v, "cheatModNames");
+            return this;
+        }
+
+        public Builder cheatModHashes(Set<String> v) {
+            this.cheatModHashes = Objects.requireNonNull(v, "cheatModHashes");
             return this;
         }
 

@@ -32,6 +32,14 @@ public interface ServerPlatformAdapter {
 
     List<String> getInstalledMods(String playerId);
 
+    /**
+     * 客户端通过 {@code pacc:mods} 通道上报的 Mod 文件哈希（小写 sha256）。默认无哈希来源，
+     * 只有实现了该通道接收的平台才覆写。
+     */
+    default List<String> getInstalledModHashes(String playerId) {
+        return List.of();
+    }
+
     List<AddonInfo> getInstalledAddons(String playerId);
 
     void alert(String playerId, String message);

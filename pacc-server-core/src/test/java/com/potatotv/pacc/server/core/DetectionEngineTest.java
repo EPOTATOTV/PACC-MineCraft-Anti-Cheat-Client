@@ -1,5 +1,6 @@
 package com.potatotv.pacc.server.core;
 
+import com.potatotv.pacc.server.core.check.ClientBrandCheck;
 import com.potatotv.pacc.server.core.check.ServerCheck;
 import com.potatotv.pacc.server.core.engine.DetectionEngine;
 import com.potatotv.pacc.server.core.model.AddonInfo;
@@ -25,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DetectionEngineTest {
+
+    private static final String CHEAT_HASH = "a".repeat(64);
 
     @Test
     void disabledCheckTypeIsSkipped() {
@@ -130,6 +133,54 @@ class DetectionEngineTest {
         assertEquals(1, adapter.alerts.size());
     }
 
+    @Test
+    void clientBrandModHashMatchIsReported() {
+        FakeAdapter adapter = new FakeAdapter();
+        adapter.modHashes = List.of(CHEAT_HASH);
+        FakeReporter reporter = new FakeReporter();
+        ServerPluginConfig config = ServerPluginConfig.builder()
+                .cheatModHashes(Set.of(CHEAT_HASH))
+                .build();
+        DetectionEngine engine = new DetectionEngine(
+                config, adapter, List.of(new ClientBrandCheck(config)), reporter);
+
+        List<DetectionResult> results = engine.handleClientBrand("p", "vanilla");
+
+        assertEquals(1, results.size());
+        assertEquals("CHEAT_MOD_HASH", results.get(0).cheatType());
+        assertEquals(1, reporter.events.size());
+        assertEquals(1, adapter.alerts.size());
+    }
+
+    @Test
+    void clientBrandWithoutHashesIsClean() {
+        FakeAdapter adapter = new FakeAdapter();
+        FakeReporter reporter = new FakeReporter();
+        ServerPluginConfig config = ServerPluginConfig.builder()
+                .cheatModHashes(Set.of(CHEAT_HASH))
+                .build();
+        DetectionEngine engine = new DetectionEngine(
+                config, adapter, List.of(new ClientBrandCheck(config)), reporter);
+
+        assertTrue(engine.handleClientBrand("p", "vanilla").isEmpty());
+        assertTrue(reporter.events.isEmpty());
+    }
+
+    @Test
+    void adapterModHashFailureIsSwallowed() {
+        FakeAdapter adapter = new FakeAdapter();
+        adapter.throwOnModHashes = true;
+        FakeReporter reporter = new FakeReporter();
+        ServerPluginConfig config = ServerPluginConfig.builder()
+                .cheatModHashes(Set.of(CHEAT_HASH))
+                .build();
+        DetectionEngine engine = new DetectionEngine(
+                config, adapter, List.of(new ClientBrandCheck(config)), reporter);
+
+        assertDoesNotThrow(() -> engine.handleClientBrand("p", "vanilla"));
+        assertTrue(reporter.events.isEmpty());
+    }
+
     private static ServerCheck moveViolationCheck(int confidence) {
         return new ServerCheck() {
             @Override
@@ -153,6 +204,8 @@ class DetectionEngineTest {
 
         private final List<String> alerts = new ArrayList<>();
         private final List<String> punishments = new ArrayList<>();
+        private List<String> modHashes = List.of();
+        private boolean throwOnModHashes;
 
         @Override
         public ServerType serverType() {
@@ -197,6 +250,14 @@ class DetectionEngineTest {
         @Override
         public List<String> getInstalledMods(String playerId) {
             return List.of();
+        }
+
+        @Override
+        public List<String> getInstalledModHashes(String playerId) {
+            if (throwOnModHashes) {
+                throw new IllegalStateException("adapter down");
+            }
+            return modHashes;
         }
 
         @Override

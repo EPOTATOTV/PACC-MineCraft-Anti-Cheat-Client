@@ -37,6 +37,7 @@ public final class WindowsSystemProbe extends PortableSystemProbe {
     private static final Pattern VID_PID = Pattern.compile("VID_[0-9A-Fa-f]{4}&PID_[0-9A-Fa-f]{4}");
 
     private final PaccProbeClient client;
+    private final KernelBridge kernelBridge;
     private final Object processLock = new Object();
     private volatile ProcessSnapshot cachedProcesses = ProcessSnapshot.empty();
     private volatile long processCacheAt;
@@ -47,15 +48,16 @@ public final class WindowsSystemProbe extends PortableSystemProbe {
 
     public WindowsSystemProbe(PaccProbeClient client) {
         this.client = client == null ? new PaccProbeClient() : client;
+        this.kernelBridge = new KernelBridge(new PaccKernelTransport(this.client));
     }
 
     @Override
     public boolean isSupported(SystemProbe.Capability capability) {
         return switch (capability) {
             case PROCESSES, FILES, DRIVERS, SERVICES, REGISTRY, NETWORK, USB, WINDOWS -> true;
-            case MODULES, MEMORY, SIGNATURE_VERIFY, INJECTION -> client.reachable();
-            // 内核级状态需要驱动配合，用户态探针一律不支持（文档 §7 风险表）
-            case KERNEL -> false;
+            // 原生能力均经 PaccManager 回环提供；内核状态还需 PaccPtv 驱动已加载，
+            // 实际可用性以 kernelState().supported() 为准。
+            case MODULES, MEMORY, SIGNATURE_VERIFY, INJECTION, KERNEL -> client.reachable();
         };
     }
 
@@ -278,6 +280,13 @@ public final class WindowsSystemProbe extends PortableSystemProbe {
             return InjectionReport.unsupported("PaccManager 探针不可达");
         }
         return client.detectInjection(processName);
+    }
+
+    // ------------------------------------------------------------------ 内核状态（三层架构 §4.4）
+
+    @Override
+    public KernelState kernelState() {
+        return kernelBridge.state();
     }
 
     // ------------------------------------------------------------------ USB

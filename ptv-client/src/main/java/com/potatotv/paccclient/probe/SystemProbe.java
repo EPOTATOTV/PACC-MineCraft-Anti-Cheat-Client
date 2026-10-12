@@ -36,7 +36,7 @@ public interface SystemProbe {
         SIGNATURE_VERIFY,
         /** 注入痕迹检测（三层架构 §4.3：远程线程 / 可执行读写区 / 句柄）。 */
         INJECTION,
-        /** 内核级状态（三层架构 §4.4；用户态版本不支持，恒 false）。 */
+        /** 内核级状态（三层架构 §4.4；Windows 探针经 PaccPtv 驱动桥接，其余平台恒 false）。 */
         KERNEL
     }
 
@@ -115,10 +115,15 @@ public interface SystemProbe {
         return InjectionReport.unsupported("当前探针不支持注入痕迹检测");
     }
 
-    // ---- 内核级状态（三层架构 §4.4；用户态默认不支持） ----
+    // ---- 内核级状态（三层架构 §4.4；默认无驱动通道，由 Windows 探针覆写） ----
 
-    /** 内核 hook / 回调 / 未签名驱动状态。 */
+    /**
+     * 内核 hook / 回调 / 未签名驱动状态。
+     *
+     * <p>默认实现无 PaccPtv 驱动通道，返回 {@link KernelState#unsupported(String)}；
+     * {@link WindowsSystemProbe} 经 {@link KernelBridge} 覆写为真实查询结果。</p>
+     */
     default KernelState kernelState() {
-        return KernelState.unsupported("内核级检测需要驱动配合，用户态探针不支持");
+        return KernelState.unsupported("当前探针未接入 PaccPtv 内核驱动通道");
     }
 }

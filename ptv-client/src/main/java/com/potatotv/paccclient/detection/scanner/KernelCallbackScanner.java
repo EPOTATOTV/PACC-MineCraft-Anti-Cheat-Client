@@ -20,8 +20,8 @@ import java.util.Optional;
 /**
  * 内核回调检测（三层架构 §4.4）：读取 SSDT / IDT hook、未签名驱动与可疑内核回调计数。
  *
- * <p><b>能力边界</b>：SSDT / IDT hook 与内核回调枚举需要 Ring0 驱动配合，用户态探针
- * （{@link KernelState#supported()} 恒 false）拿不到这些数据。此时<b>不写</b>那几项 0 值特征——
+ * <p><b>能力边界</b>：无 PaccPtv 驱动通道时（{@link KernelState#supported()} 为 false，
+ * 例如驱动未加载 / 非 Windows），SSDT / IDT hook 与内核回调计数拿不到。此时<b>不写</b>那几项 0 值特征——
  * 否则规则会把「查不了」当成「没有」，正是文档 §9 注意事项 2 要避免的误判——只写
  * {@code ext_sys_score=0}（经取大合并，不会覆盖同周期其它系统层检测器写的更高分）后返回空。</p>
  *

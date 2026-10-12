@@ -40,6 +40,10 @@ import java.util.Map;
  * GET /probe/injection?process={name}
  *   → {"process":"...","supported":true,"remoteThreadCount":0,"execRwRegionCount":0,
  *      "pendingApc":false,"suspiciousHandleCount":0,"note":"..."}
+ *
+ * GET /probe/kernel?ioctl={dword}&in={hex}
+ *   → {"supported":true,"out":"<hex>"}   向 PaccPtv 内核设备转发一次 DeviceIoControl
+ *   → {"supported":false,"note":"..."}   设备不可用 / 状态非成功
  * </pre>
  *
  * <p>所有调用失败（不可达 / 超时 / 非 200 / 解析失败）都返回空结果，绝不抛出 —— 探针是尽力而为，
@@ -198,6 +202,33 @@ public final class PaccProbeClient {
         }
     }
 
+    /**
+     * 经原生探针向 PaccPtv 内核设备转发一次 IOCTL（三层架构 §4.4 / {@code pacc_common.h}）。
+     *
+     * <p>Java 侧不做原生调用，由 PaccManager 的 {@code /probe/kernel} 打开 {@code \\.\PaccPtv}
+     * 并调用 {@code DeviceIoControl}，回传驱动输出缓冲的原始字节。</p>
+     *
+     * @param ioctl   {@code CTL_CODE} 生成的 32 位控制码
+     * @param request METHOD_BUFFERED 输入字节（可为 null）
+     * @return 输出缓冲原始字节；端点不可达 / {@code supported=false} / 解析失败时为 {@code null}
+     */
+    public byte[] kernelQuery(int ioctl, byte[] request) {
+        String body = httpGet("/probe/kernel?ioctl=" + (ioctl & 0xFFFFFFFFL)
+                + "&in=" + toHex(request));
+        if (body == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> obj = Json.decodeObject(body);
+            if (!Boolean.TRUE.equals(obj.get("supported"))) {
+                return null;
+            }
+            return fromHex(str(obj.get("out")));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     private static List<SignatureResult> parseSignatureList(String body, String arrayKey) {
         List<SignatureResult> out = new ArrayList<>();
         try {
@@ -255,6 +286,23 @@ public final class PaccProbeClient {
             sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
         }
         return sb.toString();
+    }
+
+    /** 十六进制串 → 字节；奇数长度或含非十六进制字符时返回 {@code null}。 */
+    private static byte[] fromHex(String hex) {
+        if (hex == null || (hex.length() & 1) != 0) {
+            return null;
+        }
+        byte[] out = new byte[hex.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            int hi = Character.digit(hex.charAt(i * 2), 16);
+            int lo = Character.digit(hex.charAt(i * 2 + 1), 16);
+            if (hi < 0 || lo < 0) {
+                return null;
+            }
+            out[i] = (byte) ((hi << 4) | lo);
+        }
+        return out;
     }
 
     private static String str(Object value) {

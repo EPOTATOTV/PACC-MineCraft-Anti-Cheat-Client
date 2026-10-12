@@ -1,9 +1,7 @@
 package com.potatotv.pacc.geyser;
 
-import com.potatotv.pacc.geyser.bridge.ProxyDetectionBridge;
 import com.potatotv.pacc.geyser.config.GeyserConfigLoader;
 import com.potatotv.pacc.geyser.config.SimpleYaml;
-import com.potatotv.pacc.geyser.packet.PacketHandlerRegistrar;
 import com.potatotv.pacc.geyser.report.PtvHttpReporter;
 import com.potatotv.pacc.server.core.check.AddonCheck;
 import com.potatotv.pacc.server.core.check.ClientBrandCheck;
@@ -51,6 +49,16 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>职责：加载配置、装配适配层 / 检查项 / 上报通道、按连接设备类型调整阈值基线、管理在线设备的阈值档位。
  * 检测结论经 PACC 独立通道上报 PTV；Geyser 侧只做本连接范围内的告警与断开，不做跨服封禁。
+ *
+ * <p>检测链路归属（审查报告 F-03 / F-04）：
+ * <ul>
+ *   <li>代理 → 后端的自定义插件通道、以及扩展侧的数据包处理器注册，Geyser 公开扩展 API（2.11.x）都不提供，
+ *       原先的 {@code ProxyDetectionBridge} / {@code PacketHandlerRegistrar} 占位实现从未被调用，已移除。</li>
+ *   <li>跨代理的检测线索统一走引擎既有的 {@code PtvServerReporter} 通道直达 PTV，这就是「hint 到达后端 / PTV」
+ *       的唯一链路，不再维护第二条会重复上报的旁路。</li>
+ *   <li>数据包级检测（Timer / Blink / Phase 等）下沉到后端服务端插件，由 pacc-bukkit 的 PacketCheck 承担，
+ *       归属见仓库审查报告 F-04 / F-08。</li>
+ * </ul>
  */
 public final class PaccGeyserExtension implements Extension {
 
@@ -90,11 +98,6 @@ public final class PaccGeyserExtension implements Extension {
         // 证据链密钥（§8.2）从 PTV 上报密钥派生，过短自动降级为不启用
         this.evidenceChainKey = IntelChecks.chainKeyFrom(config.ptvSecret());
         this.engine = createEngine(config.serverPluginConfig());
-
-        PacketHandlerRegistrar packetRegistrar = new PacketHandlerRegistrar.Unsupported(logger()::warning);
-        packetRegistrar.registerBedrockPacketHandler(packet -> { });
-        packetRegistrar.registerJavaPacketHandler(packet -> { });
-        new ProxyDetectionBridge.Noop(logger()::info).onConfirmation(confirmation -> { });
 
         reporter.register(config.serverInfo());
         CheatCatalog catalog = IntelChecks.builtinCatalog();

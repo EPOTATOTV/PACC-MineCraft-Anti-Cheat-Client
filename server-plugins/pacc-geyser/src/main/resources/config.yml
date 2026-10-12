@@ -19,6 +19,11 @@ max-cps: 16
 max-horizontal-speed-per-tick: 0.42
 max-place-per-tick: 1
 fly-airborne-ticks-trigger: 20
+# 作弊 Mod 文件哈希黑名单（小写 sha256，64 位十六进制）。由客户端经 pacc:mods 通道上报，与文件名无关，
+# 改名无法绕过。留空（或写成 []）表示不启用哈希比对。启用时改为列表：
+# cheat-mod-hashes:
+#   - "3a7bd3e2..."
+cheat-mod-hashes: []
 # 留空表示按 server-name:port 自动生成。
 server-id: ""
 ptv:

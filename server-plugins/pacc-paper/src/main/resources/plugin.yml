@@ -1,5 +1,5 @@
 name: PACC
-main: com.potatotv.pacc.bukkit.PaccBukkitPlugin
+main: com.potatotv.pacc.paper.PaccPaperPlugin
 api-version: '1.20'
 version: 6.0.0
 author: PotatoTV

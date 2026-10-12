@@ -7,6 +7,8 @@ import com.potatotv.pacc.server.core.model.ServerType;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,5 +73,14 @@ class GeyserConfigLoaderTest {
         assertEquals("https://ptv.example", loader.ptvUrl());
         assertEquals("s3cr3t", loader.ptvSecret());
         assertEquals("testserver:25565", loader.ptvServerId());
+    }
+
+    @Test
+    void cheatModHashesAreNormalizedAndInvalidEntriesDropped() {
+        String upper = "A".repeat(64);
+        ServerPluginConfig config = load(
+                "cheat-mod-hashes:\n  - \"" + upper + "\"\n  - \"not-a-hash\"\n").serverPluginConfig();
+        assertEquals(Set.of("a".repeat(64)), config.cheatModHashes());
+        assertTrue(load("").serverPluginConfig().cheatModHashes().isEmpty());
     }
 }

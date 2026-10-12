@@ -4,10 +4,12 @@ import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.ServerInfo;
 import com.potatotv.pacc.server.core.model.ServerPluginConfig;
 import com.potatotv.pacc.server.core.model.ServerType;
+import com.potatotv.pacc.server.core.protocol.ModHashParser;
 
 import org.bukkit.configuration.file.FileConfiguration;
 
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -68,7 +70,22 @@ public final class PluginConfigLoader {
         if (enabled != null) {
             builder.enabledChecks(enabled);
         }
+        builder.cheatModHashes(parseModHashes(cfg.getStringList("cheat-mod-hashes")));
         return builder.build();
+    }
+
+    /** 读取作弊 Mod 哈希黑名单，归一为小写；非法项（非 64 位十六进制）直接跳过。 */
+    private static Set<String> parseModHashes(List<String> raw) {
+        Set<String> hashes = new LinkedHashSet<>();
+        if (raw != null) {
+            for (String value : raw) {
+                String normalized = ModHashParser.normalizeSha256(value);
+                if (normalized != null) {
+                    hashes.add(normalized);
+                }
+            }
+        }
+        return hashes;
     }
 
     /** 返回 null 表示配置未指定，沿用内核默认（全部启用）。 */

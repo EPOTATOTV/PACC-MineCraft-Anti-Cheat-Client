@@ -8,6 +8,8 @@ import com.potatotv.pacc.server.core.model.ServerType;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -63,5 +65,18 @@ class PluginConfigLoaderTest {
         assertEquals("https://ptv.example", loader.ptvUrl());
         assertEquals("s3cr3t", loader.ptvSecret());
         assertEquals("testserver:25565", loader.ptvServerId());
+    }
+
+    @Test
+    void cheatModHashesAreNormalizedAndInvalidEntriesDropped() throws Exception {
+        String upper = "A".repeat(64);
+        ServerPluginConfig config = load(
+                "cheat-mod-hashes:\n  - \"" + upper + "\"\n  - \"not-a-hash\"\n").serverPluginConfig();
+        assertEquals(Set.of("a".repeat(64)), config.cheatModHashes());
+    }
+
+    @Test
+    void missingCheatModHashesKeepsEmpty() throws Exception {
+        assertTrue(load("punishment-mode: 0\n").serverPluginConfig().cheatModHashes().isEmpty());
     }
 }

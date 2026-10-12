@@ -37,6 +37,10 @@ enabled-checks:
   - ADDON
   - DATA_CONSISTENCY
 
+# 作弊 Mod 文件哈希黑名单（小写 sha256，64 位十六进制）。由客户端经 pacc:mods 通道上报，与文件名无关，
+# 改名无法绕过。留空表示不启用哈希比对。例：- "3a7bd3e2..."。
+cheat-mod-hashes: []
+
 # 上报到 PTV 管控后端。url 留空时不做任何网络请求（等同 Noop）。
 ptv:
   url: ""

@@ -6,6 +6,7 @@ import com.potatotv.pacc.server.core.model.ServerPluginConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +54,14 @@ class DeviceThresholdsTest {
         assertEquals(1, adjusted.punishmentMode());
         assertTrue(adjusted.isEnabled(CheckType.MOVE));
         assertEquals(false, adjusted.isEnabled(CheckType.COMBAT));
+    }
+
+    @Test
+    void adjustKeepsCheatModHashes() {
+        Set<String> hashes = Set.of("a".repeat(64));
+        ServerPluginConfig base = ServerPluginConfig.builder().cheatModHashes(hashes).build();
+        ServerPluginConfig adjusted = DeviceThresholds.adjust(base, DeviceThresholds.DeviceClass.MOBILE);
+        assertEquals(hashes, adjusted.cheatModHashes());
     }
 
     @Test

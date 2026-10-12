@@ -18,6 +18,7 @@ import com.potatotv.pacc.server.core.engine.DetectionEngine;
 import com.potatotv.pacc.server.core.intel.IntelChecks;
 import com.potatotv.pacc.server.core.model.ServerPluginConfig;
 import com.potatotv.pacc.server.core.model.ServerType;
+import com.potatotv.pacc.server.core.protocol.ModHashParser;
 import com.potatotv.pacc.server.core.report.NoopPtvServerReporter;
 import com.potatotv.pacc.server.core.report.PtvServerReporter;
 
@@ -32,14 +33,20 @@ import java.util.List;
  * PACC 的 Bukkit 插件入口（Paper 与 Spigot 共用）。负责装配适配层、检查项、上报通道与事件监听；
  * 运行在 Paper 还是 Spigot 由 {@link BukkitPlatformAdapter#detectServerType()} 在启动时判定。
  * 所有 Bukkit API 调用都在主线程（onEnable / 事件回调）里完成。
+ *
+ * <p>本类不注册为插件主类：Paper / Spigot 产物各自用自己的主类继承它（见 pacc-paper 的
+ * {@code PaccPaperPlugin} 与 pacc-spigot 的 {@code PaccSpigotPlugin}），这样每个下载件的 plugin.yml
+ * 都指向本产物内的真实主类，而不是靠运行时平台判定隐式复用。
  */
-public final class PaccBukkitPlugin extends JavaPlugin {
+public class PaccBukkitPlugin extends JavaPlugin {
 
     private static final String BRAND_CHANNEL = "minecraft:brand";
     private static final String REGISTER_CHANNEL = "minecraft:register";
+    private static final String MOD_CHANNEL = ModHashParser.CHANNEL;
 
     private DetectionEngine engine;
     private ClientBrandTracker brandTracker;
+    private ModHashTracker modHashTracker;
 
     @Override
     public void onEnable() {
@@ -58,7 +65,8 @@ public final class PaccBukkitPlugin extends JavaPlugin {
         ServerPluginConfig pluginConfig = loader.serverPluginConfig();
 
         brandTracker = new ClientBrandTracker();
-        BukkitPlatformAdapter adapter = new BukkitPlatformAdapter(this, loader, brandTracker);
+        modHashTracker = new ModHashTracker();
+        BukkitPlatformAdapter adapter = new BukkitPlatformAdapter(this, loader, brandTracker, modHashTracker);
 
         List<ServerCheck> checks = new ArrayList<>(List.of(
                 new MoveCheck(pluginConfig),
@@ -81,9 +89,10 @@ public final class PaccBukkitPlugin extends JavaPlugin {
 
         Bukkit.getPluginManager().registerEvents(new MoveListener(engine), this);
         Bukkit.getPluginManager().registerEvents(new CombatListener(engine), this);
-        Bukkit.getPluginManager().registerEvents(new ConnectionListener(engine, brandTracker), this);
+        Bukkit.getPluginManager().registerEvents(new ConnectionListener(engine, brandTracker, modHashTracker), this);
         Bukkit.getMessenger().registerIncomingPluginChannel(this, BRAND_CHANNEL, brandTracker);
         Bukkit.getMessenger().registerIncomingPluginChannel(this, REGISTER_CHANNEL, brandTracker);
+        Bukkit.getMessenger().registerIncomingPluginChannel(this, MOD_CHANNEL, modHashTracker);
 
         reporter.register(loader.serverInfo());
         CheatCatalog catalog = IntelChecks.builtinCatalog();
@@ -96,6 +105,9 @@ public final class PaccBukkitPlugin extends JavaPlugin {
         if (brandTracker != null) {
             Bukkit.getMessenger().unregisterIncomingPluginChannel(this, BRAND_CHANNEL, brandTracker);
             Bukkit.getMessenger().unregisterIncomingPluginChannel(this, REGISTER_CHANNEL, brandTracker);
+        }
+        if (modHashTracker != null) {
+            Bukkit.getMessenger().unregisterIncomingPluginChannel(this, MOD_CHANNEL, modHashTracker);
         }
         getLogger().info("PACC 服务端检测已卸载");
     }

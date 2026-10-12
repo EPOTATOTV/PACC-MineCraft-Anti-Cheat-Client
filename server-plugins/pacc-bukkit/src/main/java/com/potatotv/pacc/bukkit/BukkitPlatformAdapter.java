@@ -33,12 +33,15 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
     private final Plugin plugin;
     private final PluginConfigLoader config;
     private final ClientBrandTracker brandTracker;
+    private final ModHashTracker modHashTracker;
     private final ServerType serverType;
 
-    public BukkitPlatformAdapter(Plugin plugin, PluginConfigLoader config, ClientBrandTracker brandTracker) {
+    public BukkitPlatformAdapter(Plugin plugin, PluginConfigLoader config, ClientBrandTracker brandTracker,
+                                 ModHashTracker modHashTracker) {
         this.plugin = plugin;
         this.config = config;
         this.brandTracker = brandTracker;
+        this.modHashTracker = modHashTracker;
         this.serverType = detectServerType();
     }
 
@@ -126,6 +129,11 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
     @Override
     public List<String> getInstalledMods(String playerId) {
         return brandTracker.mods(playerId);
+    }
+
+    @Override
+    public List<String> getInstalledModHashes(String playerId) {
+        return modHashTracker == null ? List.of() : modHashTracker.hashes(playerId);
     }
 
     @Override

@@ -9,8 +9,8 @@
     <version>6.0.0</version>
     <packaging>jar</packaging>
     <name>PACC Paper</name>
-    <description>PACC 的 Paper 服务端插件产物：复用 pacc-bukkit 共享适配层，仅提供 plugin.yml / config.yml
-        与 Paper 专有的打包声明。默认仅告警，可由运维配置踢出 / 封禁。</description>
+    <description>PACC 的 Paper 服务端插件产物：主类 PaccPaperPlugin 继承 pacc-bukkit 共享适配层，
+        另附 Paper 专有的 plugin.yml / config.yml 与打包声明。默认仅告警，可由运维配置踢出 / 封禁。</description>
 
     <properties>
         <java.version>21</java.version>
@@ -27,7 +27,7 @@
     </repositories>
 
     <dependencies>
-        <!-- 本模块不含 Java 源码，仅把共享适配层与内核打进插件 jar。 -->
+        <!-- 平台层复用 pacc-bukkit；主类只是它的继承，检测逻辑不重复实现。 -->
         <dependency>
             <groupId>com.potatotv.pacc</groupId>
             <artifactId>pacc-bukkit</artifactId>

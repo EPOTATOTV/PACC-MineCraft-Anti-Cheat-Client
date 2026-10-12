@@ -99,6 +99,7 @@ public final class DeviceThresholds {
                 .flyAirborneTicksTrigger((int) Math.round(base.flyAirborneTicksTrigger() * profile.flyTicksFactor()))
                 .cheatClientBrands(base.cheatClientBrands())
                 .cheatModNames(base.cheatModNames())
+                .cheatModHashes(base.cheatModHashes())
                 .cheatAddonUuids(base.cheatAddonUuids())
                 .cheatAddonKeywords(base.cheatAddonKeywords())
                 .build();

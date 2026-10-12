@@ -71,4 +71,12 @@ class NukkitConfigLoaderTest {
         assertEquals("s3cr3t", loader.ptvSecret());
         assertEquals("testserver:19132", loader.ptvServerId());
     }
+
+    @Test
+    void cheatModHashesAreNormalizedAndInvalidEntriesDropped() throws Exception {
+        String upper = "A".repeat(64);
+        ServerPluginConfig config = load(
+                "cheat-mod-hashes:\n  - \"" + upper + "\"\n  - \"not-a-hash\"\n").serverPluginConfig();
+        assertEquals(java.util.Set.of("a".repeat(64)), config.cheatModHashes());
+    }
 }

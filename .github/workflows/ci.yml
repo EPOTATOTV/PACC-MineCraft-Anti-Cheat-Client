@@ -124,6 +124,10 @@ jobs:
       - name: 构建并安装规则语言 pacc-rule-language
         working-directory: pacc-rule-language
         run: mvn -B -q install
+      # ptv-client 依赖它（玩家端六层检测 + 指纹库）
+      - name: 构建并安装检测引擎 pacc-detection-engine
+        working-directory: pacc-detection-engine
+        run: mvn -B -q install
       # ptv-client 的发行加固走自研混淆器（tools/pob），它以插件依赖的形式被 exec-maven-plugin
       # 解析，必须先 install 到本地仓库；否则 ptv-client 会因为解析不到 pacc-obfuscator 而失败。
       - name: 构建并安装字节码混淆器 pacc-obfuscator
@@ -169,6 +173,11 @@ jobs:
           if unzip -l "$JAR" | grep -qE 'com/potatotv/paccclient/(detection|transport|signature|store|ops|probe)/'; then
             echo "::error::发行 JAR 未混淆：仍存在原始业务包路径"; exit 1
           fi
+          # 并入的检测引擎（PDE）也必须被拍平：类名（FusionEngine / ReachCheck / EvidenceChain…）
+          # 留在发行件里等于把检测器清单直接交给逆向者（前缀见 tools/pob Renamer.OBFUSCATABLE_PREFIXES）
+          if unzip -l "$JAR" | grep -qE 'com/potatotv/pacc/'; then
+            echo "::error::发行 JAR 未混淆：检测引擎包 com/potatotv/pacc/ 仍以原名存在"; exit 1
+          fi
           # 必须存在短名混淆类，防止 POB 被误跳过。Unicode 命名下短名是私有区字符，
           # 因此按「1~3 个非 / 字符」判定，不再限制为 ASCII 字母。
           unzip -l "$JAR" | grep -qE 'com/potatotv/paccclient/[^/]{1,3}\.class' \
@@ -208,6 +217,7 @@ jobs:
             pacc-binary-protocol/runtime-java/target/surefire-reports/
             pacc-cross-platform-updater/target/surefire-reports/
             pacc-rule-language/target/surefire-reports/
+            pacc-detection-engine/target/surefire-reports/
             tools/pob/target/surefire-reports/
             ptv-backend/target/site/jacoco/
           if-no-files-found: ignore
@@ -285,9 +295,11 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
-      - name: 安装内部依赖（检测内核 / Addon 扫描 / 共享适配层）
+      - name: 安装内部依赖（检测引擎 / 检测内核 / Addon 扫描 / 共享适配层）
         run: |
           set -euo pipefail
+          # 检测内核 pacc-server-core 依赖 pacc-detection-engine，必须先装引擎
+          ( cd pacc-detection-engine && mvn -B -q install )
           ( cd pacc-server-core   && mvn -B -q install )
           ( cd pacc-addon-scanner && mvn -B -q install )
           ( cd server-plugins/pacc-bukkit  && mvn -B -q install )
@@ -320,6 +332,7 @@ jobs:
           name: server-plugin-test-reports
           path: |
             pacc-server-core/target/surefire-reports/
+            pacc-detection-engine/target/surefire-reports/
             pacc-addon-scanner/target/surefire-reports/
             server-plugins/pacc-bukkit/target/surefire-reports/
             server-plugins/pacc-bedrock/target/surefire-reports/

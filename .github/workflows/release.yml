@@ -90,6 +90,8 @@ jobs:
           ( cd pacc-binary-protocol/runtime-java && mvn -B -q -DskipTests install )
           ( cd pacc-cross-platform-updater   && mvn -B -q -DskipTests install )
           ( cd pacc-rule-language            && mvn -B -q -DskipTests install )
+          # 玩家端依赖检测引擎（指纹库 + 六层检测），要在 ptv-client 之前装进本地仓库
+          ( cd pacc-detection-engine         && mvn -B -q -DskipTests install )
           ( cd tools/pob                     && mvn -B -q -DskipTests install )
 
       - name: 构建后端与玩家端
@@ -107,6 +109,10 @@ jobs:
             || { echo "::error::产物缺少入口类 PaccClient"; exit 1; }
           if unzip -l "$JAR" | grep -qE 'com/potatotv/paccclient/(detection|transport|signature|store|ops|probe)/'; then
             echo "::error::发行 JAR 未混淆"; exit 1
+          fi
+          # 并入的检测引擎（PDE）同样必须被拍平（与 CI 同一断言）
+          if unzip -l "$JAR" | grep -qE 'com/potatotv/pacc/'; then
+            echo "::error::发行 JAR 未混淆：检测引擎包 com/potatotv/pacc/ 仍以原名存在"; exit 1
           fi
           # Unicode 命名下短名是私有区字符，按「1~3 个非 / 字符」判定
           unzip -l "$JAR" | grep -qE 'com/potatotv/paccclient/[^/]{1,3}\.class' \
@@ -183,9 +189,11 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: 安装内部依赖（检测内核 / 共享适配层 / Addon 扫描）
+      - name: 安装内部依赖（检测引擎 / 检测内核 / 共享适配层 / Addon 扫描）
         run: |
           set -euo pipefail
+          # 检测内核依赖检测引擎，先装引擎
+          ( cd pacc-detection-engine && mvn -B -q -DskipTests install )
           ( cd pacc-server-core   && mvn -B -q -DskipTests install )
           ( cd pacc-addon-scanner && mvn -B -q -DskipTests install )
           # 两个共享适配层要先 install：Java 版平台插件依赖 pacc-bukkit，

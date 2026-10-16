@@ -5,6 +5,8 @@ dist/
 out/
 *.class
 *.jar
+# Gradle wrapper 的 jar 是构建入口（CI 里 ./gradlew 依赖它），必须入库，别被上面的 *.jar 吃掉
+!**/gradle/wrapper/gradle-wrapper.jar
 *.war
 # Inno Setup 安装包产物（ISCC 输出，不入库）
 /tools/installer/Output/

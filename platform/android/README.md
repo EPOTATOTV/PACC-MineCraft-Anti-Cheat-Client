@@ -5,6 +5,9 @@
 ## 结构
 ```
 android/
+  settings.gradle.kts  -> pluginManagement 仓库 + include(":app")
+  build.gradle.kts     -> 根构建，声明 AGP 版本（与 ptv-mobile/android 对齐）
+  gradle/wrapper/      -> Gradle 8.11.1 wrapper（与 ptv-mobile/android 同版本）
   app/
     src/main/
       cpp/
@@ -25,7 +28,7 @@ android/
 
 ## 构建（需 Android SDK + NDK 26+）
 ```bash
-# 项目根启用原生构建（build.gradle.kts 已配置 externalNativeBuild）
+# 模块根已带 wrapper，首次运行会拉 Gradle 8.11.1 发行包
 ./gradlew assembleDebug
 # 或在 IDE 打开本模块，Build -> Make Project
 ```

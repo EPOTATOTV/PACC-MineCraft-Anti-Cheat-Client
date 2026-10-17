@@ -1,7 +1,9 @@
 package com.potatotv.pacc.server.core.engine;
 
 import com.potatotv.pacc.server.core.ServerPlatformAdapter;
+import com.potatotv.pacc.server.core.check.MoveAware;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.server.core.check.TickAware;
 import com.potatotv.pacc.server.core.model.AddonInfo;
 import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.CombatEvent;
@@ -55,6 +57,14 @@ public final class DetectionEngine {
     public List<DetectionResult> handleMove(PlayerPosition from, PlayerPosition to) {
         if (to == null) {
             return List.of();
+        }
+        // 跨类型观察口（如 X-Ray 的探索距离统计）先拿到移动流，再走正常的 MOVE 分发
+        for (List<ServerCheck> checks : checksByType.values()) {
+            for (ServerCheck check : checks) {
+                if (check instanceof MoveAware moveAware) {
+                    moveAware.onMoveObserved(from, to);
+                }
+            }
         }
         return dispatch(CheckType.MOVE, to.playerId(), () -> {
             List<DetectionResult> raw = new ArrayList<>();
@@ -126,11 +136,45 @@ public final class DetectionEngine {
         return finish(CheckType.CLIENT_BRAND, playerId, raw);
     }
 
+    /**
+     * 直接喂入已解析的 Mod 文件哈希（{@code pacc:mods} 通道由适配层解析时用）。
+     *
+     * <p>与 {@link #handleClientBrand} 的区别：那条路径会再向适配层要一遍品牌与 Mod 列表，
+     * 适合事件驱动平台；平台侧已经拿到哈希清单时走这里，避免重复取数。
+     */
+    public List<DetectionResult> handleModHashes(String playerId, List<String> modHashes) {
+        if (!config.isEnabled(CheckType.CLIENT_BRAND)) {
+            return List.of();
+        }
+        List<String> hashes = modHashes == null ? List.of() : modHashes;
+        List<DetectionResult> raw = new ArrayList<>();
+        for (ServerCheck check : checksFor(CheckType.CLIENT_BRAND)) {
+            raw.addAll(check.onModHashes(playerId, hashes));
+        }
+        return finish(CheckType.CLIENT_BRAND, playerId, raw);
+    }
+
     public List<DetectionResult> handleAddons(String playerId, List<AddonInfo> addons) {
         return dispatch(CheckType.ADDON, playerId, () -> {
             List<DetectionResult> raw = new ArrayList<>();
             for (ServerCheck check : checksFor(CheckType.ADDON)) {
                 raw.addAll(check.onAddons(playerId, addons));
+            }
+            return raw;
+        });
+    }
+
+    /**
+     * 方块被破坏（服务端认账）。X-Ray 统计与 nuker 类判定都从这里进，走 INTERACTION 分类。
+     *
+     * @param blockType 平台给的方块材质名；拿不到时传 {@code null}，检查项会自行跳过
+     */
+    public List<DetectionResult> handleBlockBreak(
+            String playerId, String blockType, Position pos, long timestampMs) {
+        return dispatch(CheckType.INTERACTION, playerId, () -> {
+            List<DetectionResult> raw = new ArrayList<>();
+            for (ServerCheck check : checksFor(CheckType.INTERACTION)) {
+                raw.addAll(check.onBlockBreak(playerId, blockType, pos, timestampMs));
             }
             return raw;
         });
@@ -152,6 +196,22 @@ public final class DetectionEngine {
         for (List<ServerCheck> checks : checksByType.values()) {
             for (ServerCheck check : checks) {
                 check.reset(playerId);
+            }
+        }
+    }
+
+    /**
+     * 服务端刻边界通知。平台适配层每刻调一次，转给需要刻信息的检查项（{@link TickAware}）。
+     *
+     * <p>不产出检测结果：它只是喂数据（实测刻长），所以不需要走 {@code dispatch} 的开关判断——
+     * 关掉某个检查项不该让性能读数停摆。
+     */
+    public void handleTick(long nowMs) {
+        for (List<ServerCheck> checks : checksByType.values()) {
+            for (ServerCheck check : checks) {
+                if (check instanceof TickAware tickAware) {
+                    tickAware.onTick(nowMs);
+                }
             }
         }
     }

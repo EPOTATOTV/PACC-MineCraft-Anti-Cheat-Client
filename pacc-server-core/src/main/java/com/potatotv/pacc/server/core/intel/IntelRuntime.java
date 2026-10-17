@@ -9,6 +9,7 @@ import com.potatotv.pacc.detection.server.behavior.StatOutlier;
 import com.potatotv.pacc.detection.server.behavior.PatternCluster;
 import com.potatotv.pacc.detection.server.behavior.LstmWeights;
 import com.potatotv.pacc.detection.server.behavior.MLDetector;
+import com.potatotv.pacc.detection.server.behavior.WeightProvenance;
 import com.potatotv.pacc.detection.server.combat.AttackPattern;
 import com.potatotv.pacc.detection.server.combat.HitboxValidator;
 import com.potatotv.pacc.detection.server.combat.KnockbackPredictor;
@@ -18,6 +19,7 @@ import com.potatotv.pacc.detection.server.packet.BrandValidator;
 import com.potatotv.pacc.detection.server.packet.PacketOrder;
 import com.potatotv.pacc.detection.server.packet.PacketTiming;
 import com.potatotv.pacc.detection.server.packet.TransactionSync;
+import com.potatotv.pacc.detection.server.perf.PerformanceCalibrator;
 import com.potatotv.pacc.detection.server.prediction.LatencyCompensator;
 import com.potatotv.pacc.detection.server.prediction.PredictionEngine;
 import com.potatotv.pacc.detection.server.prediction.SetbackController;
@@ -25,6 +27,7 @@ import com.potatotv.pacc.detection.server.prediction.WorldReplica;
 import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.DetectionResult;
 import com.potatotv.pacc.server.core.model.Position;
+import com.potatotv.pacc.server.core.packet.TransactionSender;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -58,8 +61,17 @@ public final class IntelRuntime {
     private final PredictionEngine predictionEngine = new PredictionEngine(worlds);
     private final StatOutlier statOutlier = new StatOutlier();
     private final PatternCluster patternCluster = new PatternCluster();
-    /** ML 管线：随机权重仅保证可运行，0.95 置信门会拦下随机权重输出；生产用云端训练权重替换。 */
-    private final MLDetector mlDetector = new MLDetector(3, 16, LstmWeights.random(3, 16, 20260101L));
+    /** 内置启发式权重的固定种子（无训练数据时的降级默认值）。 */
+    private static final long ML_WEIGHT_SEED = 20260101L;
+
+    /**
+     * ML 管线。当前用的是固定种子的随机初始化权重，来源显式标注为
+     * {@link WeightProvenance.Source#HEURISTIC_DEFAULT}，{@code classify} 会直接拒绝出证——
+     * 随机权重没有判别力，不能当模型结论（§5.4 U-07）。拿到真实标注训练权重后，用
+     * {@code WeightProvenance.trained(...)} 替换即可，其余代码不用动。
+     */
+    private final MLDetector mlDetector = new MLDetector(3, 16,
+            LstmWeights.random(3, 16, ML_WEIGHT_SEED), WeightProvenance.heuristicDefault(ML_WEIGHT_SEED));
     private final ReachCheck reachCheck = new ReachCheck();
     private final AttackPattern attackPattern = new AttackPattern();
     private final RotationAnalyzer rotationAnalyzer = new RotationAnalyzer();
@@ -71,6 +83,8 @@ public final class IntelRuntime {
     private final BrandValidator brandValidator = new BrandValidator();
     private final LatencyCompensator latencyCompensator = new LatencyCompensator();
     private final SetbackController setbackController = new SetbackController();
+    /** 实测刻长 / TPS 来源，包时序检测按它做阈值归一化（§5.3 U-05）。 */
+    private final PerformanceCalibrator calibrator = new PerformanceCalibrator();
 
     /** 每玩家上一个移动起始位置（速度估算用）。 */
     private final ConcurrentHashMap<String, Position> lastPositions = new ConcurrentHashMap<>();
@@ -82,6 +96,36 @@ public final class IntelRuntime {
      * 未配置密钥时为 null，链式哈希关闭（默认行为不变）。
      */
     private volatile EvidenceChain evidenceChain;
+
+    /**
+     * 事务发包接缝。为 null 表示平台发不出事务包，此时不做延迟估计也不判 Disabler——
+     * 拿编造的 id 记账会让 ack 率恒为 0，把所有正常玩家判成 Disabler。
+     */
+    private volatile TransactionSender transactionSender;
+
+    /** 装配事务发包接缝（由适配层在启动时注入；不注入即视为平台不支持事务）。 */
+    public void attachTransactionSender(TransactionSender sender) {
+        this.transactionSender = sender;
+    }
+
+    /**
+     * 发一个事务并登记真实 id。
+     *
+     * @return 是否真的发出并登记成功；{@code false} 时调用方不应做任何延迟/ack 判定
+     */
+    public boolean requestTransaction(String playerId) {
+        TransactionSender sender = transactionSender;
+        if (sender == null) {
+            return false;
+        }
+        int id = sender.send(playerId);
+        return id >= 0 && latencyCompensator.registerSent(id);
+    }
+
+    /** 当前是否具备真实事务发包能力。 */
+    public boolean transactionsSupported() {
+        return transactionSender != null;
+    }
 
     /** 启用证据链（密钥 ≥16 字节；空白则忽略）。 */
     public void enableEvidenceChain(byte[] hmacKey) {
@@ -165,6 +209,11 @@ public final class IntelRuntime {
 
     public LatencyCompensator latencyCompensator() {
         return latencyCompensator;
+    }
+
+    /** 性能自适应校准器（§5.3 U-05）。 */
+    public PerformanceCalibrator calibrator() {
+        return calibrator;
     }
 
     public SetbackController setbackController() {

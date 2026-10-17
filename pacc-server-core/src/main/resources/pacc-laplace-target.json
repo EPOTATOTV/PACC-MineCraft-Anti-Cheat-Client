@@ -1,0 +1,12 @@
+{
+  "targetId": "pacc-server-core",
+  "kind": "detection-engine",
+  "version": "6.0.0",
+  "contractVersion": "laplace-event-contract-v1",
+  "eventClasses": ["Move", "Combat", "Packet", "Inventory", "Interact", "ClientBrand", "Mods", "ModHashes", "Addons", "DataConsistency", "Tick", "Reset"],
+  "probeCapabilities": {"server_packet_stream": true, "server_block_probe": true, "server_transaction_sync": true, "server_evidence_chain": true, "server_performance_calibration": true, "client_process_scan": false, "client_module_scan": false, "client_memory_scan": false, "client_usb_scan": false, "client_registry_scan": false},
+  "thresholdAnchors": {"move.max-horizontal-speed-per-tick": 0.420000, "move.max-vertical-climb-per-tick": 0.420000, "move.fly-airborne-ticks-trigger": 20.000000, "combat.max-reach-distance": 3.100000, "combat.max-cps": 16.000000, "interaction.max-place-per-tick": 1.000000, "inventory.confidence-threshold": 60.000000, "packet.teleport-threshold": 10.000000, "packet.no-fall-min-drop": 3.000000, "packet.timer-threshold": 1.005000, "packet.transaction-ack-rate": 0.500000, "phase.required-strikes": 2.000000, "packet.nominal-tick-ms": 50.000000},
+  "entrypoint": "com.potatotv.pacc.server.core.laplace.LaplaceTargetFacade",
+  "artifact": "com.potatotv.pacc:pacc-server-core:6.0.0",
+  "note": "服务端进程内检测目标；客户端探针（进程/模块/内存/USB 等）由 ptv-client 经 PTV 通道上报，不在本目标的进程内契约里，故相关能力位一律为 false"
+}

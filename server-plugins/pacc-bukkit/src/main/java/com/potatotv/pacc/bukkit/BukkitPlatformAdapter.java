@@ -187,7 +187,6 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
      * true 表示封禁的同时踢出。玩家不在线时只记日志，不做跨请求的补偿。
      */
     @Override
-    @SuppressWarnings("deprecation") // kickPlayer(String) 已废弃，但 Spigot/Paper 通吃的纯踢出入口只有它。
     public void punish(String playerId, PunishmentType type, String reason, long durationMs) {
         if (type == null || type == PunishmentType.ALERT) {
             return; // 仅告警由 alert() 负责，这里不做事。

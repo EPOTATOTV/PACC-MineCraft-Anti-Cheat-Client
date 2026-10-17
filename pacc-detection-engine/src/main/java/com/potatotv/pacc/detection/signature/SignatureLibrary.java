@@ -46,6 +46,19 @@ public final class SignatureLibrary {
         }
     }
 
+    /**
+     * 整体替换库内指纹（指纹包升级与回滚用）。
+     *
+     * <p>用替换而不是「追加 + 删除」：包更新必须是原子的，不能出现新旧条目混在一起的
+     * 中间态——那种状态的误报最难排查。
+     */
+    public void replaceAll(List<CheatFingerprint> replacement) {
+        fingerprints.clear();
+        if (replacement != null) {
+            fingerprints.addAll(replacement);
+        }
+    }
+
     /** 当前指纹总数。 */
     public int size() {
         return fingerprints.size();

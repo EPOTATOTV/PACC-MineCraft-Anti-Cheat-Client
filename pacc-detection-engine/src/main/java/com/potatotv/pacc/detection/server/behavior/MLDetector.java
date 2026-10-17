@@ -24,10 +24,23 @@ public final class MLDetector {
     public static final String DETECTOR_ID = "behavior-ml";
 
     private final LstmWeights weights;
+    private final WeightProvenance provenance;
 
+    /** 未标注来源的构造口：仅用于单元测试与调用方自证来源的场景。 */
     public MLDetector(int inputSize, int hiddenSize, LstmWeights weights) {
+        this(inputSize, hiddenSize, weights, WeightProvenance.unspecified());
+    }
+
+    /**
+     * @param provenance 权重来源。{@link WeightProvenance.Source#HEURISTIC_DEFAULT} 时
+     *                   {@link #classify} 永不产出证据——随机权重没有判别力，出证就是把噪声当结论。
+     */
+    public MLDetector(int inputSize, int hiddenSize, LstmWeights weights, WeightProvenance provenance) {
         if (weights == null) {
             throw new IllegalArgumentException("weights 不能为空");
+        }
+        if (provenance == null) {
+            throw new IllegalArgumentException("provenance 不能为空");
         }
         if (weights.inputSize() != inputSize || weights.hiddenSize() != hiddenSize) {
             throw new IllegalArgumentException(
@@ -35,6 +48,24 @@ public final class MLDetector {
                             + " 声明=" + inputSize + "x" + hiddenSize);
         }
         this.weights = weights;
+        this.provenance = provenance;
+    }
+
+    /** 当前权重来源标注。 */
+    public WeightProvenance provenance() {
+        return provenance;
+    }
+
+    /** 是否因权重来源降级而不会产出 ML 证据。 */
+    public boolean degraded() {
+        return provenance.degraded();
+    }
+
+    /** 启动状态行，写清「这一版权重能不能用」。 */
+    public String statusLine() {
+        return degraded()
+                ? "ML 检测已降级：" + provenance.tag() + "，启发式默认权重不出证"
+                : "ML 检测就绪：" + provenance.tag();
     }
 
     /**
@@ -70,15 +101,21 @@ public final class MLDetector {
     }
 
     /**
-     * 分类：机器概率达到 ML 门槛（0.95）才出证据。
+     * 分类：机器学习概率达到门槛（0.95）才出证据。
+     *
+     * <p>降级权重（{@link WeightProvenance.Source#HEURISTIC_DEFAULT}）直接返回空：
+     * 随机初始化没有判别力，哪怕偶然越过门槛也不能当成模型结论（§5.4 U-07）。
      */
     public Optional<Evidence> classify(String playerId, List<double[]> featureSequence) {
+        if (degraded()) {
+            return Optional.empty();
+        }
         double p = forward(featureSequence)[0];
         if (p < ConfidenceScorer.DEFAULT_ML_GATE) {
             return Optional.empty();
         }
-        String detail = String.format(Locale.ROOT, "lstm p=%.3f 玩家=%s 序列=%d",
-                p, playerId, featureSequence == null ? 0 : featureSequence.size());
+        String detail = String.format(Locale.ROOT, "lstm p=%.3f 玩家=%s 序列=%d %s",
+                p, playerId, featureSequence == null ? 0 : featureSequence.size(), provenance.tag());
         return Optional.of(Evidence.of(DETECTOR_ID, Layer.BEHAVIOR, p, detail));
     }
 

@@ -19,6 +19,11 @@
 - **注册表监控**：`CmRegisterCallback`，盯防 Image File Execution Options（调试器劫持）
   与 AppInit_DLLs（全局注入），上报键路径与被写入的值。
 - **SSDT 完整性**：加载时定位并快照系统服务分派表条目，按需重读比对，报告分歧（内核 Hook 痕迹）。
+- **IDT 完整性**：读 IDTR 后逐条目核对中断处理程序是否落在已加载内核模块内，报告异常条目
+  （无需基线快照，也就不用怕"加载时已经被 Hook"）。
+- **内核回调枚举**：定位进程 / 镜像通知回调数组，统计已注册项数并解析归属驱动名。
+  注册表（`CmRegisterCallbackEx`）与对象（`ObRegisterCallbacks`）回调不是"全局数组 + 计数"结构，
+  链表头随内核版本迁移，暂不枚举——这两类回 `Supported=FALSE`，用户态标记为"未知"而非 0。
 - **驱动枚举 + 签名核验**：遍历 `PsLoadedModuleList`，读取每个映像的 PE 证书目录，
   标记未签名 / 非 Microsoft 驱动（Rootkit 检测）。
 - **键盘过滤（输入暂停）**：kbfiltr 式键盘类过滤驱动，拦截
@@ -64,6 +69,8 @@ kernel-windows/
 | `+11` QUERY_DRIVER_STATUS | `PACC_DRIVER_QUERY` | `PACC_DRIVER_REPORT` | 驱动枚举 + 签名核验（`Entries` 变长，分页） |
 | `+12` SET_KEYBOARD_LOCK | `PACC_KBD_LOCK_REQUEST` | 无 | 锁定/解锁键盘输入（解锁可要求令牌）；状态持久化到 `SOFTWARE\PACC` |
 | `+13` QUERY_KEYBOARD_LOCK | 无 | `ULONG`（1/0） | 查询键盘是否处于锁定态 |
+| `+14` QUERY_IDT_STATUS | 无 | `PACC_IDT_STATUS` | IDT 条目数 / 异常条目数 / 首个异常项 |
+| `+15` QUERY_CALLBACK_STATUS | 无 | `PACC_CALLBACK_REPORT` | 内核回调注册枚举（每类独立标注是否可枚举） |
 
 排空接口的用户侧 `MaxCount` 仅作上限参考，实际条数由输出缓冲与环形容量共同约束；
 输出缓冲必须容纳头部 + 至少一条 `PACC_EVENT`。驱动状态查询以 `StartIndex/MaxCount` 分页，

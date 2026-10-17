@@ -67,6 +67,14 @@
 #define IOCTL_PACC_QUERY_KEYBOARD_LOCK \
     CTL_CODE(FILE_DEVICE_UNKNOWN, PACC_IOCTL_BASE + 13, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+// 查询 IDT 完整性状态（输出 PACC_IDT_STATUS）
+#define IOCTL_PACC_QUERY_IDT_STATUS \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, PACC_IOCTL_BASE + 14, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+// 查询内核回调注册枚举（输出 PACC_CALLBACK_REPORT）
+#define IOCTL_PACC_QUERY_CALLBACK_STATUS \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, PACC_IOCTL_BASE + 15, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
 // ---- 数据结构 ----
 typedef struct _PACC_SCAN_REQUEST {
     ULONG Pid;                  // 目标进程
@@ -198,6 +206,52 @@ typedef struct _PACC_KBD_LOCK_REQUEST {
     ULONG Token;   // 解锁令牌；驱动持有非零令牌时，解锁必须匹配，否则拒绝
 } PACC_KBD_LOCK_REQUEST, *PPACC_KBD_LOCK_REQUEST;
 
+// ---- IDT 完整性状态 ----
+// Supported 为 FALSE 时其余字段无意义：宁可知其"不可用"，也不拿 0 冒充"无异常"。
+typedef struct _PACC_IDT_STATUS {
+    BOOLEAN  Supported;             // 是否成功读取 IDT
+    BOOLEAN  Reserved0;
+    ULONG    EntryCount;            // 有效（Present）条目数
+    ULONG    AnomalyCount;          // 处理程序不在任何已加载内核模块内的条目数
+    ULONG    FirstAnomalyIndex;     // 首个异常条目序号（无则 0xFFFFFFFF）
+    ULONG    Reserved1;
+    ULONG64  IdtBase;
+    ULONG64  IdtLimit;
+    ULONG64  FirstAnomalyTarget;    // 首个异常条目的处理程序地址
+} PACC_IDT_STATUS, *PPACC_IDT_STATUS;
+
+// ---- 内核回调注册枚举 ----
+#define PACC_CALLBACK_CLASS_MAX           4   // 类别数
+#define PACC_CALLBACK_NAMES_PER_CLASS     8   // 每类最多回填的驱动名条数
+#define PACC_CALLBACK_NAME_CCH            64  // 单个驱动名 WCHAR 数（含终止符）
+
+// 类别下标（PACC_CALLBACK_REPORT.ClassSupported 的位序与此一致）
+#define PACC_CALLBACK_CLASS_PROCESS       0   // PsSetCreateProcessNotifyRoutine(Ex)
+#define PACC_CALLBACK_CLASS_IMAGE         1   // PsSetLoadImageNotifyRoutine
+#define PACC_CALLBACK_CLASS_REGISTRY      2   // CmRegisterCallbackEx
+#define PACC_CALLBACK_CLASS_OBJECT        3   // ObRegisterCallbacks
+
+// 每类回调各自标注 Supported：定位不到该类回调数组时计数保持 0 且无意义，
+// 由用户态据此标记"未知"，绝不把"拿不到"当成"没有注册"。
+typedef struct _PACC_CALLBACK_CLASS {
+    BOOLEAN  Supported;             // 该类回调数组是否成功定位
+    BOOLEAN  Reserved0;
+    USHORT   Reserved1;
+    ULONG    Registered;            // 已注册项数（仅 Supported 时有意义）
+    ULONG    Named;                 // DriverNames 中已填充条数
+    ULONG    Reserved2;
+    ULONG64  ArrayVa;               // 回调数组内核地址（未定位为 0）
+    WCHAR    DriverNames[PACC_CALLBACK_NAMES_PER_CLASS][PACC_CALLBACK_NAME_CCH];
+} PACC_CALLBACK_CLASS, *PPACC_CALLBACK_CLASS;
+
+typedef struct _PACC_CALLBACK_REPORT {
+    ULONG  ClassSupported;          // 位掩码：第 i 位=1 表示类别 i 已成功枚举
+    ULONG  TotalRegistered;         // 各已枚举类别的 Registered 之和
+    ULONG  Suspicious;              // 非 ntoskrnl、非本驱动模块注册的项数（第三方回调）
+    ULONG  Reserved0;
+    PACC_CALLBACK_CLASS Classes[PACC_CALLBACK_CLASS_MAX];
+} PACC_CALLBACK_REPORT, *PPACC_CALLBACK_REPORT;
+
 // 保护进程集合（全局，共用）
 extern volatile ULONG  g_paccProtectedPids[PACC_MAX_PROTECTED_PID];
 extern volatile ULONG64 g_paccBlockedOpCount;     // 被拦截的越权访问计数
@@ -245,6 +299,10 @@ NTSTATUS PaccSsdtQuery(PPACC_SSDT_STATUS out);
 
 // ---- 已加载驱动枚举 + 签名核验（pacc_drivenum.c）----
 NTSTATUS PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT report, ULONG outLen);
+
+// ---- 内核自省：IDT 完整性与内核回调枚举（pacc_introspect.c）----
+NTSTATUS PaccIdtQuery(PPACC_IDT_STATUS out);
+NTSTATUS PaccCallbackQuery(PPACC_CALLBACK_REPORT out);
 
 // ---- 键盘类过滤 / 锁定（pacc_kbdfilter.c）----
 NTSTATUS PaccKbdFilterInitialize(VOID);   // 附着键盘类设备栈 + 恢复持久化锁状态

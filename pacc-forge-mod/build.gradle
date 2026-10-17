@@ -28,6 +28,8 @@ java {
 repositories {
     // pacc-client-core 由本仓库 Maven 构建后 install 到本地仓库（见 CI）。
     mavenLocal()
+    // JUnit 5：测试源集只依赖纯 JDK + JUnit，不走 Minecraft 依赖。
+    mavenCentral()
     maven { name = 'MinecraftForge'; url = 'https://maven.minecraftforge.net/' }
 }
 
@@ -56,6 +58,39 @@ dependencies {
     implementation "com.potatotv.pacc:pacc-client-core:${clientCoreVersion}"
     jarJar "com.potatotv.pacc:pacc-client-core:${clientCoreVersion}"
     annotationProcessor "org.spongepowered:mixin:${mc.getProperty('mixin_processor_version')}:processor"
+
+    // 单元测试只跑纯 JVM 逻辑（src/test 不引用 Minecraft 类）。
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+}
+
+// 主源集里有大量引用 Minecraft 的类，走默认 test 任务得先编出 main classes（要 MC 依赖）。
+// Mod 哈希通道是纯 JDK 逻辑，单独给它一个只依赖 JUnit 的源集与任务，离线环境也能真跑起来。
+sourceSets {
+    modHashTest {
+        java {
+            srcDirs = ['src/main/java', 'src/test/java']
+            include 'com/potatotv/pacc/forge/mods/**'
+        }
+        resources.srcDirs = []
+    }
+}
+
+dependencies {
+    modHashTestImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    modHashTestRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+tasks.register('modHashTest', Test) {
+    description = '跑 Mod 哈希通道的纯 JDK 逻辑测试（不依赖 Minecraft）'
+    group = 'verification'
+    testClassesDirs = sourceSets.modHashTest.output.classesDirs
+    classpath = sourceSets.modHashTest.runtimeClasspath
+    useJUnitPlatform()
 }
 
 mixin {

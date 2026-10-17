@@ -7,6 +7,11 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ master ]
+  # 指纹包定期校验（技术文档 §5.5 U-09）。社区指纹的**抓取**不做自动化：
+  # 把未经复核的第三方数据直接灌进检测引擎是供应链风险，入库必须走人工复核；
+  # 这里定期跑的是「包格式 / 校验和 / 回滚」这条硬校验链。
+  schedule:
+    - cron: '0 3 * * 1'
 
 permissions:
   contents: read
@@ -343,6 +348,25 @@ jobs:
             server-plugins/pacc-bedrock/target/surefire-reports/
             server-plugins/pacc-geyser/target/surefire-reports/
           if-no-files-found: ignore
+
+  # ---- 指纹包定期校验（技术文档 §5.5 U-09）----
+  signature-pack:
+    name: 指纹包校验
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: 安装 JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      # 这三组用例守住指纹包的四条底线：字段往返不丢、校验和能发现篡改、
+      # 整包替换后可回滚、目录能查出重复 id。抓取环节不在这里做（见文件头说明）。
+      - name: 校验指纹包编解码与回滚
+        working-directory: pacc-detection-engine
+        run: mvn -B -q test -Dtest=SignaturePackCodecTest,CheatCatalogTest,CommunitySignaturesTest
 
   # ---- 前端（Node 20 + Vite）----
   frontend:

@@ -16,6 +16,7 @@ const ko = {
   'nav.redscreen': '레드스크린 관리',
   'nav.inspect': '원격 점검',
   'nav.evidenceChain': '교차 증거 체인',
+  'nav.alerts': '경보 센터',
   'nav.records': '치트 기록',
   'nav.accounts': 'PTEID 계정',
   'nav.admins': '관리자 관리',

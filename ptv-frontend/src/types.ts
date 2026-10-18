@@ -619,6 +619,16 @@ export interface AlertStats {
   total: number
 }
 
+/** P-07 告警渠道状态（不包含 URL / 密钥）。 */
+export interface AlertChannelStatus {
+  enabled: boolean
+  configured: boolean
+  feishuConfigured: boolean
+  discordConfigured: boolean
+  transparencyFeishuConfigured: boolean
+  timeoutMs: number
+}
+
 /** 角色与权限 - 权限项 */
 export interface RolePermission {
   module: string
@@ -1860,10 +1870,27 @@ export interface CrossEvidenceItem {
   severity?: string | null
   riskScore: number
   detail?: string | null
+  processName?: string | null
+  memoryRegion?: string | null
+  signatureHit?: string | null
+  clientVersion?: string | null
+  osInfo?: string | null
   occurredAt?: string | null
   alertId?: string | null
   serverId?: string | null
   redscreenTriggered: boolean
+}
+
+/** P-06 设备指纹。 */
+export interface CrossEvidenceDevice {
+  deviceId: string
+  deviceFingerprint?: string | null
+  platform?: string | null
+  deviceName?: string | null
+  ip?: string | null
+  firstLoginAt?: string | null
+  lastLoginAt?: string | null
+  active: boolean
 }
 
 /** P-06 跨端证据链响应。 */
@@ -1871,6 +1898,7 @@ export interface CrossEvidenceChain {
   pteid: string
   clientEventCount: number
   serverEventCount: number
+  devices: CrossEvidenceDevice[]
   items: CrossEvidenceItem[]
 }
 

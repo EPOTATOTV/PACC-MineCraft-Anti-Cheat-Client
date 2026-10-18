@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Button, Card, Col, Empty, Input, List, Row, Space, Tag, Typography } from 'antd'
+import { Button, Card, Col, Empty, Input, List, Row, Space, Table, Tag, Typography } from 'antd'
 import { LinkOutlined, SearchOutlined } from '@ant-design/icons'
+import type { TableColumnsType } from 'antd'
 import PageHeader from '../components/PageHeader'
 import MetricCard from '../components/MetricCard'
 import { api } from '../api/client'
-import type { CrossEvidenceChain, CrossEvidenceItem } from '../types'
+import type { CrossEvidenceChain, CrossEvidenceDevice, CrossEvidenceItem } from '../types'
 
 const { Text } = Typography
 
@@ -108,6 +109,7 @@ export default function EvidenceChain() {
       <Card
         title="时间线"
         size="small"
+        style={{ marginBottom: 14 }}
         styles={{ body: { padding: chain?.items.length ? '4px 16px' : 24 } }}
       >
         {!pteid ? (
@@ -124,9 +126,50 @@ export default function EvidenceChain() {
           <Empty description="该 PTEID 暂无跨端证据" />
         )}
       </Card>
+
+      <Card
+        title={`设备指纹 (${chain?.devices.length ?? 0})`}
+        size="small"
+        styles={{ body: { padding: chain?.devices.length ? 0 : 24 } }}
+      >
+        {chain && chain.devices.length > 0 ? (
+          <Table
+            size="small"
+            rowKey="deviceId"
+            columns={deviceColumns}
+            dataSource={chain.devices}
+            pagination={false}
+            scroll={{ x: 760 }}
+            locale={{ emptyText: '暂无设备指纹' }}
+          />
+        ) : (
+          <Empty description="暂无设备指纹" />
+        )}
+      </Card>
     </div>
   )
 }
+
+const deviceColumns: TableColumnsType<CrossEvidenceDevice> = [
+  { title: '设备 ID', dataIndex: 'deviceId', width: 160 },
+  {
+    title: '指纹摘要',
+    dataIndex: 'deviceFingerprint',
+    render: (value?: string) => value
+      ? <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{value.slice(0, 16)}…{value.slice(-8)}</Text>
+      : <Text type="secondary">-</Text>,
+  },
+  { title: '平台', dataIndex: 'platform', width: 100, render: (v?: string) => v || '-' },
+  { title: '设备名', dataIndex: 'deviceName', render: (v?: string) => v || '-' },
+  { title: '最近 IP', dataIndex: 'ip', width: 140, render: (v?: string) => v || '-' },
+  { title: '最近登录', dataIndex: 'lastLoginAt', width: 170, render: (v?: string) => fmt(v) },
+  {
+    title: '状态',
+    dataIndex: 'active',
+    width: 90,
+    render: (active: boolean) => active ? <Tag color="green">当前设备</Tag> : <Tag>历史</Tag>,
+  },
+]
 
 function EvidenceRow({ item }: { item: CrossEvidenceItem }) {
   const source = SOURCE_META[item.source]
@@ -146,6 +189,15 @@ function EvidenceRow({ item }: { item: CrossEvidenceItem }) {
         <div style={{ marginTop: 6, fontSize: 13, color: 'var(--muted)' }}>
           {item.detail || '无明细'}
         </div>
+        {(item.processName || item.memoryRegion || item.signatureHit || item.clientVersion || item.osInfo) && (
+          <Space wrap size={12} style={{ marginTop: 6, fontSize: 12 }}>
+            {item.processName && <Text type="secondary">进程 {item.processName}</Text>}
+            {item.memoryRegion && <Text type="secondary">内存 {item.memoryRegion}</Text>}
+            {item.signatureHit && <Text type="secondary">签名 {item.signatureHit}</Text>}
+            {item.clientVersion && <Text type="secondary">客户端 {item.clientVersion}</Text>}
+            {item.osInfo && <Text type="secondary">系统 {item.osInfo}</Text>}
+          </Space>
+        )}
         <Space wrap size={12} style={{ marginTop: 6, fontSize: 12 }}>
           {item.serverId && <Text type="secondary">服务器 {item.serverId}</Text>}
           {item.playerName && <Text type="secondary">玩家 {item.playerName}</Text>}

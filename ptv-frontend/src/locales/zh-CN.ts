@@ -17,6 +17,7 @@ const zhCN = {
   'nav.redscreen': '红屏管理',
   'nav.inspect': '查端控制台',
   'nav.evidenceChain': '跨端证据链',
+  'nav.alerts': '告警中心',
   'nav.detection41': 'v4.1 检测引擎',
   'nav.v46': '检测深化',
   'nav.v47': '情报运营中台',

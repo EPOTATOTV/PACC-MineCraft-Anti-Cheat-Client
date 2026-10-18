@@ -25,8 +25,12 @@ public final class NormalPredictor implements MovementPredictor {
         if (state.effectLevel(PlayerState.EFFECT_SLOW_FALLING) > 0 && vy < 0) {
             vy = PhysicsSimulator.stepVerticalSlowFalling(state.vy());
         }
-        if (state.onSlimeBlock() && !input.sneak() && state.fallDistance() > 0.5 && !jumped) {
-            vy = -state.vy() * 0.8; // 黏液块反弹
+        double bounce = state.blockBounciness();
+        if (bounce <= 0.0 && state.onSlimeBlock()) {
+            bounce = 0.8; // 旧状态位没有脚下方块材质时的兼容口径
+        }
+        if (bounce > 0.0 && !input.sneak() && state.fallDistance() > 0.5 && !jumped && state.vy() < 0) {
+            vy = -state.vy() * bounce;
         }
         if (state.inBubbleColumn()) {
             vy = state.vy() > 0 ? 0.9 : -0.9; // 气泡柱上/下行
@@ -35,8 +39,9 @@ public final class NormalPredictor implements MovementPredictor {
             vy = 0.01 * state.effectLevel(PlayerState.EFFECT_LEVITATION);
         }
 
-        // 水平：先摩擦后加速度（Java 版 1.8+ 口径；1.21 版本差异由版本注册处理）
-        double slip = state.onGround() ? 0.6 : 1.0;
+        // 水平：先摩擦后加速度（Java 版 1.8+ 口径）。滑度来自脚下方块（P-01）：
+        // 冰面 0.98、黏液/蜂蜜 0.8、默认 0.6；版本差异只体现在属性表，不在公式里分支
+        double slip = state.onGround() ? state.blockSlipperiness() : 1.0;
         double friction = state.onGround() ? PhysicsSimulator.groundFriction(slip) : PhysicsSimulator.AIR_DRAG;
         double vx = state.vx() * friction;
         double vz = state.vz() * friction;

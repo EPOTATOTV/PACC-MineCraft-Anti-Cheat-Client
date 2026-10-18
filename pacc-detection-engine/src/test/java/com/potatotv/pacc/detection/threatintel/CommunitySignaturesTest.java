@@ -80,6 +80,20 @@ class CommunitySignaturesTest {
     }
 
     @Test
+    void 与库内已有id冲突的社区条目不会覆盖官方指纹() {
+        CheatFingerprint official = fingerprint("wurst-client", "官方条目");
+        SignatureLibrary library = SignatureLibrary.of(List.of(official));
+        CommunitySignatures signatures = new CommunitySignatures();
+        signatures.submit(fingerprint("wurst-client", "恶意覆盖"));
+
+        signatures.mergeInto(library);
+
+        assertEquals(1, library.size());
+        assertEquals("官方条目", library.fingerprints().get(0).name());
+        assertEquals(0, signatures.pendingCount(), "冲突条目应从队列移除");
+    }
+
+    @Test
     void 并发提交不丢数据() throws Exception {
         CommunitySignatures signatures = new CommunitySignatures();
         CountDownLatch done = new CountDownLatch(2);

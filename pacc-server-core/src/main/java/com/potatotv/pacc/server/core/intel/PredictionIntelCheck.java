@@ -1,10 +1,13 @@
 package com.potatotv.pacc.server.core.intel;
 
 import com.potatotv.pacc.detection.fusion.Evidence;
+import com.potatotv.pacc.detection.server.prediction.BlockPhysics;
 import com.potatotv.pacc.detection.server.prediction.PlayerState;
 import com.potatotv.pacc.detection.server.prediction.SetbackController;
 import com.potatotv.pacc.detection.server.prediction.TickInput;
+import com.potatotv.pacc.detection.server.prediction.WorldReplica;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.server.core.check.WorldAware;
 import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.DetectionResult;
 import com.potatotv.pacc.server.core.model.GameMode;
@@ -29,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * </ul>
  * 违规时通过 {@link SetbackController} 记录回撤点，供平台适配层执行。
  */
-public final class PredictionIntelCheck implements ServerCheck {
+public final class PredictionIntelCheck implements ServerCheck, WorldAware {
 
     /** 滞空且持续上升的连击阈值（真实跳跃上升段约 6 tick）。 */
     static final int MAX_RISING_AIRBORNE_TICKS = 8;
@@ -48,12 +51,22 @@ public final class PredictionIntelCheck implements ServerCheck {
 
     @Override
     public List<DetectionResult> onMove(PlayerPosition from, PlayerPosition to) {
+        // P-01：先绑定玩家所在世界，后面的方块物理查询与共享世界副本才有归属
+        runtime.bindPlayerWorld(to.playerId(), to.world());
         Position velocity = runtime.nextVelocity(to.playerId(), from.pos());
         List<DetectionResult> results = new ArrayList<>();
 
         updateRisingStreak(from, to);
 
         if (velocity != null) {
+            // 只有平台真的喂过方块数据时才用世界副本；否则用默认地面滑度，
+            // 不能为了查一次滑度创建空世界（会把预测引擎切到无数据严格模式）
+            WorldReplica world = runtime.existingWorld(to.playerId());
+            BlockPhysics standing = world == null
+                    ? BlockPhysics.SOLID
+                    : world.physicsAt((int) Math.floor(from.pos().x()),
+                    (int) Math.floor(from.pos().y() - 0.05),
+                    (int) Math.floor(from.pos().z()));
             PlayerState state = new PlayerState(
                     to.playerId(),
                     from.pos().x(), from.pos().y(), from.pos().z(),
@@ -66,7 +79,9 @@ public final class PredictionIntelCheck implements ServerCheck {
                     gameModeName(from.gameMode()),
                     0.0,
                     Map.of(),
-                    from.timestampMs());
+                    from.timestampMs(),
+                    standing.slipperiness(),
+                    standing.bounciness());
 
             Optional<Evidence> evidence = runtime.predictionEngine().check(
                     state, TickInput.idle(from.timestampMs()), IntelRuntime.toEnginePos(to.pos()));
@@ -114,6 +129,11 @@ public final class PredictionIntelCheck implements ServerCheck {
     public void reset(String playerId) {
         runtime.clear(playerId);
         risingStreaks.remove(playerId);
+    }
+
+    @Override
+    public void onBlockChanged(String worldName, int x, int y, int z, String material) {
+        runtime.applyBlockChange(worldName, x, y, z, material);
     }
 
     private static String gameModeName(GameMode mode) {

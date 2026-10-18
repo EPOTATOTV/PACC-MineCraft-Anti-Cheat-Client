@@ -102,12 +102,34 @@ public class PrlAdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "ruleName / version / source 都不能为空"));
         }
         String author = firstNonBlank(str(body.get("author")), actor(req));
+        String signature = str(body.get("signature"));
         try {
-            return ResponseEntity.ok(versionJson(
-                    releaseService.submitDraft(ruleName, version, source, author)));
+            RuleVersion submitted = signature.isBlank()
+                    ? releaseService.submitDraft(ruleName, version, source, author)
+                    : releaseService.submitDraft(ruleName, version, source, author, signature);
+            return ResponseEntity.ok(versionJson(submitted));
         } catch (PrlException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /** {@code GET /market}：规则市场清单（当前生效版本 + 签名状态），只读。 */
+    @GetMapping("/market")
+    @RequirePermission("system:read")
+    public ResponseEntity<?> market() {
+        List<Map<String, Object>> rules = new ArrayList<>();
+        for (PrlRuleReleaseService.RuleMarketEntry entry : releaseService.market()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("ruleName", entry.ruleName());
+            m.put("version", entry.version());
+            m.put("checksum", entry.checksum());
+            m.put("signed", entry.signed());
+            m.put("signatureAlgorithm", entry.signatureAlgorithm());
+            m.put("signedBy", entry.signedBy());
+            m.put("publishedAt", entry.publishedAt() == null ? null : entry.publishedAt().toString());
+            rules.add(m);
+        }
+        return ResponseEntity.ok(Map.of("rules", rules));
     }
 
     /** {@code POST /versions/{ruleName}/{version}/canary}：进入灰度并写下放量比例。 */
@@ -184,7 +206,7 @@ public class PrlAdminController {
     // ------------------------------------------------------------------ 序列化
 
     /** 编辑器 {@code RuleVersion} 的字段名与类型（{@code status} 小写、{@code createdAt} ISO-8601）。 */
-    private static Map<String, Object> versionJson(RuleVersion version) {
+    private Map<String, Object> versionJson(RuleVersion version) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", version.ruleName() + "@" + version.version());
         m.put("ruleName", version.ruleName());
@@ -195,6 +217,7 @@ public class PrlAdminController {
         m.put("createdAt", Instant.ofEpochMilli(version.createdAtMs()).toString());
         m.put("checksum", version.checksum());
         m.put("rollbackTo", version.rollbackTo());
+        m.put("signed", releaseService.isSigned(version.ruleName(), version.version()));
         return m;
     }
 

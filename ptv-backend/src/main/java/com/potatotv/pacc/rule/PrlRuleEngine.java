@@ -337,7 +337,24 @@ public class PrlRuleEngine {
         for (NumericField field : NUMERIC_FIELDS) {
             input.put(field.ruleName(), asDouble(ctx.get(field.ctxKey())).orElse(field.fallback()));
         }
+        // P-09：包级 / 方块事件作为宿主对象传入，规则可直接 packet.is_movement()。
+        // 没有对应上下文时给空对象，保证所有内置规则在同一份 input 上都能安全求值。
+        input.put("packet", new PacketRuleObject(asMap(ctx.get("packet"))));
+        input.put("block", new BlockRuleObject(asMap(ctx.get("block"))));
         return input;
+    }
+
+    private static Map<String, Object> asMap(Object value) {
+        if (!(value instanceof Map<?, ?> raw)) {
+            return Map.of();
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : raw.entrySet()) {
+            if (entry.getKey() != null) {
+                out.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+        }
+        return out;
     }
 
     private static Optional<String> asText(Object value) {

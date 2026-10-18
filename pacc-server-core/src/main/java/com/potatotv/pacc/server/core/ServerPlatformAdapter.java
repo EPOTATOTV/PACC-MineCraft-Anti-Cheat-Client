@@ -5,6 +5,10 @@ import com.potatotv.pacc.server.core.model.GameMode;
 import com.potatotv.pacc.server.core.model.PlayerPosition;
 import com.potatotv.pacc.server.core.model.PunishmentType;
 import com.potatotv.pacc.server.core.model.ServerType;
+import com.potatotv.pacc.server.core.packet.BlockProbe;
+import com.potatotv.pacc.server.core.packet.PacketCapability;
+import com.potatotv.pacc.server.core.packet.PacketCapabilityMatrix;
+import com.potatotv.pacc.server.core.packet.TransactionSender;
 
 import java.util.List;
 
@@ -41,6 +45,27 @@ public interface ServerPlatformAdapter {
     }
 
     List<AddonInfo> getInstalledAddons(String playerId);
+
+    /**
+     * 方块通行性探针，穿墙（Phase）检测用。默认返回 {@code null} 表示平台给不出方块数据，
+     * 此时 Phase 检查整体关闭，并由 {@link #packetCapability()} 声明「穿墙检测不可用」。
+     */
+    default BlockProbe blockProbe() {
+        return null;
+    }
+
+    /**
+     * 事务发包接缝。默认返回 {@code null} 表示平台发不出事务包，此时延迟补偿与 Disabler 判定
+     * 放弃该玩家（不记账、不告警），而不是拿编造的 id 制造 ack 率为零的假阳性。
+     */
+    default TransactionSender transactionSender() {
+        return null;
+    }
+
+    /** 本平台的包级检测能力声明，启动日志与能力矩阵表都用它。 */
+    default PacketCapability packetCapability() {
+        return PacketCapabilityMatrix.forPlatform(serverType(), false, blockProbe() != null);
+    }
 
     void alert(String playerId, String message);
 

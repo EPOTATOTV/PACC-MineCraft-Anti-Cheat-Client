@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import com.potatotv.pacc.detection.fusion.Evidence;
 import com.potatotv.pacc.detection.fusion.Layer;
@@ -31,13 +32,30 @@ public final class PredictionEngine {
     /** 每玩家的世界副本；null 表示无世界数据（不做穿固体过滤）。 */
     private final Map<String, WorldReplica> worlds;
 
+    /** 按玩家解析世界副本（共享世界副本实现用）；优先于 {@link #worlds}。 */
+    private final Function<String, WorldReplica> worldResolver;
+
     public PredictionEngine(Map<String, WorldReplica> worlds) {
         this.worlds = worlds;
+        this.worldResolver = null;
+    }
+
+    /** 用解析器取世界副本：多个玩家共享同一个世界时，避免为每人复制一份。 */
+    public PredictionEngine(Function<String, WorldReplica> worldResolver) {
+        this.worlds = null;
+        this.worldResolver = worldResolver;
     }
 
     /** 无世界副本的便捷构造。 */
     public PredictionEngine() {
-        this(null);
+        this((Map<String, WorldReplica>) null);
+    }
+
+    private WorldReplica worldOf(String playerId) {
+        if (worldResolver != null) {
+            return worldResolver.apply(playerId);
+        }
+        return worlds == null ? null : worlds.get(playerId);
     }
 
     /**
@@ -52,7 +70,7 @@ public final class PredictionEngine {
         }
         MovementPredictor engine = MovementPredictor.selectEngine(prev);
         Set<PredictedPosition> predicted = engine.predict(prev, input);
-        WorldReplica world = worlds == null ? null : worlds.get(prev.playerId());
+        WorldReplica world = worldOf(prev.playerId());
         if (world != null) {
             // 世界副本参与：剔除落进固体方块内部的候选（不可能位置）；
             // 若全部候选都被剔除（预测器与世界数据不一致），保留原集合避免误报
@@ -84,7 +102,7 @@ public final class PredictionEngine {
             if (offset.withinTolerance()) {
                 return Optional.empty();
             }
-            WorldReplica world = worlds == null ? null : worlds.get(prev.playerId());
+            WorldReplica world = worldOf(prev.playerId());
             if (world == null && !isPhysicallyImpossible(prev, actual)) {
                 // 包络内的偏差在无世界数据时都可能是合法输入造成，不判
                 return Optional.empty();

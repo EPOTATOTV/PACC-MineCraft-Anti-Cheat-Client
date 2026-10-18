@@ -36,10 +36,10 @@ class PrlRuleEngineTest {
     }
 
     @Test
-    void 八条规则全部装载且元数据可读() {
-        assertEquals(8, engine.reload());
+    void 十条规则全部装载且元数据可读() {
+        assertEquals(10, engine.reload());
         List<Map<String, Object>> rules = engine.list();
-        assertEquals(8, rules.size());
+        assertEquals(10, rules.size());
         for (Map<String, Object> rule : rules) {
             assertTrue((Boolean) rule.get("enabled"), "规则应处于启用态：" + rule);
             assertEquals("1.0.0", rule.get("version"), "规则版本：" + rule);
@@ -86,7 +86,37 @@ class PrlRuleEngineTest {
         assertTrue(ev.hits().isEmpty(), "空上下文不应命中任何规则：" + ev.hits());
         assertEquals(0.0, ev.bonus(), DELTA);
         // 空上下文下仍然逐条求值了全部规则
-        assertEquals(8, ev.ruleCount());
+        assertEquals(10, ev.ruleCount());
+    }
+
+    @Test
+    void 包级规则可执行并命中包滞留() {
+        Map<String, Object> ctx = new LinkedHashMap<>();
+        ctx.put("packet", Map.of(
+                "packet_type", "PLAYER_POSITION",
+                "length", 32,
+                "arrival_ms", 2000,
+                "client_ms", 500,
+                "sequence", 7));
+        PrlRuleEngine.Evaluation ev = engine.evaluate(ctx);
+        assertTrue(ev.hits().stream().anyMatch(hit -> "packet_anomaly".equals(hit.id())),
+                "包级规则应命中：" + ev.hits());
+    }
+
+    @Test
+    void 方块级规则识别26x硫磺方块() {
+        Map<String, Object> ctx = new LinkedHashMap<>();
+        ctx.put("block", Map.of(
+                "player_id", "PTE1234567890",
+                "block_type", "SULFUR_BLOCK",
+                "action", "PLACE",
+                "x", 1.0,
+                "y", 64.0,
+                "z", 1.0,
+                "time_ms", 1000));
+        PrlRuleEngine.Evaluation ev = engine.evaluate(ctx);
+        assertTrue(ev.hits().stream().anyMatch(hit -> "sulfur_block_event".equals(hit.id())),
+                "方块级规则应命中：" + ev.hits());
     }
 
     // ------------------------------------------------------------------ 金标对照表

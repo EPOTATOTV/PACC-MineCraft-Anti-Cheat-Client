@@ -7,6 +7,11 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ master ]
+  # 指纹包定期校验（技术文档 §5.5 U-09）。社区指纹的**抓取**不做自动化：
+  # 把未经复核的第三方数据直接灌进检测引擎是供应链风险，入库必须走人工复核；
+  # 这里定期跑的是「包格式 / 校验和 / 回滚」这条硬校验链。
+  schedule:
+    - cron: '0 3 * * 1'
 
 permissions:
   contents: read
@@ -54,7 +59,7 @@ jobs:
       # 扫到密钥时上一步会以非 0 退出，报告仍要用 always() 捞出来
       - name: 上传扫描结果
         if: always()
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
         continue-on-error: true
         with:
           sarif_file: gitleaks.sarif
@@ -154,7 +159,7 @@ jobs:
         run: |
           set -euo pipefail
           # 固定版本：zstandard 是校验用的 CI 工具，浮动版本会让同一提交在不同时间得到不同结果
-          python -m pip install --quiet 'zstandard==0.23.0'
+          python -m pip install --quiet --require-hashes -r requirements.txt
           python crosscheck.py --mvn mvn
       - name: 构建后端 ptv-backend
         working-directory: ptv-backend
@@ -343,6 +348,88 @@ jobs:
             server-plugins/pacc-bedrock/target/surefire-reports/
             server-plugins/pacc-geyser/target/surefire-reports/
           if-no-files-found: ignore
+
+  # ---- MC 版本矩阵（P-01）----
+  # 26.x 起版本号改为年份口径。这里用矩阵把 26.1 / 26.2 的版本解析与方块物理表钉住；
+  # 预测引擎的模拟会话回归仍由 server-plugins job 里的 pacc-server-core 测试执行。
+  mc-version-matrix:
+    name: MC 版本矩阵 (${{ matrix.mc }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: [ '26.1', '26.2' ]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: 安装 JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      - name: 校验版本矩阵与方块物理
+        working-directory: pacc-detection-engine
+        run: mvn -B -q test -Dtest=WorldReplicaTest,McVersionMatrixTest -Dpacc.mc.version=${{ matrix.mc }}
+      - name: 服务端模拟会话零回归
+        run: |
+          set -euo pipefail
+          ( cd pacc-detection-engine && mvn -B -q install )
+          ( cd pacc-addon-scanner && mvn -B -q install )
+          ( cd pacc-server-core && mvn -B -q test -Dtest=LegitSimulatorTest,CheatMatrixTest -Dpacc.mc.version=${{ matrix.mc }} )
+
+  # ---- 26.x 编译坐标（P-01）----
+  # Paper 26.1+ 的 API 产物是 Java 25 字节码，默认的 JDK 21 构建读不了；
+  # 这里单独用 JDK 25 走 -Pmc26，验证 pacc-bukkit / pacc-paper / pacc-spigot 能对着
+  # Spigot 26.2 与 Paper 26.2.build.134-stable 编译，并检查 plugin.yml 的 api-version。
+  mc26-compile:
+    name: 26.x 编译坐标
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: 安装 JDK 25
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: 安装内部依赖
+        run: |
+          set -euo pipefail
+          ( cd pacc-detection-engine && mvn -B -q install -DskipTests )
+          ( cd pacc-addon-scanner && mvn -B -q install -DskipTests )
+          ( cd pacc-server-core && mvn -B -q install -DskipTests )
+      - name: 26.2 编译 pacc-bukkit / pacc-paper / pacc-spigot
+        run: |
+          set -euo pipefail
+          ( cd server-plugins/pacc-bukkit && mvn -B -q install -DskipTests -Pmc26 )
+          ( cd server-plugins/pacc-paper && mvn -B -q package -DskipTests -Pmc26 )
+          ( cd server-plugins/pacc-spigot && mvn -B -q package -DskipTests -Pmc26 )
+      - name: 校验 plugin.yml api-version
+        run: |
+          set -euo pipefail
+          grep -q "api-version: '26.2'" server-plugins/pacc-paper/target/classes/plugin.yml
+          grep -q "api-version: '26.2'" server-plugins/pacc-spigot/target/classes/plugin.yml
+
+  # ---- 指纹包定期校验（技术文档 §5.5 U-09）----
+  signature-pack:
+    name: 指纹包校验
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
+      - name: 安装 JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961  # v5.7.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      # 这三组用例守住指纹包的四条底线：字段往返不丢、校验和能发现篡改、
+      # 整包替换后可回滚、目录能查出重复 id。抓取环节不在这里做（见文件头说明）。
+      - name: 校验指纹包编解码与回滚
+        working-directory: pacc-detection-engine
+        run: mvn -B -q test -Dtest=SignaturePackCodecTest,CheatCatalogTest,CommunitySignaturesTest,BuiltinFingerprintsTest,SignatureLibraryTest
 
   # ---- 前端（Node 20 + Vite）----
   frontend:
@@ -649,7 +736,7 @@ jobs:
           ignore-unfixed: true
         continue-on-error: true
       - name: 上传扫描结果
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
+        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
         continue-on-error: true
         with:
           sarif_file: trivy-results.sarif

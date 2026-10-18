@@ -58,6 +58,15 @@ public interface ServerCheck {
         return List.of();
     }
 
+    /**
+     * 方块被破坏（服务端认账的挖掘事件）。{@code blockType} 是平台给的方块材质名，
+     * 如 {@code DEEPSLATE_DIAMOND_ORE}；平台拿不到时传 {@code null}。
+     */
+    default List<DetectionResult> onBlockBreak(
+            String playerId, String blockType, Position pos, long timestampMs) {
+        return List.of();
+    }
+
     default List<DetectionResult> onDataConsistency(
             String playerId, Map<String, String> clientData, Map<String, String> serverData) {
         return List.of();

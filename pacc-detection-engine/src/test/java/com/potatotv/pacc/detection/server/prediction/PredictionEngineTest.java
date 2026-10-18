@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,18 @@ class PredictionEngineTest {
         return new PlayerState(pid, x, y, z, vx, vy, vz, 0f, 0f, onGround,
                 false, false, false, false, false, false, false, false, false, false,
                 false, flightAllowed, gameMode, 0, Map.of(), 0L);
+    }
+
+    @Test
+    void resolverBasedWorldIsConsulted() {
+        AtomicInteger calls = new AtomicInteger();
+        PredictionEngine engine = new PredictionEngine(playerId -> {
+            calls.incrementAndGet();
+            return null;
+        });
+        engine.evaluate(state("p", 0, 64, 0, 0, 0, 0, false, "survival", false),
+                TickInput.idle(0L), new Position(0, 64, 0));
+        assertTrue(calls.get() > 0, "解析器应被调用");
     }
 
     @Test

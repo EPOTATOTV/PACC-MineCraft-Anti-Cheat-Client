@@ -248,6 +248,26 @@ class TypeCheckerTest {
     }
 
     @Test
+    void 包级与方块事件可用于26x规则输入() {
+        TypeCheckResult result = checkSource("""
+                rule "packet_26x" {
+                    input {
+                        pkt: PacketEvent
+                        block: BlockEvent
+                    }
+                    when:
+                        pkt.is_movement()
+                        AND pkt.length > 0
+                        AND pkt.arrival_ms - pkt.client_ms > 500
+                        AND block.is_sulfur()
+                    then:
+                        emit_alert(type = "PACKET_BLOCK", confidence = 0.8, evidence = {})
+                }
+                """);
+        assertTrue(result.ok(), result.toString());
+    }
+
+    @Test
     void 严重级字面量当字符串用() {
         TypeCheckResult result = checkSource("""
                 rule "r" {

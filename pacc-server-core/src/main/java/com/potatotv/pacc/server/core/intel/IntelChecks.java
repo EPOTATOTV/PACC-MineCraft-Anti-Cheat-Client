@@ -3,6 +3,7 @@ package com.potatotv.pacc.server.core.intel;
 import com.potatotv.pacc.detection.signature.SignatureLibrary;
 import com.potatotv.pacc.detection.threatintel.CheatCatalog;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.server.core.packet.TransactionSender;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -34,9 +35,23 @@ public final class IntelChecks {
      * 默认四类 intel 检查；{@code evidenceChainKey} 非空且 ≥16 字节时启用证据链（§8.2）。
      */
     public static List<ServerCheck> defaults(byte[] evidenceChainKey) {
+        return defaults(evidenceChainKey, null);
+    }
+
+    /**
+     * 默认四类 intel 检查，并装配事务发包接缝。
+     *
+     * <p>{@code transactionSender} 为 {@code null} 表示平台发不出事务包：此时延迟补偿与
+     * Disabler 判定整体放弃，避免用编造 id 把正常玩家判成 Disabler（见
+     * {@code IntelRuntime#requestTransaction}）。
+     */
+    public static List<ServerCheck> defaults(byte[] evidenceChainKey, TransactionSender transactionSender) {
         IntelRuntime runtime = new IntelRuntime();
         if (evidenceChainKey != null && evidenceChainKey.length >= MIN_CHAIN_KEY_BYTES) {
             runtime.enableEvidenceChain(evidenceChainKey);
+        }
+        if (transactionSender != null) {
+            runtime.attachTransactionSender(transactionSender);
         }
         return List.of(
                 new PredictionIntelCheck(runtime),

@@ -306,23 +306,26 @@ public final class PbpEncoder {
             return 0;
         }
         byte[] utf8 = s.getBytes(StandardCharsets.UTF_8);
-        return varIntSize(utf8.length) + utf8.length;
+        return checkedAdd(varIntSize(utf8.length), utf8.length);
     }
 
     public static int bytesSize(byte[] b) {
-        return b == null ? 0 : varIntSize(b.length) + b.length;
+        return b == null ? 0 : checkedAdd(varIntSize(b.length), b.length);
     }
 
     public static int presenceSize(int fieldCount) {
-        return (fieldCount + 7) / 8;
+        if (fieldCount < 0) {
+            throw badFormat("presence 字段数不能为负: " + fieldCount);
+        }
+        return checkedAdd(fieldCount, 7) / 8;
     }
 
     public static int optionalStringSize(String s) {
-        return 1 + stringSize(s);
+        return checkedAdd(1, stringSize(s));
     }
 
     public static int optionalBytesSize(byte[] b) {
-        return 1 + bytesSize(b);
+        return checkedAdd(1, bytesSize(b));
     }
 
     public static int messageSize(PbpMessage m) {
@@ -330,7 +333,19 @@ public final class PbpEncoder {
     }
 
     public static int optionalMessageSize(PbpMessage m) {
-        return 1 + messageSize(m);
+        return checkedAdd(1, messageSize(m));
+    }
+
+    /**
+     * 编码长度相加；溢出时按协议错误处理，而不是让 int 回绕成一个小的正数。
+     * 回绕会让 {@link #ensure(int)} 分配过小缓冲区，随后 {@code arraycopy} 越界。
+     */
+    private static int checkedAdd(int left, int right) {
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException e) {
+            throw new PbpException(PbpException.Code.BAD_LENGTH, "编码长度溢出");
+        }
     }
 
     public static int messageListSize(List<? extends PbpMessage> list) {
@@ -405,13 +420,21 @@ public final class PbpEncoder {
     }
 
     private void ensure(int extra) {
-        int need = len + extra;
+        if (extra < 0) {
+            throw badFormat("写入长度为负: " + extra);
+        }
+        int need = checkedAdd(len, extra);
         if (need <= buf.length) {
             return;
         }
         int capacity = buf.length;
         while (capacity < need) {
-            capacity = capacity < 1024 ? capacity * 2 : capacity + (capacity >> 1);
+            // 扩容时同样避免 int 溢出；1.5 倍增长到 Integer.MAX_VALUE 后直接取 need
+            long grown = capacity < 1024 ? (long) capacity * 2 : capacity + (capacity >> 1);
+            capacity = (int) Math.min(Integer.MAX_VALUE, Math.max(grown, need));
+            if (capacity < need) {
+                throw new PbpException(PbpException.Code.BAD_LENGTH, "编码缓冲区过大");
+            }
         }
         buf = Arrays.copyOf(buf, capacity);
     }

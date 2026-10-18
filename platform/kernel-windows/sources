@@ -23,6 +23,7 @@ SOURCES= \
     pacc_regmon.c \
     pacc_ssdt.c \
     pacc_drivenum.c \
+    pacc_introspect.c \
     pacc_kbdfilter.c
 
 # 用户态控制台工具（optional, 需显式开启）

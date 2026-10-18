@@ -37,4 +37,7 @@ public interface DetectionEventRepository extends JpaRepository<DetectionEvent, 
 
     /** BI 数据下钻：按时间倒序取最近检出明细。 */
     List<DetectionEvent> findTop50ByOccurredAtAfterOrderByOccurredAtDesc(Instant start);
+
+    /** P-06 跨端证据链：按 PTEID 取玩家端最近事件。 */
+    List<DetectionEvent> findTop200ByPteidOrderByOccurredAtDesc(String pteid);
 }

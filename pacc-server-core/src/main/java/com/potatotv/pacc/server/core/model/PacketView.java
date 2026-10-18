@@ -24,6 +24,15 @@ public record PacketView(
         }
     }
 
+    /** 读取布尔字段，缺失或不可识别时返回 {@code def}。 */
+    public boolean bool(String key, boolean def) {
+        String raw = fields == null ? null : fields.get(key);
+        if (raw == null) {
+            return def;
+        }
+        return "true".equalsIgnoreCase(raw) || "1".equals(raw);
+    }
+
     /** 读取字符串字段，缺失时返回 null。 */
     public String str(String key) {
         return fields == null ? null : fields.get(key);

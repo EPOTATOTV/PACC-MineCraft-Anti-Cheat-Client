@@ -1,7 +1,10 @@
 package com.potatotv.pacc.server.core.engine;
 
 import com.potatotv.pacc.server.core.ServerPlatformAdapter;
+import com.potatotv.pacc.server.core.check.MoveAware;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.server.core.check.TickAware;
+import com.potatotv.pacc.server.core.check.WorldAware;
 import com.potatotv.pacc.server.core.model.AddonInfo;
 import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.CombatEvent;
@@ -33,6 +36,15 @@ public final class DetectionEngine {
     private static final Logger LOG = System.getLogger(DetectionEngine.class.getName());
     private static final long TEMP_BAN_DURATION_MS = 86_400_000L;
 
+    /**
+     * 玩家可见的告警文案（P-03 检测项不披露）：只说「检测到违规行为」，不带检测项名称、
+     * 置信度或证据细节。具体检测项只进 PTEID 关联的内部证据链与管理员侧。
+     */
+    public static final String PLAYER_ALERT_MESSAGE = "PACC 检测到违规行为，已记录并进入核查。";
+
+    /** 玩家可见的处置原因，同样不披露检测项。 */
+    public static final String PLAYER_PUNISH_REASON = "PACC 检测到违规行为";
+
     private final ServerPluginConfig config;
     private final ServerPlatformAdapter adapter;
     private final PtvServerReporter reporter;
@@ -55,6 +67,14 @@ public final class DetectionEngine {
     public List<DetectionResult> handleMove(PlayerPosition from, PlayerPosition to) {
         if (to == null) {
             return List.of();
+        }
+        // 跨类型观察口（如 X-Ray 的探索距离统计）先拿到移动流，再走正常的 MOVE 分发
+        for (List<ServerCheck> checks : checksByType.values()) {
+            for (ServerCheck check : checks) {
+                if (check instanceof MoveAware moveAware) {
+                    moveAware.onMoveObserved(from, to);
+                }
+            }
         }
         return dispatch(CheckType.MOVE, to.playerId(), () -> {
             List<DetectionResult> raw = new ArrayList<>();
@@ -126,6 +146,24 @@ public final class DetectionEngine {
         return finish(CheckType.CLIENT_BRAND, playerId, raw);
     }
 
+    /**
+     * 直接喂入已解析的 Mod 文件哈希（{@code pacc:mods} 通道由适配层解析时用）。
+     *
+     * <p>与 {@link #handleClientBrand} 的区别：那条路径会再向适配层要一遍品牌与 Mod 列表，
+     * 适合事件驱动平台；平台侧已经拿到哈希清单时走这里，避免重复取数。
+     */
+    public List<DetectionResult> handleModHashes(String playerId, List<String> modHashes) {
+        if (!config.isEnabled(CheckType.CLIENT_BRAND)) {
+            return List.of();
+        }
+        List<String> hashes = modHashes == null ? List.of() : modHashes;
+        List<DetectionResult> raw = new ArrayList<>();
+        for (ServerCheck check : checksFor(CheckType.CLIENT_BRAND)) {
+            raw.addAll(check.onModHashes(playerId, hashes));
+        }
+        return finish(CheckType.CLIENT_BRAND, playerId, raw);
+    }
+
     public List<DetectionResult> handleAddons(String playerId, List<AddonInfo> addons) {
         return dispatch(CheckType.ADDON, playerId, () -> {
             List<DetectionResult> raw = new ArrayList<>();
@@ -134,6 +172,38 @@ public final class DetectionEngine {
             }
             return raw;
         });
+    }
+
+    /**
+     * 方块被破坏（服务端认账）。X-Ray 统计与 nuker 类判定都从这里进，走 INTERACTION 分类。
+     *
+     * @param blockType 平台给的方块材质名；拿不到时传 {@code null}，检查项会自行跳过
+     */
+    public List<DetectionResult> handleBlockBreak(
+            String playerId, String blockType, Position pos, long timestampMs) {
+        return dispatch(CheckType.INTERACTION, playerId, () -> {
+            List<DetectionResult> raw = new ArrayList<>();
+            for (ServerCheck check : checksFor(CheckType.INTERACTION)) {
+                raw.addAll(check.onBlockBreak(playerId, blockType, pos, timestampMs));
+            }
+            return raw;
+        });
+    }
+
+    /**
+     * 方块变更（放置 / 破坏）广播给需要世界数据的检查项。
+     *
+     * <p>不产出检测结果、不受检查项开关影响：世界副本是预测的输入事实，
+     * 关掉某个检查项不应让世界数据停在旧状态。
+     */
+    public void handleBlockChanged(String worldName, int x, int y, int z, String material) {
+        for (List<ServerCheck> checks : checksByType.values()) {
+            for (ServerCheck check : checks) {
+                if (check instanceof WorldAware worldAware) {
+                    worldAware.onBlockChanged(worldName, x, y, z, material);
+                }
+            }
+        }
     }
 
     public List<DetectionResult> handleDataConsistency(
@@ -152,6 +222,22 @@ public final class DetectionEngine {
         for (List<ServerCheck> checks : checksByType.values()) {
             for (ServerCheck check : checks) {
                 check.reset(playerId);
+            }
+        }
+    }
+
+    /**
+     * 服务端刻边界通知。平台适配层每刻调一次，转给需要刻信息的检查项（{@link TickAware}）。
+     *
+     * <p>不产出检测结果：它只是喂数据（实测刻长），所以不需要走 {@code dispatch} 的开关判断——
+     * 关掉某个检查项不该让性能读数停摆。
+     */
+    public void handleTick(long nowMs) {
+        for (List<ServerCheck> checks : checksByType.values()) {
+            for (ServerCheck check : checks) {
+                if (check instanceof TickAware tickAware) {
+                    tickAware.onTick(nowMs);
+                }
             }
         }
     }
@@ -179,11 +265,11 @@ public final class DetectionEngine {
             safeReport(event);
 
             if (result.confidence() >= config.confidenceThreshold()) {
-                adapter.alert(playerId, buildAlert(result));
+                adapter.alert(playerId, PLAYER_ALERT_MESSAGE);
                 PunishmentType punishment = config.maxPunishment();
                 if (punishment != PunishmentType.ALERT) {
                     long duration = punishment == PunishmentType.TEMP_BAN ? TEMP_BAN_DURATION_MS : 0L;
-                    adapter.punish(playerId, punishment, result.cheatType(), duration);
+                    adapter.punish(playerId, punishment, PLAYER_PUNISH_REASON, duration);
                     safeReportPunishment(playerId, punishment, result.cheatType(), duration);
                 }
             }
@@ -226,10 +312,6 @@ public final class DetectionEngine {
         } catch (RuntimeException ex) {
             LOG.log(Logger.Level.WARNING, "上报处置失败，已忽略", ex);
         }
-    }
-
-    private static String buildAlert(DetectionResult result) {
-        return "PACC 检测到 " + result.cheatType() + "（置信度 " + result.confidence() + "）";
     }
 
     private List<ServerCheck> checksFor(CheckType type) {

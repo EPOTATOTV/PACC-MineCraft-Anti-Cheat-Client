@@ -7,6 +7,10 @@ import com.potatotv.pacc.server.core.model.PlayerPosition;
 import com.potatotv.pacc.server.core.model.Position;
 import com.potatotv.pacc.server.core.model.PunishmentType;
 import com.potatotv.pacc.server.core.model.ServerType;
+import com.potatotv.pacc.server.core.packet.BlockProbe;
+import com.potatotv.pacc.server.core.packet.PacketCapability;
+import com.potatotv.pacc.server.core.packet.PacketCapabilityMatrix;
+import com.potatotv.pacc.server.core.packet.TransactionSender;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -36,6 +40,12 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
     private final ModHashTracker modHashTracker;
     private final ServerType serverType;
 
+    /**
+     * 事务发包口，由插件在接入 PacketEvents 后注入。为 null 表示本服务端发不出事务包，
+     * 延迟补偿与 Disabler 判定整体放弃——不能拿编造 id 记账。
+     */
+    private volatile TransactionSender transactionSender;
+
     public BukkitPlatformAdapter(Plugin plugin, PluginConfigLoader config, ClientBrandTracker brandTracker,
                                  ModHashTracker modHashTracker) {
         this.plugin = plugin;
@@ -43,6 +53,26 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
         this.brandTracker = brandTracker;
         this.modHashTracker = modHashTracker;
         this.serverType = detectServerType();
+    }
+
+    /** 装配事务发包口（接入 PacketEvents 后调用）。 */
+    public void setTransactionSender(TransactionSender sender) {
+        this.transactionSender = sender;
+    }
+
+    @Override
+    public TransactionSender transactionSender() {
+        return transactionSender;
+    }
+
+    @Override
+    public BlockProbe blockProbe() {
+        return new BukkitBlockProbe();
+    }
+
+    @Override
+    public PacketCapability packetCapability() {
+        return PacketCapabilityMatrix.forPlatform(serverType, transactionSender != null, true);
     }
 
     /** 存在 Paper 专有配置类即为 PAPER，否则按 SPIGOT 处理。 */
@@ -100,8 +130,9 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
         }
         Location loc = player.getLocation();
         Position pos = new Position(loc.getX(), loc.getY(), loc.getZ());
+        String world = loc.getWorld() == null ? "world" : loc.getWorld().getName();
         return new PlayerPosition(playerId, pos, loc.getYaw(), loc.getPitch(),
-                System.currentTimeMillis(), ((Entity) player).isOnGround(), getGameMode(playerId));
+                System.currentTimeMillis(), ((Entity) player).isOnGround(), getGameMode(playerId), world);
     }
 
     @Override
@@ -157,7 +188,6 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
      * true 表示封禁的同时踢出。玩家不在线时只记日志，不做跨请求的补偿。
      */
     @Override
-    @SuppressWarnings("deprecation") // kickPlayer(String) 已废弃，但 Spigot/Paper 通吃的纯踢出入口只有它。
     public void punish(String playerId, PunishmentType type, String reason, long durationMs) {
         if (type == null || type == PunishmentType.ALERT) {
             return; // 仅告警由 alert() 负责，这里不做事。
@@ -186,7 +216,11 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
         return durationMs > 0 ? new Date(nowMs + durationMs) : null;
     }
 
-    private static Player resolvePlayer(String playerId) {
+    /**
+     * 按玩家 id 解析在线玩家（先按名字精确匹配，再按 UUID）。公开是为了让数据包桥发事务包时
+     * 用同一套 id 语义，避免两处解析规则漂移。
+     */
+    public static Player resolvePlayer(String playerId) {
         if (playerId == null || playerId.isBlank()) {
             return null;
         }

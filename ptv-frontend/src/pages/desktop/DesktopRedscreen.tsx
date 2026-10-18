@@ -11,12 +11,10 @@ import { desktopBridge } from '../../services/desktopBridge'
 interface ViewState {
   level: number
   isTarget: boolean
-  cheatType: string
-  riskScore: string
   pteid: string
 }
 
-const INITIAL: ViewState = { level: 2, isTarget: true, cheatType: 'unknown', riskScore: '0', pteid: '' }
+const INITIAL: ViewState = { level: 2, isTarget: true, pteid: '' }
 
 /** 脱敏算法与服务端 RedscreenService.mask 保持一致。 */
 function maskPteid(pteid: string): string {
@@ -35,8 +33,6 @@ export default function DesktopRedscreen() {
         level: st.redscreen_level ?? 2,
         // 判定失败时保守视为被检测者，避免误给「继续」按钮。
         isTarget: st.redscreen_is_target ?? true,
-        cheatType: st.redscreen_cheat_type ?? 'unknown',
-        riskScore: st.redscreen_risk_score ?? '0',
         pteid: st.pteid ?? '',
       })
     } catch {
@@ -65,11 +61,7 @@ export default function DesktopRedscreen() {
     }
   }, [])
 
-  const headline = state.isTarget
-    ? state.level >= 3
-      ? '严重作弊嫌疑'
-      : '检测到可疑行为'
-    : '反作弊公示'
+  const headline = state.isTarget ? '检测到违规行为' : '反作弊公示'
 
   return (
     <div style={styles.root}>
@@ -93,11 +85,9 @@ export default function DesktopRedscreen() {
         .pacc-rs-btn:disabled { opacity: .6; cursor: default; }
       `}</style>
 
-      <div style={styles.mark}>⚠ PACC 警告</div>
+      <div style={styles.mark}>PACC 警告</div>
       <h1 style={styles.headline}>【{headline}】</h1>
-      <div style={styles.meta}>
-        类型：{state.cheatType} · 风险分：{state.riskScore} · 账号：{maskPteid(state.pteid)}
-      </div>
+      <div style={styles.meta}>账号：{maskPteid(state.pteid)}</div>
 
       {state.isTarget ? (
         <div style={styles.tip}>

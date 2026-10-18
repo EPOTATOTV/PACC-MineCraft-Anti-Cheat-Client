@@ -2,6 +2,7 @@ package com.potatotv.pacc.server.core;
 
 import com.potatotv.pacc.server.core.check.ClientBrandCheck;
 import com.potatotv.pacc.server.core.check.ServerCheck;
+import com.potatotv.pacc.server.core.check.WorldAware;
 import com.potatotv.pacc.server.core.engine.DetectionEngine;
 import com.potatotv.pacc.server.core.model.AddonInfo;
 import com.potatotv.pacc.server.core.model.CheckType;
@@ -122,6 +123,20 @@ class DetectionEngineTest {
     }
 
     @Test
+    void playerFacingAlertDoesNotDiscloseCheckType() {
+        FakeAdapter adapter = new FakeAdapter();
+        FakeReporter reporter = new FakeReporter();
+        DetectionEngine engine = new DetectionEngine(
+                ServerPluginConfig.defaults(), adapter, List.of(moveViolationCheck(90)), reporter);
+
+        engine.handleMove(player("p"), player("p"));
+
+        assertEquals(List.of(DetectionEngine.PLAYER_ALERT_MESSAGE), adapter.alerts);
+        assertTrue(adapter.alerts.get(0).indexOf("SPEED") < 0, "玩家告警不得包含检测项名称");
+        assertTrue(adapter.alerts.get(0).indexOf("90") < 0, "玩家告警不得包含置信度");
+    }
+
+    @Test
     void reporterExceptionDoesNotPropagate() {
         FakeAdapter adapter = new FakeAdapter();
         FakeReporter reporter = new FakeReporter();
@@ -179,6 +194,34 @@ class DetectionEngineTest {
 
         assertDoesNotThrow(() -> engine.handleClientBrand("p", "vanilla"));
         assertTrue(reporter.events.isEmpty());
+    }
+
+    @Test
+    void blockChangesReachWorldAwareChecks() {
+        FakeAdapter adapter = new FakeAdapter();
+        WorldSink sink = new WorldSink();
+        DetectionEngine engine = new DetectionEngine(
+                ServerPluginConfig.defaults(), adapter, List.of(sink), new FakeReporter());
+
+        engine.handleBlockChanged("world_nether", 3, 64, 3, "SULFUR_BLOCK");
+
+        assertEquals(1, sink.changes.size());
+        assertEquals("world_nether|3|64|3|SULFUR_BLOCK", sink.changes.get(0));
+    }
+
+    private static final class WorldSink implements ServerCheck, WorldAware {
+
+        private final List<String> changes = new ArrayList<>();
+
+        @Override
+        public CheckType type() {
+            return CheckType.MOVE;
+        }
+
+        @Override
+        public void onBlockChanged(String worldName, int x, int y, int z, String material) {
+            changes.add(worldName + "|" + x + "|" + y + "|" + z + "|" + material);
+        }
     }
 
     private static ServerCheck moveViolationCheck(int confidence) {

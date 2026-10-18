@@ -9,15 +9,18 @@ import com.potatotv.pacc.detection.server.behavior.StatOutlier;
 import com.potatotv.pacc.detection.server.behavior.PatternCluster;
 import com.potatotv.pacc.detection.server.behavior.LstmWeights;
 import com.potatotv.pacc.detection.server.behavior.MLDetector;
+import com.potatotv.pacc.detection.server.behavior.WeightProvenance;
 import com.potatotv.pacc.detection.server.combat.AttackPattern;
 import com.potatotv.pacc.detection.server.combat.HitboxValidator;
 import com.potatotv.pacc.detection.server.combat.KnockbackPredictor;
 import com.potatotv.pacc.detection.server.combat.ReachCheck;
 import com.potatotv.pacc.detection.server.combat.RotationAnalyzer;
+import com.potatotv.pacc.detection.server.packet.BacktrackAnalyzer;
 import com.potatotv.pacc.detection.server.packet.BrandValidator;
 import com.potatotv.pacc.detection.server.packet.PacketOrder;
 import com.potatotv.pacc.detection.server.packet.PacketTiming;
 import com.potatotv.pacc.detection.server.packet.TransactionSync;
+import com.potatotv.pacc.detection.server.perf.PerformanceCalibrator;
 import com.potatotv.pacc.detection.server.prediction.LatencyCompensator;
 import com.potatotv.pacc.detection.server.prediction.PredictionEngine;
 import com.potatotv.pacc.detection.server.prediction.SetbackController;
@@ -25,6 +28,7 @@ import com.potatotv.pacc.detection.server.prediction.WorldReplica;
 import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.DetectionResult;
 import com.potatotv.pacc.server.core.model.Position;
+import com.potatotv.pacc.server.core.packet.TransactionSender;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -50,16 +54,28 @@ public final class IntelRuntime {
     /** 证据窗口容量上限（防刷屏）。 */
     static final int WINDOW_MAX = 64;
 
-    /** 每玩家压缩世界副本（世界变更由平台适配层喂入，缺省为空世界=无碰撞）。 */
+    /** 每世界一份压缩世界副本（按世界名共享，玩家通过 playerWorlds 绑定）。 */
     private final ConcurrentHashMap<String, WorldReplica> worlds = new ConcurrentHashMap<>();
+
+    /** 玩家 → 世界名绑定；没有绑定时预测引擎按「无世界数据」处理。 */
+    private final ConcurrentHashMap<String, String> playerWorlds = new ConcurrentHashMap<>();
 
     private final FusionEngine fusion = new FusionEngine();
     private final CorrelationEngine correlation = new CorrelationEngine();
-    private final PredictionEngine predictionEngine = new PredictionEngine(worlds);
+    private final PredictionEngine predictionEngine;
     private final StatOutlier statOutlier = new StatOutlier();
     private final PatternCluster patternCluster = new PatternCluster();
-    /** ML 管线：随机权重仅保证可运行，0.95 置信门会拦下随机权重输出；生产用云端训练权重替换。 */
-    private final MLDetector mlDetector = new MLDetector(3, 16, LstmWeights.random(3, 16, 20260101L));
+    /** 内置启发式权重的固定种子（无训练数据时的降级默认值）。 */
+    private static final long ML_WEIGHT_SEED = 20260101L;
+
+    /**
+     * ML 管线。当前用的是固定种子的随机初始化权重，来源显式标注为
+     * {@link WeightProvenance.Source#HEURISTIC_DEFAULT}，{@code classify} 会直接拒绝出证——
+     * 随机权重没有判别力，不能当模型结论（§5.4 U-07）。拿到真实标注训练权重后，用
+     * {@code WeightProvenance.trained(...)} 替换即可，其余代码不用动。
+     */
+    private final MLDetector mlDetector = new MLDetector(3, 16,
+            LstmWeights.random(3, 16, ML_WEIGHT_SEED), WeightProvenance.heuristicDefault(ML_WEIGHT_SEED));
     private final ReachCheck reachCheck = new ReachCheck();
     private final AttackPattern attackPattern = new AttackPattern();
     private final RotationAnalyzer rotationAnalyzer = new RotationAnalyzer();
@@ -67,21 +83,58 @@ public final class IntelRuntime {
     private final HitboxValidator hitboxValidator = new HitboxValidator();
     private final PacketTiming packetTiming = new PacketTiming();
     private final PacketOrder packetOrder = new PacketOrder();
+    private final BacktrackAnalyzer backtrackAnalyzer = new BacktrackAnalyzer();
     private final TransactionSync transactionSync = new TransactionSync();
     private final BrandValidator brandValidator = new BrandValidator();
     private final LatencyCompensator latencyCompensator = new LatencyCompensator();
     private final SetbackController setbackController = new SetbackController();
+    /** 实测刻长 / TPS 来源，包时序检测按它做阈值归一化（§5.3 U-05）。 */
+    private final PerformanceCalibrator calibrator = new PerformanceCalibrator();
 
     /** 每玩家上一个移动起始位置（速度估算用）。 */
     private final ConcurrentHashMap<String, Position> lastPositions = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, Deque<Evidence>> windows = new ConcurrentHashMap<>();
 
+    public IntelRuntime() {
+        this.predictionEngine = new PredictionEngine(this::worldOf);
+    }
+
     /**
      * 证据链（技术文档 §8.2 防篡改）：每次融合告警把证据载荷追加进 HMAC 链式哈希。
      * 未配置密钥时为 null，链式哈希关闭（默认行为不变）。
      */
     private volatile EvidenceChain evidenceChain;
+
+    /**
+     * 事务发包接缝。为 null 表示平台发不出事务包，此时不做延迟估计也不判 Disabler——
+     * 拿编造的 id 记账会让 ack 率恒为 0，把所有正常玩家判成 Disabler。
+     */
+    private volatile TransactionSender transactionSender;
+
+    /** 装配事务发包接缝（由适配层在启动时注入；不注入即视为平台不支持事务）。 */
+    public void attachTransactionSender(TransactionSender sender) {
+        this.transactionSender = sender;
+    }
+
+    /**
+     * 发一个事务并登记真实 id。
+     *
+     * @return 是否真的发出并登记成功；{@code false} 时调用方不应做任何延迟/ack 判定
+     */
+    public boolean requestTransaction(String playerId) {
+        TransactionSender sender = transactionSender;
+        if (sender == null) {
+            return false;
+        }
+        int id = sender.send(playerId);
+        return id >= 0 && latencyCompensator.registerSent(id);
+    }
+
+    /** 当前是否具备真实事务发包能力。 */
+    public boolean transactionsSupported() {
+        return transactionSender != null;
+    }
 
     /** 启用证据链（密钥 ≥16 字节；空白则忽略）。 */
     public void enableEvidenceChain(byte[] hmacKey) {
@@ -167,12 +220,22 @@ public final class IntelRuntime {
         return latencyCompensator;
     }
 
+    /** 性能自适应校准器（§5.3 U-05）。 */
+    public PerformanceCalibrator calibrator() {
+        return calibrator;
+    }
+
     public SetbackController setbackController() {
         return setbackController;
     }
 
     public StatOutlier statOutlier() {
         return statOutlier;
+    }
+
+    /** P-05：Backtrack / FakeLag 包滞留与时序重放检测。 */
+    public BacktrackAnalyzer backtrackAnalyzer() {
+        return backtrackAnalyzer;
     }
 
     public PatternCluster patternCluster() {
@@ -183,9 +246,41 @@ public final class IntelRuntime {
         return mlDetector;
     }
 
-    /** 玩家世界副本（不存在则创建空世界）。 */
+    /** 绑定玩家所在世界；平台每次移动事件都会刷新。 */
+    public void bindPlayerWorld(String playerId, String worldName) {
+        if (playerId == null || worldName == null || worldName.isBlank()) {
+            return;
+        }
+        playerWorlds.put(playerId, worldName);
+    }
+
+    /** 按世界名取共享副本（不存在则创建空世界）。 */
+    public WorldReplica worldByName(String worldName) {
+        return worlds.computeIfAbsent(worldName, unused -> WorldReplica.empty());
+    }
+
+    /**
+     * 玩家当前世界副本；没有绑定或世界尚未创建时返回 {@code null}。
+     *
+     * <p>预测检查必须用这个而不是创建空世界：空世界没有碰撞信息，
+     * 会让 {@code PredictionEngine} 误以为「有世界数据」而切到严格候选匹配。
+     */
+    public WorldReplica existingWorld(String playerId) {
+        String worldName = playerWorlds.get(playerId);
+        return worldName == null ? null : worlds.get(worldName);
+    }
+
+    /** 兼容入口：按玩家取世界副本（未绑定时返回 null，不再隐式创建）。 */
     public WorldReplica worldOf(String playerId) {
-        return worlds.computeIfAbsent(playerId, unused -> WorldReplica.empty());
+        return existingWorld(playerId);
+    }
+
+    /** 平台方块变更入口：写入共享世界副本。 */
+    public void applyBlockChange(String worldName, int x, int y, int z, String material) {
+        if (worldName == null || worldName.isBlank()) {
+            return;
+        }
+        worldByName(worldName).applyBlockChange(x, y, z, material);
     }
 
     /** 记录一条证据到玩家窗口。 */
@@ -258,7 +353,7 @@ public final class IntelRuntime {
 
     /** 玩家下线：清空所有共享状态。 */
     public void clear(String playerId) {
-        worlds.remove(playerId);
+        playerWorlds.remove(playerId);
         lastPositions.remove(playerId);
         windows.remove(playerId);
         statOutlier.reset(playerId);
@@ -269,6 +364,7 @@ public final class IntelRuntime {
         reachCheck.reset(playerId);
         packetTiming.reset(playerId);
         packetOrder.reset(playerId);
+        backtrackAnalyzer.reset(playerId);
     }
 
     private static void pruneLocked(Deque<Evidence> window) {

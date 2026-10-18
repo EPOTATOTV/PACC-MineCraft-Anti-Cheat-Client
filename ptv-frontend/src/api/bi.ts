@@ -1,5 +1,6 @@
 import type {
   AdminPlayerDetail,
+  AlertChannelStatus,
   AlertEvent,
   AlertNoiseGroupPage,
   AlertNoiseStats,
@@ -84,6 +85,8 @@ export const biApi = {
         body: JSON.stringify({ note: note ?? '' }),
       }),
     stats: () => request<AlertStats>('/alerts/stats'),
+    /** P-07：告警 Webhook 渠道状态（Discord / 飞书）。 */
+    channels: () => request<AlertChannelStatus>('/alerts/channels'),
 
     // ---- §4.3.2 智能告警降噪：降噪率统计 / 聚合组 / 误报抑制规则 ----
     noiseStats: (windowHours = 24) =>

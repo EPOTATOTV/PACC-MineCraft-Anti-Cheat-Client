@@ -33,6 +33,9 @@ public final class ClientDetectionEngine {
     /** 红屏默认持续时长（毫秒）。 */
     private static final long REDSCREEN_DURATION_MS = 30_000L;
 
+    /** 玩家可见文案：不披露具体检测项（P-03）。 */
+    private static final String PLAYER_ALERT_MESSAGE = "检测到违规行为，已记录并进入核查。";
+
     private final ClientIdentity identity;
     private final MoveDetector moveDetector;
     private final CombatDetector combatDetector;
@@ -98,7 +101,7 @@ public final class ClientDetectionEngine {
             violations.add(result);
             safeReport(result);
             if (result.confidence() >= REDSCREEN_CONFIDENCE_THRESHOLD) {
-                triggerRedScreen(result);
+                triggerRedScreen();
             }
         }
         return violations;
@@ -119,13 +122,13 @@ public final class ClientDetectionEngine {
         }
     }
 
-    private void triggerRedScreen(ClientDetectionResult result) {
+    private void triggerRedScreen() {
         if (redScreen == null) {
             return;
         }
         RedScreenAlert alert = new RedScreenAlert(
                 UUID.randomUUID().toString(),
-                result.cheatType() + "：" + result.detail(),
+                PLAYER_ALERT_MESSAGE,
                 REDSCREEN_DURATION_MS);
         try {
             redScreen.show(alert);

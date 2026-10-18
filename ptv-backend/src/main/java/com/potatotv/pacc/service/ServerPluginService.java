@@ -10,6 +10,8 @@ import com.potatotv.pacc.repository.RedscreenAlertRepository;
 import com.potatotv.pacc.repository.ServerPluginEventRepository;
 import com.potatotv.pacc.repository.ServerPluginPunishmentRepository;
 import com.potatotv.pacc.repository.ServerPluginRegistrationRepository;
+import com.potatotv.pacc.service.alert.AdminAlertWebhookService;
+import com.potatotv.pacc.service.alert.AlertCategory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +54,7 @@ public class ServerPluginService {
     private final AccountRepository accountRepository;
     private final RedscreenAlertRepository alertRepository;
     private final RedscreenService redscreenService;
+    private final AdminAlertWebhookService adminAlertWebhook;
 
     @Value("${pacc.server-plugin.config-version:1}")
     private String configVersion;
@@ -138,6 +141,20 @@ public class ServerPluginService {
                 }
             } catch (Exception e) {
                 log.warn("服务端事件联动红屏失败 serverId={} err={}", req.serverId(), e.getMessage());
+            }
+        }
+        // P-07：中置信事件（可疑但未到红屏阈值）走透明度告警，让管理员知道系统在观察，
+        // 但不要求立即处置。高置信事件由 RedscreenService 发安全告警，避免重复推送。
+        if (!isBlank(req.pteid()) && !isBlank(req.cheatType())
+                && event.getConfidence() >= suspiciousLow
+                && event.getConfidence() < redscreenThreshold) {
+            try {
+                adminAlertWebhook.dispatch(AlertCategory.TRANSPARENCY,
+                        "PACC 中置信事件",
+                        "server=" + req.serverId() + " pteid=" + req.pteid()
+                                + " type=" + req.cheatType() + " conf=" + event.getConfidence());
+            } catch (Exception e) {
+                log.warn("透明度告警推送失败 serverId={} err={}", req.serverId(), e.getMessage());
             }
         }
         eventRepository.save(event);

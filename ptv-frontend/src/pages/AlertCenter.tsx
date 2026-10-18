@@ -3,7 +3,7 @@ import { Alert, Button, Card, Col, Input, Modal, Row, Select, Space, Switch, Tab
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { api } from '../api/client'
-import type { AlertEvent, AlertRule, AlertStats } from '../types'
+import type { AlertChannelStatus, AlertEvent, AlertRule, AlertStats } from '../types'
 import MetricCard from '../components/MetricCard'
 
 const { Title, Text } = Typography
@@ -28,6 +28,7 @@ export default function AlertCenter() {
   const [rules, setRules] = useState<AlertRule[]>([])
   const [events, setEvents] = useState<AlertEvent[]>([])
   const [stats, setStats] = useState<AlertStats | null>(null)
+  const [channels, setChannels] = useState<AlertChannelStatus | null>(null)
   const [eventStatus, setEventStatus] = useState<string>()
   const [err, setErr] = useState('')
   const [ruleOpen, setRuleOpen] = useState(false)
@@ -44,6 +45,7 @@ export default function AlertCenter() {
       setRules(rs)
       setEvents(evs)
       setStats(st)
+      api.alerts.channels().then(setChannels).catch(() => setChannels(null))
       setErr('')
     } catch (e) {
       setErr((e as Error).message)
@@ -178,6 +180,27 @@ export default function AlertCenter() {
         <Col xs={24} sm={12} md={6}><MetricCard label="已确认" value={list.filter((a) => a.status === 'acknowledged').length} accent="var(--kpi-amber)" /></Col>
         <Col xs={24} sm={12} md={6}><MetricCard label="已解决" value={list.filter((a) => a.status === 'resolved').length} accent="var(--kpi-green)" /></Col>
       </Row>
+
+      <Card title="通知渠道" size="small" style={{ marginBottom: 14 }}>
+        <Space wrap size={10}>
+          <Tag color={channels?.enabled ? 'green' : 'default'}>
+            {channels?.enabled ? '总开关已开启' : '总开关已关闭'}
+          </Tag>
+          <Tag color={channels?.feishuConfigured ? 'green' : 'default'}>
+            飞书 {channels?.feishuConfigured ? '已配置' : '未配置'}
+          </Tag>
+          <Tag color={channels?.discordConfigured ? 'green' : 'default'}>
+            Discord {channels?.discordConfigured ? '已配置' : '未配置'}
+          </Tag>
+          <Tag color={channels?.transparencyFeishuConfigured ? 'green' : 'default'}>
+            透明度独立飞书
+          </Tag>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            高置信违规走安全告警；P2/P3 聚合告警走透明度告警。地址通过
+            PACC_ALERT_FEISHU_WEBHOOK / PACC_ALERT_DISCORD_WEBHOOK 注入，面板不回显 URL。
+          </Text>
+        </Space>
+      </Card>
 
       <Card
         title="告警列表"

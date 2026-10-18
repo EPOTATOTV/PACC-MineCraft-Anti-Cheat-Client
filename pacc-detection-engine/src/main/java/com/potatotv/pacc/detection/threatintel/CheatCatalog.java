@@ -17,9 +17,40 @@ import java.util.Map;
 public final class CheatCatalog {
 
     private final List<CheatFingerprint> fingerprints;
+    private final String packVersion;
+    private final String packChecksum;
 
     public CheatCatalog(SignatureLibrary library) {
+        this(library, null);
+    }
+
+    /**
+     * 带指纹包元数据的目录。{@code pack} 为 {@code null} 表示内置指纹，没有版本概念。
+     */
+    public CheatCatalog(SignatureLibrary library, SignaturePack pack) {
         this.fingerprints = library.fingerprints();
+        this.packVersion = pack == null ? "" : pack.version();
+        this.packChecksum = pack == null ? "" : pack.checksum();
+    }
+
+    /** 指纹包版本；内置指纹返回空串。 */
+    public String packVersion() {
+        return packVersion;
+    }
+
+    /** 指纹包校验和；内置指纹返回空串。 */
+    public String packChecksum() {
+        return packChecksum;
+    }
+
+    /** 全部指纹 id（按写入顺序）。 */
+    public List<String> fingerprintIds() {
+        return fingerprints.stream().map(CheatFingerprint::id).toList();
+    }
+
+    /** 是否存在重复 id——指纹包入库前的硬性校验项。 */
+    public boolean hasDuplicateIds() {
+        return fingerprintIds().stream().distinct().count() != fingerprints.size();
     }
 
     /** 按类别筛选。 */

@@ -269,6 +269,46 @@ PaccDispatchDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
         break;
     }
 
+    // ---- IDT 完整性状态 ----
+    case IOCTL_PACC_QUERY_IDT_STATUS: {
+        if (Irp->AssociatedIrp.SystemBuffer == NULL ||
+            irpSp->Parameters.DeviceIoControl.OutputBufferLength < sizeof(PACC_IDT_STATUS)) {
+            status = STATUS_BUFFER_TOO_SMALL;
+            break;
+        }
+        PACC_IDT_STATUS idt;
+        status = PaccIdtQuery(&idt);
+        if (NT_SUCCESS(status)) {
+            RtlCopyMemory(Irp->AssociatedIrp.SystemBuffer, &idt, sizeof(idt));
+            info = sizeof(idt);
+        }
+        break;
+    }
+
+    // ---- 内核回调注册枚举（报告体较大，走非分页池而非内核栈）----
+    case IOCTL_PACC_QUERY_CALLBACK_STATUS: {
+        ULONG outLen = irpSp->Parameters.DeviceIoControl.OutputBufferLength;
+        PVOID sysBuf = Irp->AssociatedIrp.SystemBuffer;
+        if (sysBuf == NULL || outLen < sizeof(PACC_CALLBACK_REPORT)) {
+            status = STATUS_BUFFER_TOO_SMALL;
+            break;
+        }
+
+        PPACC_CALLBACK_REPORT report = (PPACC_CALLBACK_REPORT)ExAllocatePool2(
+            POOL_FLAG_NON_PAGED, sizeof(PACC_CALLBACK_REPORT), 'ccap');
+        if (report == NULL) {
+            status = STATUS_INSUFFICIENT_RESOURCES;
+            break;
+        }
+        status = PaccCallbackQuery(report);
+        if (NT_SUCCESS(status)) {
+            RtlCopyMemory(sysBuf, report, sizeof(*report));
+            info = sizeof(*report);
+        }
+        ExFreePoolWithTag(report, 'ccap');
+        break;
+    }
+
     default:
         status = STATUS_INVALID_DEVICE_REQUEST;
         break;

@@ -62,6 +62,8 @@ public final class MoveListener implements Listener {
     private static PlayerPosition toPosition(
             String playerId, Location loc, boolean onGround, GameMode mode, long timestampMs) {
         Position pos = new Position(loc.getX(), loc.getY(), loc.getZ());
-        return new PlayerPosition(playerId, pos, loc.getYaw(), loc.getPitch(), timestampMs, onGround, mode);
+        String world = loc.getWorld() == null ? "world" : loc.getWorld().getName();
+        return new PlayerPosition(playerId, pos, loc.getYaw(), loc.getPitch(), timestampMs, onGround, mode,
+                world);
     }
 }

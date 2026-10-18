@@ -39,8 +39,27 @@ public final class LatencyCompensator {
     private final Deque<Long> recentLatencies = new ArrayDeque<>(LATENCY_WINDOW);
 
     /**
+     * 登记一个**已经真的发到线上**的事务 id（由平台适配层发包后回传）。与
+     * {@link #sendTransaction()} 的区别在于：这里的 id 是客户端会原样回 ack 的真实 id，
+     * 所以它才能参与 ack 率与延迟估计。
+     *
+     * @return 是否登记成功（已存在同 id 时返回 false）
+     */
+    public boolean registerSent(int transactionId) {
+        boolean added = pending.putIfAbsent(transactionId, System.currentTimeMillis()) == null;
+        if (added) {
+            sent.incrementAndGet();
+        }
+        return added;
+    }
+
+    /**
      * 发出一个事务，返回自增 id。悬挂事务超过 {@value #MAX_PENDING} 个时整体清空
      * （视为全部丢失，旧 id 的迟到 ack 会被忽略）。
+     *
+     * <p>只用于不需要真实回包的场景（单元测试、离线回放）。线上路径请用
+     * {@link #registerSent(int)} 登记平台实际发出的 id，否则客户端永远不会 ack，
+     * ack 率恒为 0。
      */
     public int sendTransaction() {
         int id = nextId.incrementAndGet();

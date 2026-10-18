@@ -46,6 +46,15 @@ import java.util.regex.PatternSyntaxException;
  */
 public final class PrlStdlib {
 
+    /** 规则侧正则模式长度上限，防止超长模式拖慢编译。 */
+    private static final int MAX_REGEX_PATTERN_CHARS = 512;
+
+    /** 单次正则输入长度上限。 */
+    private static final int MAX_REGEX_INPUT_CHARS = 65_536;
+
+    /** 单次匹配允许的字符读取次数上限（防灾难性回溯）。 */
+    private static final int MAX_REGEX_CHAR_READS = 2_000_000;
+
     /** §2.11.1 L2 的集合元素上限，滑动窗口结果超过它就拒绝。 */
     private static final int COLLECTION_LIMIT = 10_000;
 
@@ -657,13 +666,13 @@ public final class PrlStdlib {
     // ------------------------------------------------------------------ §2.4.4 字符串
 
     private Object regexMatch(Object[] args) {
-        Matcher matcher = compile(PrlValues.asString(args[1])).matcher(PrlValues.asString(args[0]));
+        Matcher matcher = compile(PrlValues.asString(args[1])).matcher(guard(PrlValues.asString(args[0])));
         return matcher.find();
     }
 
     /** 有捕获组取第 1 组，无捕获组取整个匹配。 */
     private Object regexExtract(Object[] args) {
-        Matcher matcher = compile(PrlValues.asString(args[1])).matcher(PrlValues.asString(args[0]));
+        Matcher matcher = compile(PrlValues.asString(args[1])).matcher(guard(PrlValues.asString(args[0])));
         List<Object> result = new ArrayList<>();
         while (matcher.find()) {
             result.add(matcher.groupCount() >= 1 ? matcher.group(1) : matcher.group());
@@ -672,10 +681,61 @@ public final class PrlStdlib {
     }
 
     private Pattern compile(String pattern) {
+        if (pattern.length() > MAX_REGEX_PATTERN_CHARS) {
+            throw new PrlExecutionException("正则表达式过长：" + pattern.length());
+        }
         try {
+            // codeql[java/regex-injection] 规则作者可控，但输入长度与匹配步数已被 guard 限定，
+            // 且模式长度有上限；这里保留正则能力是规则语言的设计要求。
             return Pattern.compile(pattern);
         } catch (PatternSyntaxException e) {
             throw new PrlExecutionException("非法正则表达式：" + pattern, e);
+        }
+    }
+
+    /**
+     * 用有限读预算包住正则输入，避免灾难性回溯把检测线程拖死。
+     * 正常规则远达不到这个预算；超过即视为恶意模式并中止匹配。
+     */
+    private static CharSequence guard(String text) {
+        if (text.length() > MAX_REGEX_INPUT_CHARS) {
+            throw new PrlExecutionException("正则输入过长：" + text.length());
+        }
+        return new BoundedCharSequence(text, MAX_REGEX_CHAR_READS);
+    }
+
+    /** 读预算用尽后抛异常，而不是无限回溯。 */
+    private static final class BoundedCharSequence implements CharSequence {
+
+        private final CharSequence delegate;
+        private int remaining;
+
+        private BoundedCharSequence(CharSequence delegate, int budget) {
+            this.delegate = delegate;
+            this.remaining = budget;
+        }
+
+        @Override
+        public int length() {
+            return delegate.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (--remaining < 0) {
+                throw new PrlExecutionException("正则匹配超出计算预算");
+            }
+            return delegate.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new BoundedCharSequence(delegate.subSequence(start, end), remaining);
+        }
+
+        @Override
+        public String toString() {
+            return delegate.toString();
         }
     }
 

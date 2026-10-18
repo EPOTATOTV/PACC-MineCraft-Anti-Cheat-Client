@@ -37,6 +37,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { key: '/redscreen', to: '/redscreen', label: '红屏管理', i18nKey: 'nav.redscreen' },
       { key: '/inspect', to: '/inspect', label: '查端控制台', i18nKey: 'nav.inspect' },
+      { key: '/evidence', to: '/evidence', label: '跨端证据链', i18nKey: 'nav.evidenceChain' },
+      { key: '/alerts', to: '/alerts', label: '告警中心', i18nKey: 'nav.alerts' },
       { key: '/records', to: '/records', label: '作弊记录', i18nKey: 'nav.records' },
     ],
   },
@@ -160,6 +162,8 @@ export const routeMeta: Record<string, { titleKey: string; groupKey: string }> =
   '/': { titleKey: 'nav.dashboard', groupKey: 'nav.group.overview' },
   '/redscreen': { titleKey: 'nav.redscreen', groupKey: 'nav.group.detect' },
   '/inspect': { titleKey: 'nav.inspect', groupKey: 'nav.group.detect' },
+  '/evidence': { titleKey: 'nav.evidenceChain', groupKey: 'nav.group.detect' },
+  '/alerts': { titleKey: 'nav.alerts', groupKey: 'nav.group.detect' },
   '/detection41': { titleKey: 'nav.detection41', groupKey: 'nav.group.docs' },
   '/countermeasure': { titleKey: 'nav.countermeasure', groupKey: 'nav.group.docs' },
   '/v46': { titleKey: 'nav.v46', groupKey: 'nav.group.docs' },

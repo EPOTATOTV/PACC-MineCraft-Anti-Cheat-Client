@@ -61,7 +61,15 @@ public final class PacketTiming {
 
     /** 综合检查：Timer 优先，未触发再看 Blink（两层各自独立出证，见 checkTimer/checkBlink）。 */
     public Optional<Evidence> check(String playerId, long serverTickMs) {
-        Optional<Evidence> timer = checkTimer(playerId, serverTickMs);
+        return check(playerId, serverTickMs, 1.0);
+    }
+
+    /**
+     * 综合检查，{@code thresholdScale} 放宽 Timer 阈值（≥1.0）。高延迟 / 低 TPS 下包成批到达，
+     * 平均间隔会被压小，用放宽系数把门槛抬上去，避免整片误报（§5.3 U-05）。
+     */
+    public Optional<Evidence> check(String playerId, long serverTickMs, double thresholdScale) {
+        Optional<Evidence> timer = checkTimer(playerId, serverTickMs, thresholdScale);
         if (timer.isPresent()) {
             return timer;
         }
@@ -70,6 +78,16 @@ public final class PacketTiming {
 
     /** Timer 检测：发包速率超过服务器 tick 速率 0.5% 即可疑。 */
     public Optional<Evidence> checkTimer(String playerId, long serverTickMs) {
+        return checkTimer(playerId, serverTickMs, 1.0);
+    }
+
+    /**
+     * Timer 检测，阈值按 {@code thresholdScale} 放宽。
+     *
+     * <p>注意 {@code serverTickMs} 仍是**客户端标称**的 50ms，不是实测服务端刻长：客户端发包
+     * 频率不随服务端 TPS 变化，拿实测刻长做分母会把卡服时的正常玩家全判成 Timer。
+     */
+    public Optional<Evidence> checkTimer(String playerId, long serverTickMs, double thresholdScale) {
         List<Long> intervals = positiveIntervals(playerId);
         if (intervals.size() < MIN_TIMER_SAMPLES) {
             return Optional.empty();
@@ -82,14 +100,15 @@ public final class PacketTiming {
         if (avg <= 0) {
             return Optional.empty();
         }
+        double threshold = TIMER_THRESHOLD * Math.max(1.0, thresholdScale);
         double rate = serverTickMs / avg;
-        if (rate <= TIMER_THRESHOLD) {
+        if (rate <= threshold) {
             return Optional.empty();
         }
-        double confidence = Math.min(1.0, 0.5 + rate - TIMER_THRESHOLD);
+        double confidence = Math.min(1.0, 0.5 + rate - threshold);
         String detail = String.format(Locale.ROOT,
-                "Timer rate=%.4f 阈值=%.3f 平均间隔=%.2fms tick=%dms 样本=%d",
-                rate, TIMER_THRESHOLD, avg, serverTickMs, intervals.size());
+                "Timer rate=%.4f 阈值=%.4f 平均间隔=%.2fms tick=%dms 样本=%d",
+                rate, threshold, avg, serverTickMs, intervals.size());
         return Optional.of(Evidence.of(DETECTOR_ID, Layer.NETWORK, confidence, detail));
     }
 

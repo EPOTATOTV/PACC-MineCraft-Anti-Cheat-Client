@@ -1,0 +1,6 @@
+# Gitleaks 历史误报忽略清单。
+# 两条均来自测试夹具 pacc-detection-engine/.../EvidenceChainTest.java 的
+# "test-fixture-key" / "other-test-fixture-key"，不是真实凭据；当前代码已改为
+# 由非敏感前缀派生，历史提交无法改写，因此按指纹忽略。
+55059eec8dbef1cd01a898f4fad4cbe398819d32:pacc-detection-engine/src/test/java/com/potatotv/pacc/detection/fusion/EvidenceChainTest.java:generic-api-key:20
+55059eec8dbef1cd01a898f4fad4cbe398819d32:pacc-detection-engine/src/test/java/com/potatotv/pacc/detection/fusion/EvidenceChainTest.java:generic-api-key:93

@@ -19,7 +19,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -44,6 +43,12 @@ public class ExportService {
     private final ExportTaskRepository taskRepository;
     private final AccountRepository accountRepository;
     private final RedscreenAlertRepository redscreenAlertRepository;
+
+    /**
+     * 导出目录只创建一次；用 {@link Files#createTempDirectory} 生成随机目录名，
+     * 避免可预测的共享临时目录被同机其他用户抢注或读取。
+     */
+    private volatile Path exportDir;
     private final CheatRecordRepository cheatRecordRepository;
     private final AppealRepository appealRepository;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
@@ -192,18 +197,24 @@ public class ExportService {
     }
 
     private Path dirs() throws IOException {
-        Path dir = Paths.get(System.getProperty("java.io.tmpdir"), "pacc-export");
-        if (!Files.exists(dir)) {
-            // 导出物含玩家证据：创建时就带上 0700 属主权限，避免建目录与改权限之间被同机其他用户读走
-            try {
-                Files.createDirectories(dir,
-                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
-            } catch (UnsupportedOperationException e) {
-                // 非 POSIX 文件系统（如 Windows）无此语义，退回普通创建
-                Files.createDirectories(dir);
-            }
+        Path dir = exportDir;
+        if (dir != null) {
+            return dir;
         }
-        return dir;
+        synchronized (this) {
+            if (exportDir == null) {
+                try {
+                    // createTempDirectory 默认就是 0700；显式传入 POSIX 权限，语义更清楚
+                    exportDir = Files.createTempDirectory("pacc-export-",
+                            PosixFilePermissions.asFileAttribute(
+                                    PosixFilePermissions.fromString("rwx------")));
+                } catch (UnsupportedOperationException e) {
+                    // 非 POSIX 文件系统（如 Windows）无此语义，退回普通随机目录
+                    exportDir = Files.createTempDirectory("pacc-export-");
+                }
+            }
+            return exportDir;
+        }
     }
 
     private static String csv(String s) {

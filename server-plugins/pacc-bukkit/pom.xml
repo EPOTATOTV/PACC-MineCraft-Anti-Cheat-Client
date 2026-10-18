@@ -18,6 +18,8 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- PacketEvents 2.13.0 起已支持 Minecraft 26.1 / 26.2；2.14.0 在其之上。
+             这里只用于编译期接口，运行期由服务端上的 PacketEvents 插件提供，见 plugin.yml 的 softdepend。 -->
         <packetevents.version>2.14.0</packetevents.version>
     </properties>
 

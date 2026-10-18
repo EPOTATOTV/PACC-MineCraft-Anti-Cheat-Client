@@ -298,7 +298,7 @@ VOID     PaccSsdtUninitialize(void);
 NTSTATUS PaccSsdtQuery(PPACC_SSDT_STATUS out);
 
 // ---- 已加载驱动枚举 + 签名核验（pacc_drivenum.c）----
-NTSTATUS PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT report, ULONG outLen);
+NTSTATUS PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT reportOut, ULONG outLen);
 
 // ---- 内核自省：IDT 完整性与内核回调枚举（pacc_introspect.c）----
 NTSTATUS PaccIdtQuery(PPACC_IDT_STATUS out);

@@ -132,6 +132,25 @@ class FusionEngineTest {
                 "外部改动快照不得影响引擎内部权重");
     }
 
+    @Test
+    void mlDisguiseEvidenceAddsBoundedComponent() {
+        FusionEngine engine = new FusionEngine();
+        Evidence ml = Evidence.of("combat-rotation-ml", Layer.BEHAVIOR, 0.9, "ML 旋转伪装");
+        FusionEngine.FusionResult result = engine.evaluateDetailed(batch(ml));
+        assertEquals(0.9, result.mlDisguiseScore(), DELTA);
+        assertTrue(result.score() > 0.9 * Layer.BEHAVIOR.defaultWeight(),
+                "ML 伪装置信度应补足融合总分");
+        assertTrue(result.score() <= 1.0);
+    }
+
+    @Test
+    void absentMlEvidenceLeavesComponentZero() {
+        FusionEngine engine = new FusionEngine();
+        FusionEngine.FusionResult result = engine.evaluateDetailed(batch(memory(0.95)));
+        assertEquals(0.0, result.mlDisguiseScore(), DELTA);
+        assertEquals(0.95, result.score(), DELTA);
+    }
+
     private static EvidenceBatch batch(Evidence... evidence) {
         return new EvidenceBatch("p", List.of(evidence), false, false, Map.of());
     }

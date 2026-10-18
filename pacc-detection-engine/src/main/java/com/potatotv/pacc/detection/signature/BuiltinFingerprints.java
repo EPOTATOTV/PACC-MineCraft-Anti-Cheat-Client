@@ -36,6 +36,16 @@ final class BuiltinFingerprints {
      */
     private static List<CheatFingerprint> clients() {
         List<CheatFingerprint> list = new ArrayList<>();
+        // P-10：2026 年出现的 ML 转头 / 客户端绕过家族。产物名与内存串都收，
+        // 单靠 JAR 名会被改名绕过，内存串是第二道。
+        list.add(mod("nanokalite-client", "NanokaLite（ML 转头）", FingerprintCategory.CLIENT, 4,
+                List.of("nanokalite.jar", "nanokalite-client.jar", "nanoka-ml.jar")));
+        list.add(mem("nanokalite-memory", "NanokaLite 内存字符串特征", FingerprintCategory.CLIENT, 4,
+                List.of("6E 61 6E 6F 6B 61 6C 69 74 65")));
+        list.add(mod("opai-client", "OPAI 客户端", FingerprintCategory.CLIENT, 4,
+                List.of("opai.jar", "opai-client.jar", "opai-loader.jar")));
+        list.add(mem("opai-memory", "OPAI 内存字符串特征", FingerprintCategory.CLIENT, 4,
+                List.of("6F 70 61 69 2D 63 6C 69 65 6E 74")));
         // Wurst 7.x：JAR 模块名 + 启动器进程 + 驻留内存的 ASCII 客户端名。
         list.add(mod("wurst-client", "Wurst Client 7.x", FingerprintCategory.CLIENT, 4,
                 List.of("wurst-client.jar", "wurst_client.jar", "wurst.jar")));
@@ -296,6 +306,13 @@ final class BuiltinFingerprints {
     /** 配置 / 脚本特征（AutoConfig 检测，文档 §2.2），标记串按契约存 windowTitles。 */
     private static List<CheatFingerprint> configs() {
         List<CheatFingerprint> list = new ArrayList<>();
+        // P-10：ML 伪装相关的配置键。模型文件与普通配置混在一起，靠这些标记串区分。
+        list.add(cfg("nanokalite-config", "NanokaLite 配置标记", FingerprintCategory.CLIENT, 4,
+                List.of("nanokalite")));
+        list.add(cfg("opai-config", "OPAI 配置标记", FingerprintCategory.CLIENT, 4,
+                List.of("opai-client")));
+        list.add(cfg("ml-rotation-config", "ML 转头配置标记", FingerprintCategory.CLIENT, 4,
+                List.of("ml-rotation", "smooth-aim", "aim-assist-ml")));
         list.add(cfg("liquidbounce-config", "LiquidBounce 配置标记", FingerprintCategory.CLIENT, 4,
                 List.of("liquidbounce")));
         list.add(cfg("wurst-config", "Wurst 配置标记", FingerprintCategory.CLIENT, 4,

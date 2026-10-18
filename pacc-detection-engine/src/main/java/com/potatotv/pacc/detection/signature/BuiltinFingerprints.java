@@ -46,6 +46,14 @@ final class BuiltinFingerprints {
                 List.of("opai.jar", "opai-client.jar", "opai-loader.jar")));
         list.add(mem("opai-memory", "OPAI 内存字符串特征", FingerprintCategory.CLIENT, 4,
                 List.of("6F 70 61 69 2D 63 6C 69 65 6E 74")));
+        list.add(proc("nanokalite-loader", "NanokaLite 加载器", FingerprintCategory.CLIENT, 4,
+                List.of("nanokalite loader", "nanoka-loader")));
+        list.add(proc("opai-loader", "OPAI 加载器", FingerprintCategory.CLIENT, 4,
+                List.of("opai loader", "opai-loader")));
+        list.add(mem("ml-rotation-memory", "ML 转头模块内存特征", FingerprintCategory.CLIENT, 4,
+                List.of("6D 6C 2D 72 6F 74 61 74 69 6F 6E")));
+        list.add(mem("smooth-aim-memory", "平滑瞄准模块内存特征", FingerprintCategory.CLIENT, 4,
+                List.of("73 6D 6F 6F 74 68 2D 61 69 6D")));
         // Wurst 7.x：JAR 模块名 + 启动器进程 + 驻留内存的 ASCII 客户端名。
         list.add(mod("wurst-client", "Wurst Client 7.x", FingerprintCategory.CLIENT, 4,
                 List.of("wurst-client.jar", "wurst_client.jar", "wurst.jar")));
@@ -313,6 +321,14 @@ final class BuiltinFingerprints {
                 List.of("opai-client")));
         list.add(cfg("ml-rotation-config", "ML 转头配置标记", FingerprintCategory.CLIENT, 4,
                 List.of("ml-rotation", "smooth-aim", "aim-assist-ml")));
+        list.add(cfg("ai-aim-config", "AI 瞄准配置标记", FingerprintCategory.CLIENT, 4,
+                List.of("ai-aimbot", "aim-assist-ai")));
+        list.add(cfg("rotation-model-config", "旋转模型配置标记", FingerprintCategory.CLIENT, 4,
+                List.of("rotation-model", "rotation-predict")));
+        list.add(cfg("backtrack-config", "Backtrack 模块配置标记", FingerprintCategory.CLIENT, 4,
+                List.of("backtrack-module")));
+        list.add(cfg("fakelag-config", "FakeLag 模块配置标记", FingerprintCategory.CLIENT, 4,
+                List.of("fakelag-module")));
         list.add(cfg("liquidbounce-config", "LiquidBounce 配置标记", FingerprintCategory.CLIENT, 4,
                 List.of("liquidbounce")));
         list.add(cfg("wurst-config", "Wurst 配置标记", FingerprintCategory.CLIENT, 4,

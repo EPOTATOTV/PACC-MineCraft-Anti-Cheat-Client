@@ -14,13 +14,14 @@ public final class FullScreenRed {
     private static JFrame frame;
 
     /**
-     * 展示红屏警告。level=2 二级 / level=3 三级（严重）。
+     * 展示红屏警告。
      * <p>仅被检测者暂停输入；其它在线玩家收到的是公示红屏，保留键盘并带「继续」按钮。</p>
      *
-     * <p>P-03：玩家可见界面不展示具体检测项与风险分。{@code cheatType} / {@code riskScore}
-     * 参数保留是为了兼容调用方与内部状态持久化，不再渲染到界面——检测项只进 PTEID 证据链。</p>
+     * <p>P-03：玩家可见界面不展示具体检测项与风险分，所以这里只需要脱敏账号；
+     * level / cheatType / riskScore 由 {@link RedscreenReceiver} 与持久化层保存，
+     * 只进 PTEID 证据链，不再传进渲染层。</p>
      */
-    public static void show(int level, String cheatType, String pteidMasked, String riskScore) {
+    public static void show(String pteidMasked) {
         boolean isTarget = RedscreenReceiver.activeIsTarget();
         if (isTarget) {
             KeyboardLock.lock();

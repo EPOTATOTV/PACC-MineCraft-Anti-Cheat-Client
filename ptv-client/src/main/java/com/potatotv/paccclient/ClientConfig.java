@@ -147,7 +147,13 @@ public final class ClientConfig {
     }
 
     private static int getInt(Properties p, String key, String env, int def) {
-        return Integer.parseInt(get(p, key, env, String.valueOf(def)));
+        String raw = get(p, key, env, String.valueOf(def));
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            // 配置项写错时给出键名，别把原始值带出去：它可能来自环境变量。
+            throw new IllegalStateException("配置项 " + key + " 不是合法整数", e);
+        }
     }
 
     private static boolean getBool(Properties p, String key, String env, boolean def) {

@@ -117,7 +117,7 @@ public final class RedscreenReceiver {
                 String alertId = stringOf(json, "alert_id", "");
                 if (persistence != null) persistence.setActive(level, type, pteid, risk);
                 markActive(level, pteid, type, risk);
-                FullScreenRed.show(level, type, pteid, risk);
+                FullScreenRed.show(pteid);
                 notifyActivated(level, alertId);
             } else if (json.contains("\"type\":\"mitigation\"")) {
                 // 服务端就地防护指令（如 force_close）。P-03：不把 reason / 检测细节打到玩家可见控制台

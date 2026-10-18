@@ -215,9 +215,9 @@ PaccCheckImageSignature(
 
 // 枚举 + 分页 + 签名核验。
 NTSTATUS
-PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT report, ULONG outLen)
+PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT reportOut, ULONG outLen)
 {
-    if (req == NULL || report == NULL) return STATUS_INVALID_PARAMETER;
+    if (req == NULL || reportOut == NULL) return STATUS_INVALID_PARAMETER;
 
     ULONG headerSize = (ULONG)FIELD_OFFSET(PACC_DRIVER_REPORT, Entries);
     if (outLen < headerSize + sizeof(PACC_DRIVER_ENTRY)) return STATUS_BUFFER_TOO_SMALL;
@@ -242,7 +242,7 @@ PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT report, ULONG ou
 
                 PKLDR_DATA_TABLE_ENTRY mod =
                     CONTAINING_RECORD(link, KLDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
-                PPACC_DRIVER_ENTRY ent = &report->Entries[returned];
+                PPACC_DRIVER_ENTRY ent = &reportOut->Entries[returned];
                 RtlZeroMemory(ent, sizeof(*ent));
 
                 PaccCopyUnicode(&mod->FullDllName, ent->ImagePath, PACC_DRIVER_PATH_MAX);
@@ -265,9 +265,9 @@ PaccDriverScanQuery(PPACC_DRIVER_QUERY req, PPACC_DRIVER_REPORT report, ULONG ou
         }
     }
 
-    report->TotalLoaded = total;
-    report->Returned    = returned;
-    report->NextIndex   = req->StartIndex + returned;
-    report->Suspicious  = suspicious;
+    reportOut->TotalLoaded = total;
+    reportOut->Returned    = returned;
+    reportOut->NextIndex   = req->StartIndex + returned;
+    reportOut->Suspicious  = suspicious;
     return STATUS_SUCCESS;
 }

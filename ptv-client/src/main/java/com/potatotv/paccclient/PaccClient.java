@@ -102,7 +102,7 @@ public final class PaccClient {
         redscreenState.loadActive().ifPresent(active -> {
             System.out.println("[PTV-Client] 检测到未解除红屏，重启恢复 level=" + active.level());
             RedscreenReceiver.markActive(active.level(), active.masked(), active.cheatType(), active.risk());
-            FullScreenRed.show(active.level(), active.cheatType(), active.masked(), active.risk());
+            FullScreenRed.show(active.masked());
         });
         RedscreenReceiver.init(redscreenState);
 

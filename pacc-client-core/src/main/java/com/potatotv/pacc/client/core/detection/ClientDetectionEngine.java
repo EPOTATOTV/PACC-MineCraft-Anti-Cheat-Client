@@ -101,7 +101,7 @@ public final class ClientDetectionEngine {
             violations.add(result);
             safeReport(result);
             if (result.confidence() >= REDSCREEN_CONFIDENCE_THRESHOLD) {
-                triggerRedScreen(result);
+                triggerRedScreen();
             }
         }
         return violations;
@@ -122,7 +122,7 @@ public final class ClientDetectionEngine {
         }
     }
 
-    private void triggerRedScreen(ClientDetectionResult result) {
+    private void triggerRedScreen() {
         if (redScreen == null) {
             return;
         }

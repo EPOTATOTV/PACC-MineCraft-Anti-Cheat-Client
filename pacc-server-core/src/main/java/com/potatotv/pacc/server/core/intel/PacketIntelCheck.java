@@ -57,6 +57,17 @@ public final class PacketIntelCheck implements ServerCheck, TickAware {
 
         if (isMovementPacket(type)) {
             runtime.packetTiming().recordMovement(playerId, packet.timestampMs());
+            // P-05：带坐标的移动包进入 Backtrack / FakeLag 窗口（位置回退 + 压包突发）
+            if (PacketTypes.carriesPosition(packet.packetType()) || packet.has(PacketTypes.FIELD_X)) {
+                int sequence = packet.has(PacketTypes.FIELD_SEQUENCE)
+                        ? (int) packet.num(PacketTypes.FIELD_SEQUENCE, Integer.MIN_VALUE)
+                        : Integer.MIN_VALUE;
+                runtime.backtrackAnalyzer().record(playerId, packet.timestampMs(), sequence,
+                        packet.num(PacketTypes.FIELD_X, Double.NaN),
+                        packet.num(PacketTypes.FIELD_Y, Double.NaN),
+                        packet.num(PacketTypes.FIELD_Z, Double.NaN));
+                checkAndCollect(results, runtime.backtrackAnalyzer().check(playerId));
+            }
             // Timer / Blink：基准取客户端标称刻长，阈值按 TPS 与延迟放宽（§5.3 U-05）
             long latencyMs = runtime.latencyCompensator().estimatedLatencyMs();
             checkAndCollect(results, runtime.packetTiming().check(

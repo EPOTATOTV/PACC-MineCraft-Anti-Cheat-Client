@@ -2,6 +2,7 @@ package com.potatotv.pacc.server.core.check;
 
 import com.potatotv.pacc.detection.fusion.Evidence;
 import com.potatotv.pacc.detection.server.mining.OreDiscoveryStats;
+import com.potatotv.pacc.detection.server.mining.OreProfile;
 import com.potatotv.pacc.detection.server.mining.XRayAnalyzer;
 import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.DetectionResult;
@@ -49,13 +50,21 @@ public final class XRayCheck implements ServerCheck, MoveAware {
         double dx = to.pos().x() - from.pos().x();
         double dz = to.pos().z() - from.pos().z();
         stats.recordTravel(to.playerId(), Math.sqrt(dx * dx + dz * dz));
+        // P-04：记录位置与视角，用于「玩家→矿石」夹角、yaw 熵与路径直线度
+        stats.recordPosition(to.playerId(), to.pos().x(), to.pos().z(), to.yaw());
     }
 
     @Override
     public List<DetectionResult> onBlockBreak(
             String playerId, String blockType, Position pos, long timestampMs) {
-        stats.recordOre(playerId, blockType);
-        Optional<Evidence> evidence = analyzer.evaluate(stats.profile(playerId));
+        stats.recordOre(playerId, blockType, pos == null ? Double.NaN : pos.x(),
+                pos == null ? Double.NaN : pos.z());
+        OreProfile profile = stats.profile(playerId);
+        Optional<Evidence> evidence = analyzer.evaluate(profile);
+        if (evidence.isEmpty()) {
+            // 基础双条件不成立时，再用视角相关性做补充判定；仍然要求稀有矿占比达标
+            evidence = analyzer.evaluateViewCorrelation(stats.viewProfile(playerId), profile);
+        }
         return evidence
                 .map(ev -> List.of(DetectionResult.violation(CheckType.INTERACTION, ev.detectorId(),
                         (int) Math.round(ev.confidence() * 100), ev.detail(), timestampMs)))

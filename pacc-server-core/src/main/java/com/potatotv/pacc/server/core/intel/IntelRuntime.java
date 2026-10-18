@@ -15,6 +15,7 @@ import com.potatotv.pacc.detection.server.combat.HitboxValidator;
 import com.potatotv.pacc.detection.server.combat.KnockbackPredictor;
 import com.potatotv.pacc.detection.server.combat.ReachCheck;
 import com.potatotv.pacc.detection.server.combat.RotationAnalyzer;
+import com.potatotv.pacc.detection.server.packet.BacktrackAnalyzer;
 import com.potatotv.pacc.detection.server.packet.BrandValidator;
 import com.potatotv.pacc.detection.server.packet.PacketOrder;
 import com.potatotv.pacc.detection.server.packet.PacketTiming;
@@ -79,6 +80,7 @@ public final class IntelRuntime {
     private final HitboxValidator hitboxValidator = new HitboxValidator();
     private final PacketTiming packetTiming = new PacketTiming();
     private final PacketOrder packetOrder = new PacketOrder();
+    private final BacktrackAnalyzer backtrackAnalyzer = new BacktrackAnalyzer();
     private final TransactionSync transactionSync = new TransactionSync();
     private final BrandValidator brandValidator = new BrandValidator();
     private final LatencyCompensator latencyCompensator = new LatencyCompensator();
@@ -224,6 +226,11 @@ public final class IntelRuntime {
         return statOutlier;
     }
 
+    /** P-05：Backtrack / FakeLag 包滞留与时序重放检测。 */
+    public BacktrackAnalyzer backtrackAnalyzer() {
+        return backtrackAnalyzer;
+    }
+
     public PatternCluster patternCluster() {
         return patternCluster;
     }
@@ -235,6 +242,17 @@ public final class IntelRuntime {
     /** 玩家世界副本（不存在则创建空世界）。 */
     public WorldReplica worldOf(String playerId) {
         return worlds.computeIfAbsent(playerId, unused -> WorldReplica.empty());
+    }
+
+    /**
+     * 只读查询世界副本；没有数据时返回 {@code null}。
+     *
+     * <p>预测检查必须用这个而不是 {@link #worldOf(String)}：后者会创建空世界，
+     * 让 {@code PredictionEngine} 误以为「有世界数据」而切到严格候选匹配，
+     * 空世界没有碰撞信息，结果是把合法移动判成偏差。
+     */
+    public WorldReplica existingWorld(String playerId) {
+        return worlds.get(playerId);
     }
 
     /** 记录一条证据到玩家窗口。 */
@@ -318,6 +336,7 @@ public final class IntelRuntime {
         reachCheck.reset(playerId);
         packetTiming.reset(playerId);
         packetOrder.reset(playerId);
+        backtrackAnalyzer.reset(playerId);
     }
 
     private static void pruneLocked(Deque<Evidence> window) {

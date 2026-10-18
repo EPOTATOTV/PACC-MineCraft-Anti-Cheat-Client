@@ -171,13 +171,6 @@ public record AimProfile(
         if (rateVar <= 1e-9 || p <= 0.0 || p >= 1.0) {
             return 0.0;
         }
-        double meanTrue = 0.0;
-        for (int i = 0; i < n; i++) {
-            if (attacking[i]) {
-                meanTrue += rates[i];
-            }
-        }
-        meanTrue /= trueCount;
         double covariance = 0.0;
         for (int i = 0; i < n; i++) {
             covariance += (rates[i] - meanRate) * ((attacking[i] ? 1.0 : 0.0) - p);

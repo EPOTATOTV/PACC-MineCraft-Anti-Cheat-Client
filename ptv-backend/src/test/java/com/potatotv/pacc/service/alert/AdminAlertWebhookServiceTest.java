@@ -48,4 +48,19 @@ class AdminAlertWebhookServiceTest {
         assertTrue(service.configured());
         service.shutdown();
     }
+
+    @Test
+    void statusReportsChannelsWithoutLeakingUrls() {
+        AdminAlertWebhookService service = new AdminAlertWebhookService(
+                true, "https://feishu.invalid/hook", "https://discord.invalid/hook",
+                "https://transparency.invalid/hook", 4000);
+        AdminAlertWebhookService.ChannelStatus status = service.status();
+        assertTrue(status.enabled());
+        assertTrue(status.configured());
+        assertTrue(status.feishuConfigured());
+        assertTrue(status.discordConfigured());
+        assertTrue(status.transparencyFeishuConfigured());
+        assertEquals(4000, status.timeoutMs());
+        service.shutdown();
+    }
 }

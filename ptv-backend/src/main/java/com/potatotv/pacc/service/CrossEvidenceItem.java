@@ -18,6 +18,11 @@ import java.time.Instant;
  * @param severity          low / medium / high / critical
  * @param riskScore         0-100 风险分（玩家端为端侧预评分，服务端为置信度）
  * @param detail            已脱敏的检测说明
+ * @param processName       玩家端命中的进程名（可空）
+ * @param memoryRegion      玩家端命中的内存区域（可空）
+ * @param signatureHit      玩家端命中的签名（可空）
+ * @param clientVersion     玩家端版本（可空）
+ * @param osInfo            玩家端系统信息（可空）
  * @param occurredAt        事件发生时间
  * @param alertId           联动红屏告警 ID（可空）
  * @param serverId          来源服务器（玩家端事件为空）
@@ -34,6 +39,11 @@ public record CrossEvidenceItem(
         String severity,
         int riskScore,
         String detail,
+        String processName,
+        String memoryRegion,
+        String signatureHit,
+        String clientVersion,
+        String osInfo,
         Instant occurredAt,
         String alertId,
         String serverId,

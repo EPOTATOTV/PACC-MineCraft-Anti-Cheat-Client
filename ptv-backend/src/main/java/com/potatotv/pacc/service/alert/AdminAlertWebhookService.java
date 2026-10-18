@@ -60,6 +60,22 @@ public class AdminAlertWebhookService {
         return enabled && (!feishuUrl.isEmpty() || !discordUrl.isEmpty());
     }
 
+    /** 渠道状态快照，供管理端展示「通知有没有接上」。 */
+    public record ChannelStatus(
+            boolean enabled,
+            boolean configured,
+            boolean feishuConfigured,
+            boolean discordConfigured,
+            boolean transparencyFeishuConfigured,
+            long timeoutMs) {
+    }
+
+    /** 当前渠道配置状态；不返回任何 URL / 密钥。 */
+    public ChannelStatus status() {
+        return new ChannelStatus(enabled, configured(), !feishuUrl.isEmpty(),
+                !discordUrl.isEmpty(), !transparencyFeishuUrl.isEmpty(), timeoutMs);
+    }
+
     /** 异步发送一条管理端告警；未配置渠道时静默跳过。 */
     public void dispatch(AlertCategory category, String title, String detail) {
         if (!configured() || category == null) {

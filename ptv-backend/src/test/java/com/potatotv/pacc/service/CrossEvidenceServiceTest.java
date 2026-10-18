@@ -1,8 +1,10 @@
 package com.potatotv.pacc.service;
 
 import com.potatotv.pacc.domain.DetectionEvent;
+import com.potatotv.pacc.domain.DeviceRecord;
 import com.potatotv.pacc.domain.ServerPluginEvent;
 import com.potatotv.pacc.repository.DetectionEventRepository;
+import com.potatotv.pacc.repository.DeviceRecordRepository;
 import com.potatotv.pacc.repository.ServerPluginEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,19 +20,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * P-06 跨端证据链：两侧事件合并、按时间倒序、空 PTEID 短路。
+ * P-06 跨端证据链：两侧事件合并、按时间倒序、设备指纹、空 PTEID 短路。
  */
 class CrossEvidenceServiceTest {
 
     private DetectionEventRepository detectionEventRepository;
     private ServerPluginEventRepository serverPluginEventRepository;
+    private DeviceRecordRepository deviceRecordRepository;
     private CrossEvidenceService service;
 
     @BeforeEach
     void setUp() {
         detectionEventRepository = mock(DetectionEventRepository.class);
         serverPluginEventRepository = mock(ServerPluginEventRepository.class);
-        service = new CrossEvidenceService(detectionEventRepository, serverPluginEventRepository);
+        deviceRecordRepository = mock(DeviceRecordRepository.class);
+        service = new CrossEvidenceService(detectionEventRepository, serverPluginEventRepository,
+                deviceRecordRepository);
     }
 
     @Test
@@ -69,14 +74,45 @@ class CrossEvidenceServiceTest {
         assertEquals("high", client.severity());
         assertEquals("signature-hit", client.detail());
         assertEquals(88, client.riskScore());
+        assertEquals("cheat.exe", client.processName());
+        assertEquals("0x7FF", client.memoryRegion());
+        assertEquals("signature-hit", client.signatureHit());
+        assertEquals("6.0.0", client.clientVersion());
+    }
+
+    @Test
+    void includesDeviceFingerprints() {
+        when(deviceRecordRepository.findByPteidOrderByLastLoginAtDesc("PT1234ABCD"))
+                .thenReturn(List.of(DeviceRecord.builder()
+                        .deviceId("dev-1")
+                        .pteid("PT1234ABCD")
+                        .deviceFingerprint("a".repeat(64))
+                        .platform("WINDOWS")
+                        .deviceName("DESKTOP-1")
+                        .ip("127.0.0.1")
+                        .firstLoginAt(Instant.parse("2026-10-01T00:00:00Z"))
+                        .lastLoginAt(Instant.parse("2026-10-18T00:00:00Z"))
+                        .active(true)
+                        .build()));
+
+        CrossEvidenceChain chain = service.chain("PT1234ABCD");
+
+        assertEquals(1, chain.devices().size());
+        CrossEvidenceDevice device = chain.devices().get(0);
+        assertEquals("dev-1", device.deviceId());
+        assertEquals("WINDOWS", device.platform());
+        assertTrue(device.active());
+        assertEquals(64, device.deviceFingerprint().length());
     }
 
     @Test
     void blankPteidShortCircuits() {
         CrossEvidenceChain chain = service.chain("   ");
         assertTrue(chain.items().isEmpty());
+        assertTrue(chain.devices().isEmpty());
         verify(detectionEventRepository, never()).findTop200ByPteidOrderByOccurredAtDesc("   ");
         verify(serverPluginEventRepository, never()).findTop200ByPteidOrderByReceivedAtDesc("   ");
+        verify(deviceRecordRepository, never()).findByPteidOrderByLastLoginAtDesc("   ");
     }
 
     private static DetectionEvent client(String pteid, String id, Instant at) {
@@ -86,7 +122,9 @@ class CrossEvidenceServiceTest {
                 .eventType("memory_tamper")
                 .severity("high")
                 .clientRiskScore(88)
-                .evidence(new DetectionEvent.Evidence(null, null, "signature-hit", null))
+                .evidence(new DetectionEvent.Evidence("cheat.exe", "0x7FF", "signature-hit", null))
+                .clientVersion("6.0.0")
+                .osInfo("Windows 11")
                 .occurredAt(at)
                 .build();
     }

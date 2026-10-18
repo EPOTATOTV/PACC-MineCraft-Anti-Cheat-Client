@@ -34,6 +34,9 @@ public final class BlockBreakListener implements Listener {
             return;
         }
         Block block = event.getBlock();
+        // P-01：破坏后该格变空气，先把世界副本更新掉，再做 X-Ray 统计
+        engine.handleBlockChanged(block.getWorld().getName(), block.getX(), block.getY(), block.getZ(),
+                "AIR");
         Position pos = new Position(block.getX(), block.getY(), block.getZ());
         engine.handleBlockBreak(player.getUniqueId().toString(), block.getType().name(),
                 pos, System.currentTimeMillis());

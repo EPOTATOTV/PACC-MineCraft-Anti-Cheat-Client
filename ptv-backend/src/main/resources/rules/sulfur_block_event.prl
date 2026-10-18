@@ -1,0 +1,30 @@
+# sulfur_block_event：26.2 硫磺方块事件（P-09 方块级规则）
+# 规则不关心方块 ID，只认 block_type 字符串；硫磺洞穴相关材质统一命中 is_sulfur()。
+
+rule "sulfur_block_event" {
+    version: "1.0.0"
+    author: "PACC Security Team"
+    severity: medium
+    category: "block"
+    description: "硫磺方块放置事件"
+    cooldown: 30s
+    enabled: true
+
+    input {
+        block: BlockEvent
+    }
+
+    when:
+        block.is_sulfur()
+        AND block.action == "PLACE"
+
+    then:
+        emit_alert(
+            type = "SULFUR_PLACE",
+            confidence = 0.8,
+            evidence = {
+                "score": 6.0,
+                "reason": f"硫磺方块 {block.block_type}"
+            }
+        )
+}

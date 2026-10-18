@@ -130,8 +130,9 @@ public final class BukkitPlatformAdapter implements ServerPlatformAdapter {
         }
         Location loc = player.getLocation();
         Position pos = new Position(loc.getX(), loc.getY(), loc.getZ());
+        String world = loc.getWorld() == null ? "world" : loc.getWorld().getName();
         return new PlayerPosition(playerId, pos, loc.getYaw(), loc.getPitch(),
-                System.currentTimeMillis(), ((Entity) player).isOnGround(), getGameMode(playerId));
+                System.currentTimeMillis(), ((Entity) player).isOnGround(), getGameMode(playerId), world);
     }
 
     @Override

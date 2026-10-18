@@ -174,6 +174,34 @@ public final class HostTypeRegistry {
                 .method("is_horizontal", PrlType.BOOL)
                 .build());
 
+        // P-09 / 26.x：包级事件。服务端插件把归一化后的数据包喂进规则引擎，
+        // 规则可以直接对包类型、长度、到达间隔与客户端序号做声明式判定。
+        registry.register(HostType.builder("PacketEvent")
+                .field("player_id", PrlType.STRING)
+                .field("packet_type", PrlType.STRING)
+                .field("length", PrlType.INT)
+                .field("arrival_ms", PrlType.INT)
+                .field("client_ms", PrlType.INT)
+                .field("sequence", PrlType.INT)
+                .method("is_movement", PrlType.BOOL)
+                .method("is_combat", PrlType.BOOL)
+                .method("is_placement", PrlType.BOOL)
+                .build());
+
+        // P-09 / 26.2：方块事件。硫磺方块 / 硫磺尖刺等新方块用 block_type 字符串表达，
+        // 规则侧用 is_sulfur() 之类的谓词，不需要每加一种方块就改语言。
+        registry.register(HostType.builder("BlockEvent")
+                .field("player_id", PrlType.STRING)
+                .field("block_type", PrlType.STRING)
+                .field("action", PrlType.STRING)
+                .field("x", PrlType.FLOAT)
+                .field("y", PrlType.FLOAT)
+                .field("z", PrlType.FLOAT)
+                .field("time_ms", PrlType.INT)
+                .method("is_sulfur", PrlType.BOOL)
+                .method("is_ore", PrlType.BOOL)
+                .build());
+
         registry.register(HostType.builder("ClickPattern")
                 .field("cps", PrlType.FLOAT)
                 .field("interval_stddev", PrlType.FLOAT)

@@ -15,6 +15,7 @@ import com.potatotv.pacc.detection.server.combat.HitboxValidator;
 import com.potatotv.pacc.detection.server.combat.KnockbackPredictor;
 import com.potatotv.pacc.detection.server.combat.ReachCheck;
 import com.potatotv.pacc.detection.server.combat.RotationAnalyzer;
+import com.potatotv.pacc.detection.server.packet.BacktrackAnalyzer;
 import com.potatotv.pacc.detection.server.packet.BrandValidator;
 import com.potatotv.pacc.detection.server.packet.PacketOrder;
 import com.potatotv.pacc.detection.server.packet.PacketTiming;
@@ -53,12 +54,15 @@ public final class IntelRuntime {
     /** 证据窗口容量上限（防刷屏）。 */
     static final int WINDOW_MAX = 64;
 
-    /** 每玩家压缩世界副本（世界变更由平台适配层喂入，缺省为空世界=无碰撞）。 */
+    /** 每世界一份压缩世界副本（按世界名共享，玩家通过 playerWorlds 绑定）。 */
     private final ConcurrentHashMap<String, WorldReplica> worlds = new ConcurrentHashMap<>();
+
+    /** 玩家 → 世界名绑定；没有绑定时预测引擎按「无世界数据」处理。 */
+    private final ConcurrentHashMap<String, String> playerWorlds = new ConcurrentHashMap<>();
 
     private final FusionEngine fusion = new FusionEngine();
     private final CorrelationEngine correlation = new CorrelationEngine();
-    private final PredictionEngine predictionEngine = new PredictionEngine(worlds);
+    private final PredictionEngine predictionEngine;
     private final StatOutlier statOutlier = new StatOutlier();
     private final PatternCluster patternCluster = new PatternCluster();
     /** 内置启发式权重的固定种子（无训练数据时的降级默认值）。 */
@@ -79,6 +83,7 @@ public final class IntelRuntime {
     private final HitboxValidator hitboxValidator = new HitboxValidator();
     private final PacketTiming packetTiming = new PacketTiming();
     private final PacketOrder packetOrder = new PacketOrder();
+    private final BacktrackAnalyzer backtrackAnalyzer = new BacktrackAnalyzer();
     private final TransactionSync transactionSync = new TransactionSync();
     private final BrandValidator brandValidator = new BrandValidator();
     private final LatencyCompensator latencyCompensator = new LatencyCompensator();
@@ -90,6 +95,10 @@ public final class IntelRuntime {
     private final ConcurrentHashMap<String, Position> lastPositions = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, Deque<Evidence>> windows = new ConcurrentHashMap<>();
+
+    public IntelRuntime() {
+        this.predictionEngine = new PredictionEngine(this::worldOf);
+    }
 
     /**
      * 证据链（技术文档 §8.2 防篡改）：每次融合告警把证据载荷追加进 HMAC 链式哈希。
@@ -224,6 +233,11 @@ public final class IntelRuntime {
         return statOutlier;
     }
 
+    /** P-05：Backtrack / FakeLag 包滞留与时序重放检测。 */
+    public BacktrackAnalyzer backtrackAnalyzer() {
+        return backtrackAnalyzer;
+    }
+
     public PatternCluster patternCluster() {
         return patternCluster;
     }
@@ -232,9 +246,41 @@ public final class IntelRuntime {
         return mlDetector;
     }
 
-    /** 玩家世界副本（不存在则创建空世界）。 */
+    /** 绑定玩家所在世界；平台每次移动事件都会刷新。 */
+    public void bindPlayerWorld(String playerId, String worldName) {
+        if (playerId == null || worldName == null || worldName.isBlank()) {
+            return;
+        }
+        playerWorlds.put(playerId, worldName);
+    }
+
+    /** 按世界名取共享副本（不存在则创建空世界）。 */
+    public WorldReplica worldByName(String worldName) {
+        return worlds.computeIfAbsent(worldName, unused -> WorldReplica.empty());
+    }
+
+    /**
+     * 玩家当前世界副本；没有绑定或世界尚未创建时返回 {@code null}。
+     *
+     * <p>预测检查必须用这个而不是创建空世界：空世界没有碰撞信息，
+     * 会让 {@code PredictionEngine} 误以为「有世界数据」而切到严格候选匹配。
+     */
+    public WorldReplica existingWorld(String playerId) {
+        String worldName = playerWorlds.get(playerId);
+        return worldName == null ? null : worlds.get(worldName);
+    }
+
+    /** 兼容入口：按玩家取世界副本（未绑定时返回 null，不再隐式创建）。 */
     public WorldReplica worldOf(String playerId) {
-        return worlds.computeIfAbsent(playerId, unused -> WorldReplica.empty());
+        return existingWorld(playerId);
+    }
+
+    /** 平台方块变更入口：写入共享世界副本。 */
+    public void applyBlockChange(String worldName, int x, int y, int z, String material) {
+        if (worldName == null || worldName.isBlank()) {
+            return;
+        }
+        worldByName(worldName).applyBlockChange(x, y, z, material);
     }
 
     /** 记录一条证据到玩家窗口。 */
@@ -307,7 +353,7 @@ public final class IntelRuntime {
 
     /** 玩家下线：清空所有共享状态。 */
     public void clear(String playerId) {
-        worlds.remove(playerId);
+        playerWorlds.remove(playerId);
         lastPositions.remove(playerId);
         windows.remove(playerId);
         statOutlier.reset(playerId);
@@ -318,6 +364,7 @@ public final class IntelRuntime {
         reachCheck.reset(playerId);
         packetTiming.reset(playerId);
         packetOrder.reset(playerId);
+        backtrackAnalyzer.reset(playerId);
     }
 
     private static void pruneLocked(Deque<Evidence> window) {

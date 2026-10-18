@@ -16,6 +16,9 @@ public final class FullScreenRed {
     /**
      * 展示红屏警告。level=2 二级 / level=3 三级（严重）。
      * <p>仅被检测者暂停输入；其它在线玩家收到的是公示红屏，保留键盘并带「继续」按钮。</p>
+     *
+     * <p>P-03：玩家可见界面不展示具体检测项与风险分。{@code cheatType} / {@code riskScore}
+     * 参数保留是为了兼容调用方与内部状态持久化，不再渲染到界面——检测项只进 PTEID 证据链。</p>
      */
     public static void show(int level, String cheatType, String pteidMasked, String riskScore) {
         boolean isTarget = RedscreenReceiver.activeIsTarget();
@@ -32,12 +35,10 @@ public final class FullScreenRed {
             frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
             frame.setBackground(Color.RED);  // 置为红
 
-            String headline = isTarget
-                    ? (level >= 3 ? "严重作弊嫌疑" : "检测到可疑行为")
-                    : "反作弊公示";
+            String headline = isTarget ? "检测到违规行为" : "反作弊公示";
             String tip = isTarget
                     ? "请保持现状等待管理员远程查端。输入已暂停，勿关闭本窗口。"
-                    : "本机未被判定为作弊，可直接点击下方按钮继续游戏。";
+                    : "本机未被判定为违规，可直接点击下方按钮继续游戏。";
 
             JPanel panel = new JPanel(new GridBagLayout());
             panel.setBackground(new Color(0xE0, 0x00, 0x00));
@@ -45,7 +46,7 @@ public final class FullScreenRed {
             c.gridwidth = GridBagConstraints.REMAINDER;
             c.insets = new Insets(14, 24, 14, 24);
 
-            JLabel mark = new JLabel("⚠ PACC 警告");
+            JLabel mark = new JLabel("PACC 警告");
             mark.setFont(new Font(Font.DIALOG, Font.BOLD, 56));
             mark.setForeground(Color.WHITE);
 
@@ -53,8 +54,7 @@ public final class FullScreenRed {
             h.setFont(new Font(Font.DIALOG, Font.BOLD, 30));
             h.setForeground(Color.WHITE);
 
-            JLabel sub = new JLabel("<html>类型：" + cheatType + "　|　风险分：" + riskScore
-                    + "　|　账号：" + pteidMasked + "</html>");
+            JLabel sub = new JLabel("<html>账号：" + pteidMasked + "</html>");
             sub.setFont(new Font(Font.DIALOG, Font.PLAIN, 20));
             sub.setForeground(Color.WHITE);
 

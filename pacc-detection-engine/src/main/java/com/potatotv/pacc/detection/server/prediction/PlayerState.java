@@ -36,7 +36,32 @@ public record PlayerState(
         String gameMode,
         double fallDistance,
         Map<String, Integer> effects,
-        long timestampMs) {
+        long timestampMs,
+        double blockSlipperiness,
+        double blockBounciness) {
+
+    /**
+     * 兼容构造：未提供脚下方块物理时，按默认地面滑度 0.6、无反弹处理。
+     */
+    public PlayerState(String playerId, double x, double y, double z, double vx, double vy, double vz,
+                       float yaw, float pitch, boolean onGround, boolean inWater, boolean inLava,
+                       boolean isGliding, boolean ridingBoat, boolean sprinting, boolean sneaking,
+                       boolean climbing, boolean onSlimeBlock, boolean onHoneyBlock, boolean inPowderSnow,
+                       boolean inBubbleColumn, boolean flightAllowed, String gameMode, double fallDistance,
+                       Map<String, Integer> effects, long timestampMs) {
+        this(playerId, x, y, z, vx, vy, vz, yaw, pitch, onGround, inWater, inLava, isGliding, ridingBoat,
+                sprinting, sneaking, climbing, onSlimeBlock, onHoneyBlock, inPowderSnow, inBubbleColumn,
+                flightAllowed, gameMode, fallDistance, effects, timestampMs, 0.6, 0.0);
+    }
+
+    public PlayerState {
+        if (blockSlipperiness <= 0.0 || blockSlipperiness > 1.0) {
+            blockSlipperiness = 0.6;
+        }
+        if (blockBounciness < 0.0 || blockBounciness > 1.0) {
+            blockBounciness = 0.0;
+        }
+    }
 
     /** 药水效果键。 */
     public static final String EFFECT_SPEED = "speed";

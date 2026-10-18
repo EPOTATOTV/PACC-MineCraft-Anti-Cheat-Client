@@ -262,6 +262,14 @@ class PrlStdlibTest {
         assertEquals(1.0, num(stdlib.call("similarity", new Object[]{"", ""})), 1e-9);
     }
 
+    @Test
+    void regexRejectsOversizedPatternAndInput() {
+        assertThrows(PrlExecutionException.class, () ->
+                stdlib.call("regex_match", new Object[]{"abc", "a".repeat(513)}));
+        assertThrows(PrlExecutionException.class, () ->
+                stdlib.call("regex_match", new Object[]{"a".repeat(65_537), "a"}));
+    }
+
     // ------------------------------------------------------------------ §2.4.5 数学
 
     @Test

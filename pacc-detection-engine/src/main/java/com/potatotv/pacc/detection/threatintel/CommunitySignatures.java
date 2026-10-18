@@ -42,14 +42,24 @@ public final class CommunitySignatures {
 
     /**
      * 把当前 pending 全部注册进签名库并清空队列；合并期间新提交的条目保留在队列里。
+     *
+     * <p>与库内已有 id 冲突的条目直接丢弃，不覆盖内置 / 已发布指纹：
+     * 社区上报不能改掉官方条目的匹配规则，否则一次错误提交就能让整条检测失效。
      */
     public synchronized void mergeInto(SignatureLibrary library) {
         if (pending.isEmpty()) {
             return;
         }
-        List<CheatFingerprint> batch = List.copyOf(pending);
-        library.registerAll(batch);
-        pending.removeAll(batch);
+        List<CheatFingerprint> snapshot = List.copyOf(pending);
+        java.util.Set<String> existingIds = library.fingerprints().stream()
+                .map(CheatFingerprint::id)
+                .collect(java.util.stream.Collectors.toSet());
+        List<CheatFingerprint> fresh = snapshot.stream()
+                .filter(fingerprint -> !existingIds.contains(fingerprint.id()))
+                .toList();
+        library.registerAll(fresh);
+        // 冲突条目也从队列移除：它们永远不会被合并，留着只会反复触发同一轮检查
+        pending.removeAll(snapshot);
     }
 
     /** 特征级相等（不含 id）：同特征不同 id 也算重复上报。 */

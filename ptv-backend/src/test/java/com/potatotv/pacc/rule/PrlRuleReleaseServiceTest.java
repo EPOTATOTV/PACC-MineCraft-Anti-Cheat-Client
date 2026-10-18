@@ -53,9 +53,24 @@ class PrlRuleReleaseServiceTest {
     void setUp() throws Exception {
         String url = String.format(MYSQL_COMPAT_URL_TEMPLATE, UUID.randomUUID());
         createSchema(url);
-        store = new JdbcRuleVersionStore(new JdbcTemplate(new DriverManagerDataSource(url, "sa", "")));
+        JdbcTemplate jdbc = new JdbcTemplate(new DriverManagerDataSource(url, "sa", ""));
+        store = new JdbcRuleVersionStore(jdbc);
         engine = new PrlRuleEngine(true, 15.0, store);
-        service = new PrlRuleReleaseService(store, engine);
+        service = new PrlRuleReleaseService(store, engine,
+                new RuleSignatureService(false, ""), new JdbcRuleSignatureStore(jdbc));
+    }
+
+    @Test
+    void 规则市场列出生效版本与签名状态() {
+        service.submitDraft(RULE, "1.0.0", source("1.0.0", 8.0), "tester");
+        service.approve(RULE, "1.0.0", "alice");
+
+        List<PrlRuleReleaseService.RuleMarketEntry> market = service.market();
+        assertEquals(1, market.size());
+        PrlRuleReleaseService.RuleMarketEntry entry = market.get(0);
+        assertEquals(RULE, entry.ruleName());
+        assertEquals("1.0.0", entry.version());
+        assertFalse(entry.signed(), "未提交签名的版本在清单里应标为未签名");
     }
 
     @Test
@@ -255,12 +270,25 @@ class PrlRuleReleaseServiceTest {
                 """.formatted(version, multiplier);
     }
 
-    /** 执行 V40 迁移脚本建表；读实际文件而不是抄一份 DDL，避免测试与迁移漂移。 */
+    /** 执行迁移脚本建表；读实际文件而不是抄一份 DDL，避免测试与迁移漂移。 */
     private static void createSchema(String url) throws Exception {
         List<String> statements = new ArrayList<>();
+        loadStatements(statements, "db/migration/V40__prl_rule_versions.sql");
+        loadStatements(statements, "db/migration/V43__prl_rule_signatures.sql");
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            for (String sql : statements) {
+                statement.execute(sql);
+            }
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException("建表失败", e);
+        }
+    }
+
+    private static void loadStatements(List<String> statements, String resource) throws Exception {
         try (InputStream in = PrlRuleReleaseServiceTest.class.getClassLoader()
-                .getResourceAsStream("db/migration/V40__prl_rule_versions.sql")) {
-            assertTrue(in != null, "找不到迁移脚本 db/migration/V40__prl_rule_versions.sql");
+                .getResourceAsStream(resource)) {
+            assertTrue(in != null, "找不到迁移脚本 " + resource);
             StringBuilder text = new StringBuilder();
             for (String line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
                 if (!line.trim().startsWith("--")) {
@@ -272,14 +300,6 @@ class PrlRuleReleaseServiceTest {
                     statements.add(part.trim());
                 }
             }
-        }
-        try (Connection connection = DriverManager.getConnection(url, "sa", "");
-             Statement statement = connection.createStatement()) {
-            for (String sql : statements) {
-                statement.execute(sql);
-            }
-        } catch (java.sql.SQLException e) {
-            throw new IllegalStateException("建表失败", e);
         }
     }
 }

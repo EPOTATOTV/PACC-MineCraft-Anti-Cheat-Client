@@ -1,0 +1,34 @@
+# packet_anomaly：包滞留 / 时序重放（P-09 包级规则）
+# 宿主把归一化数据包包成 PacketEvent；delay_ms 为「服务端到达时间 - 客户端时间」。
+# 正常网络抖动远低于 800ms；超过该值说明客户端压包后集中释放。
+
+rule "packet_anomaly" {
+    version: "1.0.0"
+    author: "PACC Security Team"
+    severity: high
+    category: "packet"
+    description: "包滞留与时序重放"
+    cooldown: 60s
+    enabled: true
+
+    input {
+        packet: PacketEvent
+    }
+
+    let delay_ms = packet.arrival_ms - packet.client_ms
+
+    when:
+        packet.is_movement()
+        AND packet.length > 0
+        AND delay_ms > 800
+
+    then:
+        emit_alert(
+            type = "PACKET_TIMING",
+            confidence = 0.85,
+            evidence = {
+                "score": 12.0,
+                "reason": f"包滞留 {delay_ms}ms"
+            }
+        )
+}

@@ -10,6 +10,8 @@ import com.potatotv.pacc.repository.AccountRepository;
 import com.potatotv.pacc.repository.CheatRecordRepository;
 import com.potatotv.pacc.repository.RedscreenAlertRepository;
 import com.potatotv.pacc.repository.SuspicionFlagRepository;
+import com.potatotv.pacc.service.alert.AdminAlertWebhookService;
+import com.potatotv.pacc.service.alert.AlertCategory;
 import com.potatotv.pacc.service.detection.v52.ThreatIntelExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +43,7 @@ public class RedscreenService {
     private final InspectService inspectService;
     private final WebhookDispatcher webhookDispatcher;
     private final NotificationService notificationService;
+    private final AdminAlertWebhookService adminAlertWebhook;
     private final ThreatIntelExtractor threatIntelExtractor;
     private final ObjectMapper mapper;
 
@@ -57,6 +60,7 @@ public class RedscreenService {
                             InspectService inspectService,
                             WebhookDispatcher webhookDispatcher,
                             NotificationService notificationService,
+                            AdminAlertWebhookService adminAlertWebhook,
                             ThreatIntelExtractor threatIntelExtractor,
                             ObjectMapper mapper,
                             @Value("${pacc.detection.redscreen-threshold:85}") int redscreenThreshold,
@@ -71,6 +75,7 @@ public class RedscreenService {
         this.inspectService = inspectService;
         this.webhookDispatcher = webhookDispatcher;
         this.notificationService = notificationService;
+        this.adminAlertWebhook = adminAlertWebhook;
         this.threatIntelExtractor = threatIntelExtractor;
         this.mapper = mapper;
         this.redscreenThreshold = redscreenThreshold;
@@ -123,9 +128,10 @@ public class RedscreenService {
 
         // 写入统一通知主表（站内白名单/定向方式进通知中心，WS 帧由下方 broadcast 派发）
         try {
-            String title = level >= 3 ? "高危险作弊告警" : "作弊告警";
+            String title = level >= 3 ? "高危险违规告警" : "违规告警";
+            // P-03：sendToAll 会推给全体在线玩家，正文不能带检测项与置信度
             notificationService.sendToAll(title,
-                    "检测到风险操作（" + cheatType + "，置信度 " + riskScore + "%），管理平台已介入查端。",
+                    "检测到违规行为，管理平台已介入核查。",
                     "SECURITY", "REDSCREEN_ALERT", level >= 3 ? "HIGH" : "NORMAL");
         } catch (Exception e) {
             log.warn("写入红屏通知失败 alert={} err={}", alertId, e.getMessage());
@@ -172,6 +178,16 @@ public class RedscreenService {
             log.warn("Webhook 推送失败 alert={} err={}", alertId, e.getMessage());
         }
 
+        // P-07：管理员渠道（Discord / 飞书）安全告警。Webhook 明细允许带检测项，仅管理员可见
+        try {
+            adminAlertWebhook.dispatch(AlertCategory.SECURITY,
+                    "PACC 高置信违规",
+                    "alert=" + alertId + " pteid=" + alert.getPteidMasked()
+                            + " type=" + alert.getCheatType() + " risk=" + riskScore);
+        } catch (Exception e) {
+            log.warn("管理端告警推送失败 alert={} err={}", alertId, e.getMessage());
+        }
+
         return alert;
     }
 
@@ -196,7 +212,9 @@ public class RedscreenService {
         msg.put("event_type", "redscreen_alert");
         msg.put("alert_id", alert.getAlertId());
         msg.put("level", alert.getLevel());
-        msg.put("cheat_type", alert.getCheatType());
+        // P-03：面向全体在线客户端的广播不携带具体检测项；cheatType 只留在 RedscreenAlert
+        // 与 CheatRecord 的内部证据链里，供管理员与 PTEID 关联查询
+        msg.put("cheat_type", "violation");
         msg.put("pteid_masked", alert.getPteidMasked());
         msg.put("timestamp", alert.getOccurredAt().toString());
         msg.put("risk_score", alert.getRiskScore());

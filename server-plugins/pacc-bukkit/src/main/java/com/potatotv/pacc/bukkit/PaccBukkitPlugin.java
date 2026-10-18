@@ -1,6 +1,7 @@
 package com.potatotv.pacc.bukkit;
 
 import com.potatotv.pacc.bukkit.listener.BlockBreakListener;
+import com.potatotv.pacc.bukkit.listener.BlockPlaceListener;
 import com.potatotv.pacc.bukkit.listener.CombatListener;
 import com.potatotv.pacc.bukkit.listener.ConnectionListener;
 import com.potatotv.pacc.bukkit.listener.MoveListener;
@@ -111,6 +112,7 @@ public class PaccBukkitPlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new MoveListener(engine), this);
         Bukkit.getPluginManager().registerEvents(new CombatListener(engine), this);
         Bukkit.getPluginManager().registerEvents(new BlockBreakListener(engine), this);
+        Bukkit.getPluginManager().registerEvents(new BlockPlaceListener(engine), this);
         Bukkit.getPluginManager().registerEvents(new ConnectionListener(engine, brandTracker, modHashTracker), this);
         Bukkit.getMessenger().registerIncomingPluginChannel(this, BRAND_CHANNEL, brandTracker);
         Bukkit.getMessenger().registerIncomingPluginChannel(this, REGISTER_CHANNEL, brandTracker);

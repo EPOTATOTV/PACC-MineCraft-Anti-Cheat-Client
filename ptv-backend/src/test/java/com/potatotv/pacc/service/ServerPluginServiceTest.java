@@ -10,6 +10,7 @@ import com.potatotv.pacc.repository.RedscreenAlertRepository;
 import com.potatotv.pacc.repository.ServerPluginEventRepository;
 import com.potatotv.pacc.repository.ServerPluginPunishmentRepository;
 import com.potatotv.pacc.repository.ServerPluginRegistrationRepository;
+import com.potatotv.pacc.service.alert.AdminAlertWebhookService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -55,7 +56,8 @@ class ServerPluginServiceTest {
         redscreenService = mock(RedscreenService.class);
 
         service = new ServerPluginService(registrationRepository, eventRepository, punishmentRepository,
-                accountRepository, alertRepository, redscreenService);
+                accountRepository, alertRepository, redscreenService,
+                mock(AdminAlertWebhookService.class));
         ReflectionTestUtils.setField(service, "configVersion", "1");
         ReflectionTestUtils.setField(service, "punishmentMode", 0);
         ReflectionTestUtils.setField(service, "enabledChecksCsv", "MOVE,COMBAT");

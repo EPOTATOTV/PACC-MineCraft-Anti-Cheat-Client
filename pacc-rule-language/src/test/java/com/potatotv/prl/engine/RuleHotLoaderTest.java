@@ -150,6 +150,26 @@ class RuleHotLoaderTest {
     }
 
     @Test
+    void 空文件不会终止热加载线程() throws IOException, InterruptedException {
+        Path file = dir.resolve("a.prl");
+        Files.writeString(file, alertRule("a", "V1"));
+        RuleManager manager = new RuleManager(new RecordingHost());
+
+        try (RuleHotLoader loader = new RuleHotLoader(dir, manager)) {
+            loader.start();
+            assertEquals("V1", alertType(manager, "a"));
+
+            // 保存过程中文件会短暂为空：能解析但没有 rule，IR 生成会抛异常。
+            Files.writeString(file, "");
+            await("空文件应被记为编译错误", () -> loader.errors().containsKey("a"));
+
+            Files.writeString(file, alertRule("a", "V2"));
+            await("空文件之后热加载仍然工作", () -> "V2".equals(alertType(manager, "a")));
+            assertTrue(threadAlive("prl-hot-loader"), "单个文件出错不应终止热加载线程");
+        }
+    }
+
+    @Test
     void 关闭后热加载线程停止() throws IOException {
         Files.writeString(dir.resolve("a.prl"), alertRule("a", "V1"));
         RuleManager manager = new RuleManager(new RecordingHost());

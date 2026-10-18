@@ -6,6 +6,8 @@ import { Route } from 'react-router-dom'
 const Dashboard = lazy(() => import('../pages/Dashboard'))
 const Redscreen = lazy(() => import('../pages/Redscreen'))
 const Inspect = lazy(() => import('../pages/Inspect'))
+const EvidenceChain = lazy(() => import('../pages/EvidenceChain'))
+const AlertCenter = lazy(() => import('../pages/AlertCenter'))
 const SignatureLibrary = lazy(() => import('../pages/SignatureLibrary'))
 const Accounts = lazy(() => import('../pages/Accounts'))
 const CheatRecords = lazy(() => import('../pages/CheatRecords'))
@@ -34,6 +36,8 @@ export const coreRoutes = (
     <Route path="/" element={<Dashboard />} />
     <Route path="/redscreen" element={<Redscreen />} />
     <Route path="/inspect" element={<Inspect />} />
+    <Route path="/evidence" element={<EvidenceChain />} />
+    <Route path="/alerts" element={<AlertCenter />} />
     <Route path="/signatures" element={<SignatureLibrary />} />
     <Route path="/accounts" element={<Accounts />} />
     <Route path="/records" element={<CheatRecords />} />

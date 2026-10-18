@@ -53,6 +53,24 @@ class AimProfileTest {
     }
 
     @Test
+    void mlDisguiseRaisesLikelihoodWithoutPassingBaseThreshold() {
+        AimProfile disguised = AimProfile.fromRotations(mlDisguisedRotation());
+        assertTrue(disguised.machineLikelihood() < 0.6,
+                "基础启发式应被伪装压低，不能直接越过出证阈值");
+        assertTrue(disguised.mlDisguiseLikelihood() >= 0.65,
+                "旋转-CPS 相关 + 低 jerk + 长窗口周期应给出高 ML 伪装似然");
+        assertTrue(Math.abs(disguised.rotationCpsCorrelation()) > 0.5,
+                "攻击帧应与高角速度同拍");
+    }
+
+    @Test
+    void humanNoiseDoesNotLookLikeMlDisguise() {
+        AimProfile human = AimProfile.fromRotations(noisyHumanRotation());
+        assertTrue(human.mlDisguiseLikelihood() < 0.5,
+                "无规律的左右修正不应触发 ML 伪装分量");
+    }
+
+    @Test
     void normalizeDeltaWrapsIntoHalfOpenRange() {
         assertEquals(-10.0, RotationSample.normalizeDelta(350.0), DELTA);
         assertEquals(10.0, RotationSample.normalizeDelta(10.0), DELTA);
@@ -81,6 +99,24 @@ class AimProfileTest {
             if (i < deltas.length) {
                 yaw += deltas[i];
             }
+        }
+        return samples;
+    }
+
+    /**
+     * ML 转头伪装：角速度按固定节拍起伏（低二阶差分 + 强自相关），
+     * 且只在高角速度帧出手（旋转与攻击同拍）。方向不反转，基础启发式拿不到 snap / 过冲分。
+     */
+    private static List<RotationSample> mlDisguisedRotation() {
+        int count = 120;
+        List<RotationSample> samples = new ArrayList<>();
+        float yaw = 0f;
+        for (int i = 0; i < count; i++) {
+            double phase = 2 * Math.PI * i / 20.0;
+            float step = (float) (10.0 + 25.0 * Math.sin(phase));
+            boolean attacking = step > 10f;
+            samples.add(new RotationSample(yaw, 0f, i * 50L, attacking));
+            yaw += step;
         }
         return samples;
     }

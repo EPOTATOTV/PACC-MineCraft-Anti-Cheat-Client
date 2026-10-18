@@ -134,7 +134,11 @@ public final class RuleHotLoader implements AutoCloseable {
             }
             for (WatchEvent<?> event : key.pollEvents()) {
                 if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
-                    reloadAll();
+                    try {
+                        reloadAll();
+                    } catch (RuntimeException e) {
+                        manager.host().log("error", "规则目录重扫失败：" + e.getMessage());
+                    }
                     continue;
                 }
                 Object context = event.context();
@@ -154,13 +158,18 @@ public final class RuleHotLoader implements AutoCloseable {
         if (name == null) {
             return;
         }
-        if (Files.notExists(file)) {
-            manager.unloadRule(name);
-            fingerprints.remove(name);
-            errors.remove(name);
-            return;
+        try {
+            if (Files.notExists(file)) {
+                manager.unloadRule(name);
+                fingerprints.remove(name);
+                errors.remove(name);
+                return;
+            }
+            reload(file);
+        } catch (RuntimeException e) {
+            // 单个文件出错不能带走整个看守线程，否则目录里其他规则从此不再热加载。
+            fail(name, "热加载失败：" + e.getMessage());
         }
-        reload(file);
     }
 
     /** 重新扫描目录，全量对齐一次。目录里的 {@code *.prl} 之外的文件不动。 */
@@ -186,7 +195,15 @@ public final class RuleHotLoader implements AutoCloseable {
         if (fingerprint.equals(fingerprints.get(name))) {
             return;
         }
-        CompileResult result = compiler.compileChecked(content);
+        CompileResult result;
+        try {
+            result = compiler.compileChecked(content);
+        } catch (RuntimeException e) {
+            // 空文件、写到一半的文件都会走到这里（例如解析通过但没有任何 rule）。
+            // 记成编译错误并保留旧规则，不能让异常逃出看守线程。
+            fail(name, "编译异常：" + e.getMessage());
+            return;
+        }
         if (!result.ok()) {
             fail(name, result.describe());
             return;

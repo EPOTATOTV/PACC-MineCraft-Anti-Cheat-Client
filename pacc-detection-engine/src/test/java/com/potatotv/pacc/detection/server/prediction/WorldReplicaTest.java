@@ -59,13 +59,53 @@ class WorldReplicaTest {
     }
 
     @Test
-    void belowZeroIsVoidAbove255IsOutside() {
+    void worldHeightCoversModernRange() {
         WorldReplica world = WorldReplica.empty();
-        assertFalse(world.hasBlockAt(0, -5, 0));
-        assertEquals(0, world.blockAt(0, -1, 0));
-        world.applyBlockChange(0, 256, 0, 1);
-        assertEquals(0, world.blockAt(0, 256, 0));
-        world.applyBlockChange(0, 255, 0, 2);
-        assertEquals(2, world.blockAt(0, 255, 0));
+        world.applyBlockChange(0, MinecraftVersion.MIN_Y, 0, 1);
+        assertEquals(1, world.blockAt(0, MinecraftVersion.MIN_Y, 0));
+        world.applyBlockChange(0, MinecraftVersion.MAX_Y, 0, 2);
+        assertEquals(2, world.blockAt(0, MinecraftVersion.MAX_Y, 0));
+        // 界外：低于 -64 / 高于 319
+        world.applyBlockChange(0, MinecraftVersion.MIN_Y - 1, 0, 3);
+        assertEquals(0, world.blockAt(0, MinecraftVersion.MIN_Y - 1, 0));
+        world.applyBlockChange(0, MinecraftVersion.MAX_Y + 1, 0, 4);
+        assertEquals(0, world.blockAt(0, MinecraftVersion.MAX_Y + 1, 0));
+    }
+
+    @Test
+    void materialBlocksExposePhysics() {
+        WorldReplica world = WorldReplica.empty();
+        world.applyBlockChange(5, 64, 5, "SULFUR_BLOCK");
+        assertEquals("SULFUR_BLOCK", world.materialAt(5, 64, 5));
+        assertTrue(world.hasBlockAt(5.5, 64.5, 5.5));
+        assertEquals(0.6, world.physicsAt(5, 64, 5).slipperiness(), 1e-9);
+
+        world.applyBlockChange(6, 64, 5, "minecraft:ice");
+        assertEquals(0.98, world.physicsAt(6, 64, 5).slipperiness(), 1e-9);
+
+        world.applyBlockChange(7, 64, 5, "WATER");
+        assertFalse(world.hasBlockAt(7.5, 64.5, 5.5), "水不是碰撞方块");
+        assertEquals(null, world.materialAt(7, 64, 5));
+    }
+
+    @Test
+    void blockPhysicsTableMapsKnownMaterials() {
+        assertEquals(0.98, BlockPhysics.forMaterial("PACKED_ICE").slipperiness(), 1e-9);
+        assertEquals(0.8, BlockPhysics.forMaterial("SLIME_BLOCK").bounciness(), 1e-9);
+        assertEquals(0.8, BlockPhysics.forMaterial("HONEY_BLOCK").slipperiness(), 1e-9);
+        assertEquals(BlockPhysics.SOLID, BlockPhysics.forMaterial("SOME_FUTURE_BLOCK"));
+        assertFalse(BlockPhysics.forMaterial("AIR").collides());
+        assertFalse(BlockPhysics.forMaterial("CAVE_AIR").collides());
+    }
+
+    @Test
+    void minecraftVersionMatrixDeclares26x() {
+        assertEquals(MinecraftVersion.V26_2, MinecraftVersion.parse("git-Paper-123 (MC: 26.2)"));
+        assertEquals(MinecraftVersion.V26_1, MinecraftVersion.parse("26.1.1"));
+        assertEquals(MinecraftVersion.V1_21, MinecraftVersion.parse("1.21.1"));
+        assertEquals(MinecraftVersion.V1_20, MinecraftVersion.parse("1.20.4"));
+        assertTrue(MinecraftVersion.V26_2.hasSulfurBlocks());
+        assertFalse(MinecraftVersion.V26_1.hasSulfurBlocks());
+        assertEquals(MinecraftVersion.V26_2, MinecraftVersion.latest());
     }
 }

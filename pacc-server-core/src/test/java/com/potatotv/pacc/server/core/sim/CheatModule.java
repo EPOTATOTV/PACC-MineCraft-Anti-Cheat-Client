@@ -37,6 +37,11 @@ enum CheatModule {
         return !expectedCheatTypes.isEmpty();
     }
 
+    /** 当前检测项产出的 cheatType 集合（P-08 回归覆盖检查用）。 */
+    Set<String> expectedCheatTypes() {
+        return expectedCheatTypes;
+    }
+
     /** 命中的 cheatType 是否属于本模块的对应检测项。 */
     boolean isCorrespondingHit(String cheatType) {
         return expectedCheatTypes.contains(cheatType);

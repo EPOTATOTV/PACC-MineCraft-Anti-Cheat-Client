@@ -20,6 +20,7 @@ import com.potatotv.pacc.repository.AccountRepository;
 import com.potatotv.pacc.repository.CheatRecordRepository;
 import com.potatotv.pacc.repository.RedscreenAlertRepository;
 import com.potatotv.pacc.repository.SuspicionFlagRepository;
+import com.potatotv.pacc.service.alert.AdminAlertWebhookService;
 import com.potatotv.pacc.service.detection.v52.ThreatIntelExtractor;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +56,9 @@ class RedscreenServiceTest {
         webhook = mock(WebhookDispatcher.class);
         service = new RedscreenService(alertRepo, accountRepo, cheatRepo, suspicionRepo,
                 new ConfidenceService(70, THRESHOLD), online, inspect, webhook,
-                mock(NotificationService.class), mock(ThreatIntelExtractor.class),
+                mock(NotificationService.class),
+                mock(AdminAlertWebhookService.class),
+                mock(ThreatIntelExtractor.class),
                 new ObjectMapper(), THRESHOLD, SEVERE, 10);
     }
 

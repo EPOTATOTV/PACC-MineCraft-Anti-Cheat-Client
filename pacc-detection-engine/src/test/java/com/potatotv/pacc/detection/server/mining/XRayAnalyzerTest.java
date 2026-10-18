@@ -76,4 +76,60 @@ class XRayAnalyzerTest {
         stats.reset("p1");
         assertEquals(0, stats.profile("p1").totalOres());
     }
+
+    @Test
+    void viewCorrelationFlagsMechanicalAiming() {
+        ViewCorrelationProfile view = new ViewCorrelationProfile(30, 5.0, 3.0, 0.5, 0.9);
+        assertTrue(analyzer.evaluateViewCorrelation(view, new OreProfile(40, 20, 400)).isPresent());
+    }
+
+    @Test
+    void viewCorrelationRequiresRareOreShare() {
+        ViewCorrelationProfile view = new ViewCorrelationProfile(30, 5.0, 3.0, 0.5, 0.9);
+        // 40 块矿里只有 4 块稀有（10%），普通矿工不看这个维度
+        assertTrue(analyzer.evaluateViewCorrelation(view, new OreProfile(40, 4, 400)).isEmpty());
+    }
+
+    @Test
+    void scatteredHumanViewIsClean() {
+        ViewCorrelationProfile view = new ViewCorrelationProfile(30, 45.0, 30.0, 2.8, 0.4);
+        assertTrue(analyzer.evaluateViewCorrelation(view, new OreProfile(40, 20, 400)).isEmpty());
+    }
+
+    @Test
+    void missingViewDataAbortsViewJudgement() {
+        assertTrue(analyzer.evaluateViewCorrelation(
+                ViewCorrelationProfile.empty(), new OreProfile(40, 20, 400)).isEmpty());
+    }
+
+    @Test
+    void alignmentComputesBukkitYawConvention() {
+        assertEquals(0.0, OreDiscoveryStats.alignmentDeg(0, 0, 0f, 0, 5), 1e-9);
+        assertEquals(90.0, OreDiscoveryStats.alignmentDeg(0, 0, 0f, -5, 0), 1e-9);
+        assertEquals(0.0, OreDiscoveryStats.alignmentDeg(0, 0, 90f, -5, 0), 1e-9);
+        assertEquals(0.0, OreDiscoveryStats.alignmentDeg(0, 0, 270f, 5, 0), 1e-9);
+    }
+
+    @Test
+    void entropyAndIqrAreComputedFromDistribution() {
+        assertEquals(0.0, OreDiscoveryStats.entropyBits(java.util.List.of(10.0, 10.0, 10.0)), 1e-9);
+        assertEquals(0.0, OreDiscoveryStats.iqr(java.util.List.of(1.0, 2.0, 3.0)), 1e-9);
+        assertTrue(OreDiscoveryStats.iqr(java.util.List.of(1.0, 2.0, 8.0, 9.0)) > 5.0);
+    }
+
+    @Test
+    void viewProfileUsesPositionYawAndOreCoordinates() {
+        OreDiscoveryStats stats = new OreDiscoveryStats();
+        for (int i = 0; i < 30; i++) {
+            double z = i * 5.0;
+            stats.recordPosition("p1", 0, z, 0f);
+            stats.recordTravel("p1", 5.0);
+            stats.recordOre("p1", "DIAMOND_ORE", 0, z + 2.0);
+        }
+        ViewCorrelationProfile view = stats.viewProfile("p1");
+        assertEquals(30, view.samples());
+        assertEquals(0.0, view.meanAlignmentDeg(), 1e-6);
+        assertEquals(0.0, view.yawEntropyBits(), 1e-9);
+        assertEquals(145.0 / 150.0, view.pathStraightness(), 1e-9);
+    }
 }

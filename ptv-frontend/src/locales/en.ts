@@ -14,6 +14,8 @@ const en: Record<string, string> = {
   'nav.dashboard': 'Dashboard',
   'nav.redscreen': 'Red Screen',
   'nav.inspect': 'Inspect Console',
+  'nav.evidenceChain': 'Cross-end Evidence',
+  'nav.alerts': 'Alert Center',
   'nav.detection41': 'v4.1 Detection Engine',
   'nav.countermeasure': 'Countermeasure Patrol',
   'nav.v46': 'Detection Deep-Dive',

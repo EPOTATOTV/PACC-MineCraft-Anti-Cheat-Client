@@ -15,6 +15,7 @@ const ko = {
   'nav.dashboard': '데이터 대시보드',
   'nav.redscreen': '레드스크린 관리',
   'nav.inspect': '원격 점검',
+  'nav.evidenceChain': '교차 증거 체인',
   'nav.records': '치트 기록',
   'nav.accounts': 'PTEID 계정',
   'nav.admins': '관리자 관리',

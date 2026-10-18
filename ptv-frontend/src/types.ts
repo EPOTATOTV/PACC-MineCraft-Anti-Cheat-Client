@@ -1848,6 +1848,32 @@ export interface AutomationExecutionPage {
   totalPages?: number
 }
 
+/** P-06 跨端证据链单条事件（玩家端 CLIENT / 服务端 SERVER）。 */
+export interface CrossEvidenceItem {
+  source: 'CLIENT' | 'SERVER'
+  eventId: string
+  pteid: string
+  playerName?: string | null
+  playerUuid?: string | null
+  eventType?: string | null
+  checkType?: string | null
+  severity?: string | null
+  riskScore: number
+  detail?: string | null
+  occurredAt?: string | null
+  alertId?: string | null
+  serverId?: string | null
+  redscreenTriggered: boolean
+}
+
+/** P-06 跨端证据链响应。 */
+export interface CrossEvidenceChain {
+  pteid: string
+  clientEventCount: number
+  serverEventCount: number
+  items: CrossEvidenceItem[]
+}
+
 /** §4.2.2 插件市场条目（/plugins，下划线字段）。 */
 export interface PluginMarketRow {
   plugin_id?: string

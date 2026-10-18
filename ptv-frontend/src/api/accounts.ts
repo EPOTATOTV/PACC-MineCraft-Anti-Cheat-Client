@@ -1,6 +1,7 @@
 import type {
   Account,
   AdminRole,
+  CrossEvidenceChain,
   SystemAdmins,
   SystemConfig,
   SystemInfo,
@@ -15,6 +16,12 @@ export const accountsApi = {
   accounts: {
     list: (keyword?: string) =>
       request<Account[]>(`/accounts?keyword=${encodeURIComponent(keyword ?? '')}`),
+  },
+
+  // ---- P-06 跨端证据链：同一 PTEID 的玩家端 + 服务端事件 ----
+  crossEvidence: {
+    player: (pteid: string) =>
+      request<CrossEvidenceChain>(`/cross-evidence/players/${encodeURIComponent(pteid)}`),
   },
 
   roles: {

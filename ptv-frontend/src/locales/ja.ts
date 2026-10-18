@@ -15,6 +15,7 @@ const ja = {
   'nav.dashboard': 'データ盤',
   'nav.redscreen': '赤画面管理',
   'nav.inspect': '検端コンソール',
+  'nav.evidenceChain': 'クロスエンド証拠チェーン',
   'nav.records': 'チート記録',
   'nav.accounts': 'PTEID アカウント',
   'nav.admins': '管理者管理',

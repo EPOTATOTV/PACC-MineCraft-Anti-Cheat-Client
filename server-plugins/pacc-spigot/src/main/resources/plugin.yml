@@ -1,6 +1,6 @@
 name: PACC
 main: com.potatotv.pacc.spigot.PaccSpigotPlugin
-api-version: '1.20'
+api-version: '${plugin.api.version}'
 version: 6.0.0
 author: PotatoTV
 description: PACC 服务端本地检测与留痕插件，默认仅告警，可由运维配置踢出 / 封禁。

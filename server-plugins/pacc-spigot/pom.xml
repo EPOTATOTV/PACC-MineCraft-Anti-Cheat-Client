@@ -17,6 +17,8 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spigot.api.version>1.20.4-R0.1-SNAPSHOT</spigot.api.version>
+        <plugin.api.version>1.20</plugin.api.version>
     </properties>
 
     <repositories>
@@ -36,12 +38,29 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.20.4-R0.1-SNAPSHOT</version>
+            <version>${spigot.api.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
 
     <build>
+        <!-- plugin.yml 的 api-version 随 profile 变化；其它资源原样拷贝，不做过滤。 -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>plugin.yml</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -68,4 +87,16 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- P-01：26.2 编译坐标。Spigot API 从 26.x 起仍是 -R0.1-SNAPSHOT 口径；
+             需要 JDK 25 才能读取 26.x 的 API 产物。 -->
+        <profile>
+            <id>mc26</id>
+            <properties>
+                <spigot.api.version>26.2-R0.1-SNAPSHOT</spigot.api.version>
+                <plugin.api.version>26.2</plugin.api.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>

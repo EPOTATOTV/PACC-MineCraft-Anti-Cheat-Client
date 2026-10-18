@@ -21,6 +21,7 @@
         <!-- PacketEvents 2.13.0 起已支持 Minecraft 26.1 / 26.2；2.14.0 在其之上。
              这里只用于编译期接口，运行期由服务端上的 PacketEvents 插件提供，见 plugin.yml 的 softdepend。 -->
         <packetevents.version>2.14.0</packetevents.version>
+        <spigot.api.version>1.20.4-R0.1-SNAPSHOT</spigot.api.version>
     </properties>
 
     <repositories>
@@ -49,7 +50,7 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.20.4-R0.1-SNAPSHOT</version>
+            <version>${spigot.api.version}</version>
             <scope>provided</scope>
         </dependency>
         <!-- provided 而不是 shaded：PacketEvents 的 spigot 产物自带 plugin.yml，打进产物会
@@ -83,4 +84,15 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- P-01：26.2 编译坐标。需要 JDK 25（Paper 26.x 的 API 产物是 Java 25 字节码），
+             CI 的 mc26-compile job 用 -Pmc26 单独验证；默认构建仍是 1.20.4。 -->
+        <profile>
+            <id>mc26</id>
+            <properties>
+                <spigot.api.version>26.2-R0.1-SNAPSHOT</spigot.api.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>

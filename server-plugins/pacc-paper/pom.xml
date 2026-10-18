@@ -17,6 +17,8 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <paper.api.version>1.21.1-R0.1-SNAPSHOT</paper.api.version>
+        <plugin.api.version>1.20</plugin.api.version>
     </properties>
 
     <repositories>
@@ -36,12 +38,29 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.1-R0.1-SNAPSHOT</version>
+            <version>${paper.api.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
 
     <build>
+        <!-- plugin.yml 的 api-version 随 profile 变化；其它资源原样拷贝，不做过滤。 -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>plugin.yml</exclude>
+                </excludes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -70,4 +89,16 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- P-01：26.2 编译坐标（Paper 新版本号从 26.1 起改为 <mc>.<build>-<status>）。
+             Paper 26.x API 是 Java 25 字节码，必须在 JDK 25 上构建。 -->
+        <profile>
+            <id>mc26</id>
+            <properties>
+                <paper.api.version>26.2.build.134-stable</paper.api.version>
+                <plugin.api.version>26.2</plugin.api.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>

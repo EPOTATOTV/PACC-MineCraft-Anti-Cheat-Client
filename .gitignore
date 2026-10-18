@@ -25,6 +25,8 @@ deploy/dl-web/files/*.apk
 deploy/dl-web/files/*.tar.gz
 # 下载站品牌/logo 归档（企业品牌资产，仅本机留档，不入库、不上传）
 deploy/dl-web/archive/
+# 本地工具下载目录（如 gitleaks），仅本机使用
+.tmp/
 
 # --- Node ---
 node_modules/

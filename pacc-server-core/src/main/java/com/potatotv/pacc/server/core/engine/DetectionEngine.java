@@ -4,6 +4,7 @@ import com.potatotv.pacc.server.core.ServerPlatformAdapter;
 import com.potatotv.pacc.server.core.check.MoveAware;
 import com.potatotv.pacc.server.core.check.ServerCheck;
 import com.potatotv.pacc.server.core.check.TickAware;
+import com.potatotv.pacc.server.core.check.WorldAware;
 import com.potatotv.pacc.server.core.model.AddonInfo;
 import com.potatotv.pacc.server.core.model.CheckType;
 import com.potatotv.pacc.server.core.model.CombatEvent;
@@ -187,6 +188,22 @@ public final class DetectionEngine {
             }
             return raw;
         });
+    }
+
+    /**
+     * 方块变更（放置 / 破坏）广播给需要世界数据的检查项。
+     *
+     * <p>不产出检测结果、不受检查项开关影响：世界副本是预测的输入事实，
+     * 关掉某个检查项不应让世界数据停在旧状态。
+     */
+    public void handleBlockChanged(String worldName, int x, int y, int z, String material) {
+        for (List<ServerCheck> checks : checksByType.values()) {
+            for (ServerCheck check : checks) {
+                if (check instanceof WorldAware worldAware) {
+                    worldAware.onBlockChanged(worldName, x, y, z, material);
+                }
+            }
+        }
     }
 
     public List<DetectionResult> handleDataConsistency(

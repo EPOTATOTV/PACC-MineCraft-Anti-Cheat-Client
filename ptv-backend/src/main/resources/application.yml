@@ -154,6 +154,14 @@ pacc:
     session-key-required: ${PACC_WSS_SESSION_KEY_REQUIRED:false}
   webhook:
     retry: 3
+  # P-07 管理端告警渠道（Discord / 飞书机器人）。留空即关闭对应渠道；
+  # 透明度告警未单独配置飞书地址时复用主地址，只改文案前缀。
+  alert-webhook:
+    enabled: ${PACC_ALERT_WEBHOOK_ENABLED:true}
+    feishu-url: ${PACC_ALERT_FEISHU_WEBHOOK:}
+    discord-url: ${PACC_ALERT_DISCORD_WEBHOOK:}
+    transparency-feishu-url: ${PACC_ALERT_TRANSPARENCY_FEISHU_WEBHOOK:}
+    timeout-ms: ${PACC_ALERT_WEBHOOK_TIMEOUT_MS:5000}
   ai:
     # AI 推理服务（Python / FastAPI，deploy/ai）。启用后风险评分按 15% 权重融合 AI 分
     enabled: false
@@ -167,6 +175,10 @@ pacc:
     # PRL 动态规则引擎（classpath:rules/*.prl，管理端可触发热更新）
     enabled: true
     max-bonus: 15          # 规则命中加分上限
+    # P-09 规则市场签名：强制要求所有规则版本携带作者签名（默认关闭，向后兼容）
+    require-signature: ${PACC_RULES_REQUIRE_SIGNATURE:false}
+    # Base64 X.509 DER 公钥；配置后带签名的提交必须验签通过
+    signature-public-key: ${PACC_RULES_SIGNATURE_PUBKEY:}
   update:
     # PCU 灰度发布（§5.3）。内部测试 PTEID 逗号分隔，任何灰度比例下都优先放行
     internal-pteids: ${PACC_UPDATE_INTERNAL_PTEIDS:}

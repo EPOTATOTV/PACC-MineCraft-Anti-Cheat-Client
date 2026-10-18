@@ -238,10 +238,11 @@ public class PlayerWebSocketHandler extends AbstractWebSocketHandler {
             // 触发红屏决策（含冷却去重 + 全服广播 + 查端排队）
             redscreenService.decideAndHandle(pteid, cheatTypeOf(eventType), score, edition, detail);
 
-            // 高威胁可下发客户端就地防护指令
+            // 高威胁可下发客户端就地防护指令。P-03：reason 用通用文案，不把检测项 / 证据细节
+            // 发给玩家端（客户端控制台、抓包都能看到）
             if (score >= 70) {
                 send(sessionOf(pteid), Map.of("type", "mitigation",
-                        "action", "force_close", "reason", detail, "score", score));
+                        "action", "force_close", "reason", "检测到违规行为", "score", score));
             }
         } catch (Exception e) {
             log.warn("处理检测事件失败 pteid={} err={}", pteid, e.getMessage());

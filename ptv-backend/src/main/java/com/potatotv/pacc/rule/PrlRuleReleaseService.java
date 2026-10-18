@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,11 +51,17 @@ public class PrlRuleReleaseService {
 
     private final JdbcRuleVersionStore store;
     private final PrlRuleEngine ruleEngine;
+    private final RuleSignatureService signatureService;
+    private final JdbcRuleSignatureStore signatureStore;
     private final RuleReleaseManager releases;
 
-    public PrlRuleReleaseService(JdbcRuleVersionStore store, PrlRuleEngine ruleEngine) {
+    public PrlRuleReleaseService(JdbcRuleVersionStore store, PrlRuleEngine ruleEngine,
+                                 RuleSignatureService signatureService,
+                                 JdbcRuleSignatureStore signatureStore) {
         this.store = store;
         this.ruleEngine = ruleEngine;
+        this.signatureService = signatureService;
+        this.signatureStore = signatureStore;
         // 发布链路与风控求值共用同一个 RuleManager：审批通过就等于线上生效，没有中间态。
         this.releases = new RuleReleaseManager(store, ruleEngine.manager());
     }
@@ -72,7 +79,76 @@ public class PrlRuleReleaseService {
      * @throws PrlException 静态分析有错误、源码里的规则名与入参不符、或同版本号已有不同内容
      */
     public RuleVersion submitDraft(String ruleName, String version, String source, String author) {
-        return releases.submitDraft(ruleName, version, source, author);
+        return submitDraft(ruleName, version, source, author, null);
+    }
+
+    /**
+     * 提交带签名的草稿（P-09 规则市场）。
+     *
+     * <p>签名在入库前校验；{@code pacc.rules.require-signature=true} 时无签名直接拒绝。
+     * 可选模式下允许无签名，但一旦带了签名就必须验过——不能让假签名混进版本库。
+     *
+     * @param signatureBase64 Base64 签名，可为空
+     * @throws PrlException 签名缺失（强制模式）、签名无效或静态分析失败
+     */
+    public RuleVersion submitDraft(String ruleName, String version, String source,
+                                   String author, String signatureBase64) {
+        boolean hasSignature = signatureBase64 != null && !signatureBase64.isBlank();
+        if (signatureService.required() && !hasSignature) {
+            throw new PrlException("规则签名缺失：当前部署要求所有规则版本携带作者签名");
+        }
+        if (hasSignature && !signatureService.verify(ruleName, version, source, signatureBase64)) {
+            throw new PrlException("规则签名校验失败：签名与规则名 / 版本 / 正文不匹配");
+        }
+        RuleVersion draft = releases.submitDraft(ruleName, version, source, author);
+        if (hasSignature) {
+            signatureStore.save(ruleName, version, signatureBase64.trim(),
+                    signatureService.algorithm(), author);
+        }
+        return draft;
+    }
+
+    /** 某个版本是否已登记签名。 */
+    public boolean isSigned(String ruleName, String version) {
+        return signatureStore.find(ruleName, version).isPresent();
+    }
+
+    /**
+     * 规则市场清单（P-09）：每条规则当前生效版本的版本号、校验和、签名状态。
+     * 只读，不触发发布或下载；玩家端下发仍走 {@link #deliveriesFor(String)}。
+     */
+    public List<RuleMarketEntry> market() {
+        Map<String, RuleVersion> active = new LinkedHashMap<>();
+        for (RuleVersion version : store.all()) {
+            if (version.status() == RuleStatus.ACTIVE) {
+                active.putIfAbsent(version.ruleName(), version);
+            }
+        }
+        List<RuleMarketEntry> out = new ArrayList<>(active.size());
+        for (RuleVersion version : active.values()) {
+            Optional<JdbcRuleSignatureStore.SignatureRecord> signature =
+                    signatureStore.find(version.ruleName(), version.version());
+            out.add(new RuleMarketEntry(
+                    version.ruleName(),
+                    version.version(),
+                    version.checksum(),
+                    signature.isPresent(),
+                    signature.map(JdbcRuleSignatureStore.SignatureRecord::algorithm).orElse(""),
+                    signature.map(JdbcRuleSignatureStore.SignatureRecord::signedBy).orElse(""),
+                    Instant.ofEpochMilli(version.createdAtMs())));
+        }
+        return out;
+    }
+
+    /** 规则市场条目。 */
+    public record RuleMarketEntry(
+            String ruleName,
+            String version,
+            String checksum,
+            boolean signed,
+            String signatureAlgorithm,
+            String signedBy,
+            Instant publishedAt) {
     }
 
     /**

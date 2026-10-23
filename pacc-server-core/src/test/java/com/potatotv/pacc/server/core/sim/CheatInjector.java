@@ -89,7 +89,11 @@ final class CheatInjector {
                 results.addAll(engine.handleInventory(pid, "TOTEM_SWAP", 1000 + (long) Math.round(magnitude)));
             }
             // 未实现检测项：注入正常速度行为（无对应检测通道）
-            case PHASE, JESUS -> results.addAll(engine.handleMove(
+            // 两个 case 分开写：CodeQL 的 missing-case-in-switch 对多标签 arrow case 会误报缺 JESUS 分支。
+            case PHASE -> results.addAll(engine.handleMove(
+                    pos(pid, 0, 64, 0, 1000, true),
+                    pos(pid, magnitude, 64, 0, 1050, true)));
+            case JESUS -> results.addAll(engine.handleMove(
                     pos(pid, 0, 64, 0, 1000, true),
                     pos(pid, magnitude, 64, 0, 1050, true)));
         }

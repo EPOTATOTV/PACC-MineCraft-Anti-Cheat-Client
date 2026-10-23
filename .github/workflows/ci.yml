@@ -59,7 +59,7 @@ jobs:
       # 扫到密钥时上一步会以非 0 退出，报告仍要用 always() 捞出来
       - name: 上传扫描结果
         if: always()
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # v4.39.0
         continue-on-error: true
         with:
           sarif_file: gitleaks.sarif
@@ -578,7 +578,7 @@ jobs:
           components: clippy, rustfmt
       - name: 缓存 cargo
         if: steps.probe.outputs.rust_core == 'yes' || steps.probe.outputs.linux_client == 'yes'
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6  # v2.9.2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0  # v2.9.3
         with:
           workspaces: |
             platform/rust-core
@@ -736,7 +736,7 @@ jobs:
           ignore-unfixed: true
         continue-on-error: true
       - name: 上传扫描结果
-        uses: github/codeql-action/upload-sarif@24c54180a607b1449ed407dd24f251e4e9147c8d  # v4.38.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # v4.39.0
         continue-on-error: true
         with:
           sarif_file: trivy-results.sarif

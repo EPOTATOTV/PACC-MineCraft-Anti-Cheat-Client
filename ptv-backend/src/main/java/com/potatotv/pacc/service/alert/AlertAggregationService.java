@@ -46,6 +46,8 @@ public class AlertAggregationService {
     private final AlertSuppressionRuleRepository suppressionRuleRepository;
     private final AlertSuppressionService suppressionService;
     private final AlertPriorityService priorityService;
+    private final AlertQueuePublisher queuePublisher;
+    private final com.potatotv.pacc.service.RealtimeMetricsService metrics;
     private final DfProperties props;
 
     /** 聚合草案（纯计算结果，不落库）。 */
@@ -90,6 +92,7 @@ public class AlertAggregationService {
         if (signal == null) {
             return Optional.empty();
         }
+        metrics.recordAlert();
         if (suppressionService.isSuppressed(signal)) {
             return Optional.empty();
         }
@@ -137,7 +140,7 @@ public class AlertAggregationService {
         Instant scheduled = low
                 ? now.plus(Duration.ofMinutes(Math.max(1, props.getAlert().getLowPriorityDelayMinutes())))
                 : now;
-        queueRepository.save(AlertNotifyQueue.builder()
+        AlertNotifyQueue queued = queueRepository.save(AlertNotifyQueue.builder()
                 .id(UUID.randomUUID().toString().replace("-", ""))
                 .groupId(group.getId())
                 .priority(group.getPriority())
@@ -147,6 +150,7 @@ public class AlertAggregationService {
                 .payload("group=" + group.getId() + " player=" + group.getPlayerId()
                         + " family=" + group.getFamilyCode() + " signals=" + group.getSignalCount())
                 .build());
+        queuePublisher.publishAfterCommit(queued.getId());
     }
 
     private static boolean sameGroup(AlertGroup g, AlertSignal s) {

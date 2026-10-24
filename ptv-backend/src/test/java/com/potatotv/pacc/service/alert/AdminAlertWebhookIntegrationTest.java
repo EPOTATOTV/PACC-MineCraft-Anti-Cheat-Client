@@ -54,7 +54,6 @@ class AdminAlertWebhookIntegrationTest {
         assertTrue(feishuBodies.get(0).contains("[安全告警]"));
         assertTrue(feishuBodies.get(0).contains("\"msg_type\":\"text\""));
         assertTrue(discordBodies.get(0).contains("[安全告警]"));
-        service.shutdown();
     }
 
     @Test
@@ -66,7 +65,6 @@ class AdminAlertWebhookIntegrationTest {
         assertTrue(awaitSize(discordBodies, 1), "Discord 应收到请求");
         assertTrue(feishuBodies.isEmpty(), "主飞书地址不应收到透明度告警");
         assertTrue(transparencyBodies.get(0).contains("[透明度告警]"));
-        service.shutdown();
     }
 
     @Test
@@ -77,7 +75,6 @@ class AdminAlertWebhookIntegrationTest {
                 () -> service.dispatch(AlertCategory.SECURITY, "失败渠道", "detail"));
         assertTrue(awaitSize(failBodies, 1), "失败渠道也应真实收到请求");
         TimeUnit.MILLISECONDS.sleep(200);
-        service.shutdown();
     }
 
     private AdminAlertWebhookService service(String feishu, String discord, String transparency) {

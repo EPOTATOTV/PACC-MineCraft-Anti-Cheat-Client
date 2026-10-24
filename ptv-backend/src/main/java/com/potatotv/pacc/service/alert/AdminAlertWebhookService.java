@@ -1,6 +1,5 @@
 package com.potatotv.pacc.service.alert;
 
-import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -10,8 +9,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * 管理端告警 Webhook（P-07）：Discord 与飞书机器人两种渠道。
@@ -36,7 +33,6 @@ public class AdminAlertWebhookService {
     private final String transparencyFeishuUrl;
     private final long timeoutMs;
     private final HttpClient httpClient;
-    private final ExecutorService executor;
 
     public AdminAlertWebhookService(
             @Value("${pacc.alert-webhook.enabled:true}") boolean enabled,
@@ -49,10 +45,10 @@ public class AdminAlertWebhookService {
         this.discordUrl = trim(discordUrl);
         this.transparencyFeishuUrl = trim(transparencyFeishuUrl);
         this.timeoutMs = Math.max(500, timeoutMs);
+        // sendAsync 由 HttpClient 自己的线程池执行；这层只做 best-effort 投递，不额外建线程池。
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(this.timeoutMs))
                 .build();
-        this.executor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
     /** 是否至少配置了一个渠道。 */
@@ -91,11 +87,6 @@ public class AdminAlertWebhookService {
         if (!discordUrl.isEmpty()) {
             send(discordUrl, discordPayload(text));
         }
-    }
-
-    @PreDestroy
-    void shutdown() {
-        executor.shutdownNow();
     }
 
     private void send(String url, String body) {

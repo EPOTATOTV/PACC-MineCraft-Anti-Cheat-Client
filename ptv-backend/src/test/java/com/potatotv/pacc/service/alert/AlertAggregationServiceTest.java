@@ -38,7 +38,8 @@ class AlertAggregationServiceTest {
         AlertNotifyQueueRepository queueRepository = mock(AlertNotifyQueueRepository.class);
         AlertSuppressionService suppressionService = mock(AlertSuppressionService.class);
         service = new AlertAggregationService(groupRepository, queueRepository, suppressionRuleRepository,
-                suppressionService, new AlertPriorityService(), new DfProperties());
+                suppressionService, new AlertPriorityService(), mock(AlertQueuePublisher.class),
+                mock(com.potatotv.pacc.service.RealtimeMetricsService.class), new DfProperties());
     }
 
     @Test

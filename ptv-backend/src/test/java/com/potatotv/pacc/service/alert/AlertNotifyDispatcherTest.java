@@ -1,9 +1,12 @@
 package com.potatotv.pacc.service.alert;
 
+import com.potatotv.pacc.cluster.ClusterLock;
+import com.potatotv.pacc.cluster.RedisClient;
 import com.potatotv.pacc.domain.alert.AlertNotifyQueue;
 import com.potatotv.pacc.repository.AlertNotifyQueueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,18 +24,21 @@ import static org.mockito.Mockito.when;
 class AlertNotifyDispatcherTest {
 
     private AlertNotifyQueueRepository repository;
-    private AdminAlertWebhookService webhook;
+    private AlertNotifyDeliveryService deliveryService;
     private AlertNotifyDispatcher dispatcher;
 
     @BeforeEach
     void setUp() {
         repository = mock(AlertNotifyQueueRepository.class);
-        webhook = mock(AdminAlertWebhookService.class);
-        dispatcher = new AlertNotifyDispatcher(repository, webhook);
+        deliveryService = mock(AlertNotifyDeliveryService.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<RedisClient> redisProvider = mock(ObjectProvider.class);
+        when(redisProvider.getIfAvailable()).thenReturn(null);
+        dispatcher = new AlertNotifyDispatcher(repository, deliveryService, new ClusterLock(redisProvider));
     }
 
     @Test
-    void dueQueueIsDispatchedByPriorityCategory() {
+    void dueQueueIsHandedToDeliveryService() {
         AlertNotifyQueue security = queue("q1", "P0", AlertNotifyQueue.ST_PENDING);
         AlertNotifyQueue transparency = queue("q2", "P3", AlertNotifyQueue.ST_PENDING);
         when(repository.findByStatusOrderByScheduledAtAsc(AlertNotifyQueue.ST_HELD))
@@ -42,10 +48,8 @@ class AlertNotifyDispatcherTest {
 
         dispatcher.dispatchDue();
 
-        verify(webhook).dispatch(eq(AlertCategory.SECURITY), any(), eq("payload-q1"));
-        verify(webhook).dispatch(eq(AlertCategory.TRANSPARENCY), any(), eq("payload-q2"));
-        assertEquals(AlertNotifyQueue.ST_SENT, security.getStatus());
-        assertEquals(AlertNotifyQueue.ST_SENT, transparency.getStatus());
+        verify(deliveryService).deliver("q1");
+        verify(deliveryService).deliver("q2");
     }
 
     @Test

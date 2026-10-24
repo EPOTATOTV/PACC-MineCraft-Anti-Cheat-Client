@@ -26,6 +26,7 @@ public class AlertNotifyQueue {
     public static final String ST_PENDING = "PENDING";
     public static final String ST_SENT = "SENT";
     public static final String ST_HELD = "HELD";
+    public static final String ST_DEAD = "DEAD";
 
     @Id
     @Column(length = 64)
@@ -55,6 +56,15 @@ public class AlertNotifyQueue {
 
     @Column(length = 2000)
     private String payload;
+
+    /** 已失败重试次数；SENT 后保留最后一次值，便于排查。 */
+    @Builder.Default
+    @Column(nullable = false)
+    private int attempts = 0;
+
+    /** 最近一次投递失败原因，成功发送后清空。 */
+    @Column(name = "last_error", length = 255)
+    private String lastError;
 
     @Builder.Default
     @Column(name = "created_at", nullable = false)

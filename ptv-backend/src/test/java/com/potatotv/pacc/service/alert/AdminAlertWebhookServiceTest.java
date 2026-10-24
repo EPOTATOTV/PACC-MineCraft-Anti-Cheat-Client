@@ -38,7 +38,6 @@ class AdminAlertWebhookServiceTest {
         assertFalse(service.configured());
         // 未配置时 dispatch 必须是静默 no-op
         service.dispatch(AlertCategory.SECURITY, "t", "d");
-        service.shutdown();
     }
 
     @Test
@@ -46,7 +45,6 @@ class AdminAlertWebhookServiceTest {
         AdminAlertWebhookService service = new AdminAlertWebhookService(
                 true, "https://example.invalid/hook", "", "", 5000);
         assertTrue(service.configured());
-        service.shutdown();
     }
 
     @Test
@@ -61,6 +59,5 @@ class AdminAlertWebhookServiceTest {
         assertTrue(status.discordConfigured());
         assertTrue(status.transparencyFeishuConfigured());
         assertEquals(4000, status.timeoutMs());
-        service.shutdown();
     }
 }

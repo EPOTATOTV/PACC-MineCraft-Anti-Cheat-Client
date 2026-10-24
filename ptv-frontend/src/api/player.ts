@@ -4,7 +4,6 @@ import type {
   AiModelStatus,
   BpStateDto,
   Broadcast,
-  CheatRecord,
   DetectionEvent,
   DetectionLogLine,
   DetectorStatus,
@@ -25,7 +24,8 @@ import type {
   ProtectionResource,
   ProtectionStat,
   ProtectionStatus,
-  RedScreenDetail,
+  PlayerCheatRecord,
+  PlayerRedScreenDetail,
   ReputationSummary,
   SecurityScore,
   SupportTicket,
@@ -92,7 +92,7 @@ export const playerApi = {
     me: () => playerRequest<{ pteid: string }>('/me'),
     logout: () => fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }),
     summary: () => playerRequest<PlayerSummary>('/summary'),
-    records: () => playerRequest<CheatRecord[]>('/records'),
+    records: () => playerRequest<PlayerCheatRecord[]>('/records'),
     appeals: () => playerRequest<Appeal[]>('/appeals'),
     submitAppeal: (body: Record<string, string>) =>
       playerRequest<Appeal>('/appeals', { method: 'POST', body: JSON.stringify(body) }),
@@ -135,7 +135,7 @@ export const playerApi = {
         return playerRequest<DetectionLogLine[]>(`/monitor/logs?${p.toString()}`)
       },
     },
-    redscreenDetail: (id: string) => playerRequest<RedScreenDetail>(`/redscreen/${id}`),
+    redscreenDetail: (id: string) => playerRequest<PlayerRedScreenDetail>(`/redscreen/${id}`),
     notifications: {
       list: (kind?: string) =>
         playerRequest<PlayerNotification[]>(`/notifications${kind ? `?kind=${kind}` : ''}`),

@@ -4,7 +4,7 @@ import { Alert, Button, Card, Col, Descriptions, Empty, Row, Steps, Tag, Typogra
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { RedScreenDetail } from '../../types'
+import type { PlayerRedScreenDetail } from '../../types'
 import { RippleButton } from '../../components/animations'
 
 const { Title, Text } = Typography
@@ -23,7 +23,7 @@ const LEVEL_META: Record<number, { label: string; color: string }> = {
 export default function PlayerRedScreenDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [detail, setDetail] = useState<RedScreenDetail | null>(null)
+  const [detail, setDetail] = useState<PlayerRedScreenDetail | null>(null)
   const [err, setErr] = useState('')
 
   useEffect(() => {
@@ -78,29 +78,13 @@ export default function PlayerRedScreenDetail() {
             <Descriptions column={2} size="small">
               <Descriptions.Item label="事件 ID">{detail.eventId}</Descriptions.Item>
               <Descriptions.Item label="触发时间">{new Date(detail.triggeredAt).toLocaleString('zh-CN', { hour12: false })}</Descriptions.Item>
-              <Descriptions.Item label="检测类型">{detail.cheatType}</Descriptions.Item>
               <Descriptions.Item label="风险分">
                 <Text style={{ color: detail.riskScore >= 80 ? 'var(--kpi-red)' : detail.riskScore >= 60 ? 'var(--kpi-amber)' : 'var(--kpi-green)', fontWeight: 700 }}>
                   {detail.riskScore}
                 </Text>
               </Descriptions.Item>
               <Descriptions.Item label="状态">{detail.state}</Descriptions.Item>
-              <Descriptions.Item label="影响玩家">{(detail.hitDetectors ?? []).length > 0 ? '参考下方命中明细' : '暂无'}</Descriptions.Item>
             </Descriptions>
-          </Card>
-
-          <Card title="命中检测器" size="small" style={{ marginTop: 14 }}>
-            {(detail.hitDetectors ?? []).length === 0 ? (
-              <Text type="secondary">暂无命中明细</Text>
-            ) : (
-              detail.hitDetectors.map((d) => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                  <Tag color={d.matched ? 'error' : 'default'}>{d.matched ? '命中' : '未命中'}</Tag>
-                  <span style={{ flex: 1 }}>{d.name}</span>
-                  <Text type="secondary">风险 {d.risk}</Text>
-                </div>
-              ))
-            )}
           </Card>
 
           {(detail.evidence?.memory || detail.evidence?.behavior) && (

@@ -3,7 +3,7 @@ import { Alert, Card, Col, Input, Row, Select, Space, Table, Tag, Typography } f
 import type { TableColumnsType } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { CheatRecord } from '../../types'
+import type { PlayerCheatRecord } from '../../types'
 import EChart from '../../components/EChart'
 import type { EChartsOption } from 'echarts'
 import MetricCard from '../../components/MetricCard'
@@ -11,10 +11,9 @@ import MetricCard from '../../components/MetricCard'
 const { Title, Text } = Typography
 
 export default function PlayerRecords() {
-  const [records, setRecords] = useState<CheatRecord[]>([])
+  const [records, setRecords] = useState<PlayerCheatRecord[]>([])
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(true)
-  const [typeFilter, setTypeFilter] = useState<string>()
   const [minRisk, setMinRisk] = useState<number>()
   const [keyword, setKeyword] = useState('')
   const navigate = useNavigate()
@@ -28,16 +27,13 @@ export default function PlayerRecords() {
 
   const riskColor = (v: number) => (v >= 80 ? 'error' : v >= 60 ? 'warning' : 'success')
 
-  const types = useMemo(() => Array.from(new Set(records.map((r) => r.cheatType))), [records])
-
   const filtered = useMemo(() => {
     return records.filter((r) => {
-      if (typeFilter && r.cheatType !== typeFilter) return false
       if (minRisk && r.riskScore < minRisk) return false
-      if (keyword.trim() && !r.cheatType.toLowerCase().includes(keyword.trim().toLowerCase())) return false
+      if (keyword.trim() && !(r.inspectConclusion ?? '').toLowerCase().includes(keyword.trim().toLowerCase())) return false
       return true
     })
-  }, [records, typeFilter, minRisk, keyword])
+  }, [records, minRisk, keyword])
 
   const riskDistOption: EChartsOption = useMemo(() => {
     const classified = records.reduce(
@@ -70,15 +66,12 @@ export default function PlayerRecords() {
     }
   }, [records])
 
-  const columns: TableColumnsType<CheatRecord> = [
+  const columns: TableColumnsType<PlayerCheatRecord> = [
     {
-      title: '类型',
-      dataIndex: 'cheatType',
-      render: (t: string, r) => (
-        <span>
-          {t} <Text type="secondary">L{r.level}</Text>
-        </span>
-      ),
+      title: '等级',
+      dataIndex: 'level',
+      width: 90,
+      render: (v: number) => <Tag>L{v}</Tag>,
     },
     {
       title: '风险',
@@ -117,21 +110,13 @@ export default function PlayerRecords() {
           <Space wrap>
             <Select
               allowClear
-              placeholder="检测类型"
-              style={{ width: 150 }}
-              value={typeFilter}
-              onChange={(v) => setTypeFilter(v)}
-              options={types.map((t) => ({ value: t, label: t }))}
-            />
-            <Select
-              allowClear
               placeholder="最低风险"
               style={{ width: 120 }}
               value={minRisk}
               onChange={(v) => setMinRisk(v)}
               options={[60, 70, 80, 90].map((v) => ({ value: v, label: `≥ ${v}` }))}
             />
-            <Input.Search allowClear placeholder="搜索类型" style={{ width: 160 }} onSearch={(v) => setKeyword(v)} />
+            <Input.Search allowClear placeholder="搜索查端结论" style={{ width: 180 }} onSearch={(v) => setKeyword(v)} />
           </Space>
         }
       >
@@ -139,7 +124,7 @@ export default function PlayerRecords() {
       </Card>
 
       <Card styles={{ body: { padding: 0 } }}>
-        <Table<CheatRecord>
+        <Table<PlayerCheatRecord>
           rowKey="recordId"
           columns={columns}
           dataSource={filtered}

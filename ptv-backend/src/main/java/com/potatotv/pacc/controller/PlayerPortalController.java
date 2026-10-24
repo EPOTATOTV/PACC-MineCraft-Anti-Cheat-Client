@@ -61,15 +61,38 @@ public class PlayerPortalController {
         return out;
     }
 
-    /** 我的作弊记录（自助查询）。 */
+    /** 我的作弊记录（自助查询）。P-03：玩家侧不返回检测项名称，只给记录标识与处置状态。 */
     @GetMapping("/records")
-    public List<CheatRecord> myRecords(HttpServletRequest req) {
+    public List<PlayerCheatRecord> myRecords(HttpServletRequest req) {
         String pteid = pteidOf(req);
         if (pteid.isEmpty()) return List.of();
         return recordRepository.findAll().stream()
                 .filter(r -> pteid.equals(r.getPteid()))
                 .sorted((a, b) -> b.getOccurredAt().compareTo(a.getOccurredAt()))
+                .map(PlayerCheatRecord::of)
                 .toList();
+    }
+
+    /** 玩家可见的违规记录视图；检测项名称留在管理端与 PTEID 内部证据链。 */
+    public record PlayerCheatRecord(
+            String recordId,
+            String alertId,
+            int level,
+            int riskScore,
+            String inspectConclusion,
+            boolean revoked,
+            Instant occurredAt) {
+
+        static PlayerCheatRecord of(CheatRecord record) {
+            return new PlayerCheatRecord(
+                    record.getRecordId(),
+                    record.getAlertId(),
+                    record.getLevel(),
+                    record.getRiskScore(),
+                    record.getInspectConclusion(),
+                    record.isRevoked(),
+                    record.getOccurredAt());
+        }
     }
 
     /** 客户端完整性自检上报（受玩家 JWT 保护）：完整性破坏/可疑按对抗等级落库决策。 */
@@ -217,9 +240,9 @@ public class PlayerPortalController {
         String pteid = pteidOf(req);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("pteid", pteid);
-        List<CheatRecord> records = myRecords(req);
+        List<PlayerCheatRecord> records = myRecords(req);
         out.put("record_count", records.size());
-        out.put("revoked_count", records.stream().filter(CheatRecord::isRevoked).count());
+        out.put("revoked_count", records.stream().filter(PlayerCheatRecord::revoked).count());
         out.put("pending_appeals", appealRepository.findByPteidOrderByCreatedAtDesc(pteid)
                 .stream().filter(a -> "pending".equals(a.getStatus())).count());
         out.put("open_tickets", ticketRepository.findByPteidOrderByCreatedAtDesc(pteid)

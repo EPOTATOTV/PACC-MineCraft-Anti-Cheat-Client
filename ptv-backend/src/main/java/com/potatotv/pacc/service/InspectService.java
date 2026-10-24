@@ -33,6 +33,7 @@ public class InspectService {
     private final com.potatotv.pacc.repository.CheatRecordRepository cheatRecordRepository;
     private final OnlineStatusService onlineStatusService;
     private final InspectSignalBus inspectSignalBus;
+    private final SessionStateService sessionState;
 
     public int enqueue(String pteid, String alertId) {
         InspectSession s = InspectSession.builder()
@@ -117,6 +118,10 @@ public class InspectService {
             account.setStatus(account.getTotalRedscreen() >= 2 ? "high_risk" : "normal");
         }
         accountRepository.save(account);
+        // PENDING 只结束会话、不解锁；有明确结论时才清掉跨实例红屏锁定
+        if ("FALSE_POSITIVE".equals(normalized) || "CONFIRMED_CHEAT".equals(normalized)) {
+            sessionState.unlockRedscreen(s.getPteid());
+        }
         // 查端结束：通知玩家端解除监管，并释放信令总线腿
         inspectSignalBus.sendToPlayer(sessionId, signal("inspect_bye", s, normalized));
         inspectSignalBus.sendToAdmin(sessionId, signal("inspect_closed", s, normalized));

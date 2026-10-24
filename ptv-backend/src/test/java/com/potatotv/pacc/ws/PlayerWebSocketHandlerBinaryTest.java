@@ -2,9 +2,11 @@ package com.potatotv.pacc.ws;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.potatotv.pacc.service.AccountService;
+import com.potatotv.pacc.service.HotCacheService;
 import com.potatotv.pacc.service.InspectSignalBus;
 import com.potatotv.pacc.service.MapBpEventBus;
 import com.potatotv.pacc.service.OnlineStatusService;
+import com.potatotv.pacc.service.RealtimeMetricsService;
 import com.potatotv.pacc.service.RedscreenService;
 import com.potatotv.pacc.service.RiskScoringService;
 import com.potatotv.pbp.gen.PaccEnvelope;
@@ -39,7 +41,8 @@ class PlayerWebSocketHandlerBinaryTest {
         when(bus.forwardPlayerToAdmin(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(true);
 
-        PlayerWebSocketHandler h = new PlayerWebSocketHandler(new ObjectMapper(), online, risk, red, acc, guard, bus, new MapBpEventBus(new ObjectMapper()), codec, new WssSessionKeys(false));
+        PlayerWebSocketHandler h = new PlayerWebSocketHandler(new ObjectMapper(), online, risk, red, acc, guard, bus, new MapBpEventBus(new ObjectMapper()), codec, new WssSessionKeys(false), mock(HotCacheService.class),
+                mock(RealtimeMetricsService.class));
 
         WebSocketSession session = mock(WebSocketSession.class);
         when(session.getAttributes()).thenReturn(Map.of("pteid", "PT01"));
@@ -63,7 +66,8 @@ class PlayerWebSocketHandlerBinaryTest {
         AccountService acc = mock(AccountService.class);
         WssMessageGuard guard = mock(WssMessageGuard.class);
         InspectSignalBus bus = mock(InspectSignalBus.class);
-        PlayerWebSocketHandler h = new PlayerWebSocketHandler(new ObjectMapper(), online, risk, red, acc, guard, bus, new MapBpEventBus(new ObjectMapper()), codec, new WssSessionKeys(false));
+        PlayerWebSocketHandler h = new PlayerWebSocketHandler(new ObjectMapper(), online, risk, red, acc, guard, bus, new MapBpEventBus(new ObjectMapper()), codec, new WssSessionKeys(false), mock(HotCacheService.class),
+                mock(RealtimeMetricsService.class));
 
         WebSocketSession session = mock(WebSocketSession.class);
         when(session.getAttributes()).thenReturn(Map.of("pteid", "PT02"));
@@ -95,7 +99,8 @@ class PlayerWebSocketHandlerBinaryTest {
         WssSessionKeys keys = new WssSessionKeys(false);
         PaccWireCodec wire = new PaccWireCodec("test-secret", 60_000, keys);
         PlayerWebSocketHandler h = new PlayerWebSocketHandler(new ObjectMapper(), online, risk, red, acc, guard,
-                bus, new MapBpEventBus(new ObjectMapper()), wire, keys);
+                bus, new MapBpEventBus(new ObjectMapper()), wire, keys, mock(HotCacheService.class),
+                mock(RealtimeMetricsService.class));
 
         WebSocketSession session = mock(WebSocketSession.class);
         // 必须可变：处理器会把会话密钥 id 记进 attributes，供断线时销毁
@@ -137,7 +142,8 @@ class PlayerWebSocketHandlerBinaryTest {
         PlayerWebSocketHandler h = new PlayerWebSocketHandler(new ObjectMapper(), online,
                 mock(RiskScoringService.class), mock(RedscreenService.class), mock(AccountService.class),
                 mock(WssMessageGuard.class), mock(InspectSignalBus.class), new MapBpEventBus(new ObjectMapper()),
-                new PaccWireCodec("test-secret", 60_000, keys), keys);
+                new PaccWireCodec("test-secret", 60_000, keys), keys, mock(HotCacheService.class),
+                mock(RealtimeMetricsService.class));
 
         WebSocketSession session = mock(WebSocketSession.class);
         java.util.Map<String, Object> attrs = new java.util.HashMap<>();

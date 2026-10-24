@@ -23,6 +23,7 @@ import com.potatotv.pacc.security.RequirePermission;
 import com.potatotv.pacc.service.AlertService;
 import com.potatotv.pacc.service.OnlineStatusService;
 import com.potatotv.pacc.service.RbacService;
+import com.potatotv.pacc.service.RealtimeMetricsService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -77,6 +78,7 @@ public class AdminP0Controller {
     private final OnlineStatusService onlineStatusService;
     private final AlertService alertService;
     private final RbacService rbacService;
+    private final RealtimeMetricsService realtimeMetrics;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 已确认告警 id 集合（确认状态为瞬态，进程内承载即可）。 */
@@ -149,22 +151,32 @@ public class AdminP0Controller {
 
     @GetMapping("/realtime/overview")
     public Map<String, Object> realtimeOverview() {
-        Instant dayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
-        List<DetectionEvent> today = eventRepository.findByOccurredAtAfter(dayStart.minusSeconds(1));
-        long detections = today.size();
-        long redsToday = redscreenRepository.countByOccurredAtBetween(dayStart, Instant.now());
-        double avgRisk = today.stream().mapToInt(DetectionEvent::getClientRiskScore).average().orElse(0.0);
+        int online = onlineStatusService.onlineCount();
         long pending = inspectRepository.findAll().stream()
                 .filter(s -> "QUEUED".equals(s.getState())).count();
         long active = inspectRepository.findAll().stream()
                 .filter(s -> "ACTIVE".equals(s.getState())).count();
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("online", onlineStatusService.onlineCount());
-        out.put("detections", detections);
-        out.put("redscreenToday", redsToday);
+        out.put("online", online);
+        RealtimeMetricsService.Snapshot snapshot = realtimeMetrics.snapshot(online);
+        if (snapshot != null) {
+            out.put("detections", snapshot.detectionsToday());
+            out.put("redscreenToday", snapshot.redscreensToday());
+            out.put("avgRisk", snapshot.avgRisk());
+            out.put("detections30m", snapshot.detections30m());
+            out.put("alertsToday", snapshot.alertsToday());
+            out.put("detectionRate", snapshot.detectionRatePercent());
+        } else {
+            Instant dayStart = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
+            List<DetectionEvent> today = eventRepository.findByOccurredAtAfter(dayStart.minusSeconds(1));
+            long redsToday = redscreenRepository.countByOccurredAtBetween(dayStart, Instant.now());
+            double avgRisk = today.stream().mapToInt(DetectionEvent::getClientRiskScore).average().orElse(0.0);
+            out.put("detections", today.size());
+            out.put("redscreenToday", redsToday);
+            out.put("avgRisk", Math.round(avgRisk * 10.0) / 10.0);
+        }
         out.put("pendingInspect", pending);
         out.put("activeInspect", active);
-        out.put("avgRisk", Math.round(avgRisk * 10.0) / 10.0);
         return out;
     }
 
@@ -177,7 +189,12 @@ public class AdminP0Controller {
         out.add(stat("redscreen_total", "红屏累计", redscreenRepository.count(), "", "ok"));
         out.add(stat("pending_appeals", "待审申诉", appealRepository.countByStatus("pending"), "", "ok"));
         out.add(stat("pending_inspect", "待查验", inspectRepository.findAll().stream().filter(s -> "QUEUED".equals(s.getState())).count(), "", "warn"));
-        out.add(stat("detect_30m", "近30分钟检测", eventRepository.countByOccurredAtBetween(now.minusSeconds(1800), now), "", "ok"));
+        RealtimeMetricsService.Snapshot snapshot =
+                realtimeMetrics.snapshot(onlineStatusService.onlineCount());
+        long detect30m = snapshot != null
+                ? snapshot.detections30m()
+                : eventRepository.countByOccurredAtBetween(now.minusSeconds(1800), now);
+        out.add(stat("detect_30m", "近30分钟检测", detect30m, "", "ok"));
         return out;
     }
 

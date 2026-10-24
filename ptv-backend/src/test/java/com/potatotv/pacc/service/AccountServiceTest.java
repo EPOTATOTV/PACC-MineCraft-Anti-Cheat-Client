@@ -61,7 +61,7 @@ class AccountServiceTest {
         when(accountRepository.findByEcid("ECIDTEST01")).thenAnswer(inv -> Optional.ofNullable(saved));
         when(accountRepository.findByQq("100200300")).thenAnswer(inv -> Optional.ofNullable(saved));
         service = new AccountService(accountRepository, evtRepo, devRepo, perRepo,
-                pteidGenerator, tokenService);
+                pteidGenerator, tokenService, mock(SessionStateService.class));
     }
 
     private Account registerValid() {

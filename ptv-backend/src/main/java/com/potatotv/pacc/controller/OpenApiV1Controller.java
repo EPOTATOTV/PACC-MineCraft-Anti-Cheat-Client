@@ -44,6 +44,7 @@ public class OpenApiV1Controller {
     private final StatsService statsService;
     private final OpsService opsService;
     private final OpenApiWebhookService webhookService;
+    private final com.potatotv.pacc.service.SessionStateService sessionState;
 
     // ---------- 检测记录 ----------
     @GetMapping("/detections")
@@ -95,8 +96,12 @@ public class OpenApiV1Controller {
         if (!Boolean.TRUE.equals(req.getAttribute("apiWriteName"))) {
             return ResponseEntity.status(403).body(Map.of("error", "仅读密钥不可执行写操作"));
         }
+        var alert = alertRepository.findById(alertId).orElse(null);
         int n = alertRepository.unlockByAlertId(alertId, "FALSE_POSITIVE");
         if (n <= 0) return ResponseEntity.status(404).body(Map.of("error", "红屏不存在或已处理"));
+        if (alert != null) {
+            sessionState.unlockRedscreen(alert.getPteid());
+        }
         ApiKey key = (ApiKey) req.getAttribute("apiKey");
         webhookService.push(key, "redscreen.unlocked", Map.of("alert_id", alertId));
         return ResponseEntity.ok(Map.of("unlocked", true, "alert_id", alertId));

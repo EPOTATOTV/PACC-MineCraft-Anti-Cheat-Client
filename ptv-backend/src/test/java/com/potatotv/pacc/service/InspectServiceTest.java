@@ -48,7 +48,8 @@ class InspectServiceTest {
         cheatRepo = mock(CheatRecordRepository.class);
         online = mock(OnlineStatusService.class);
         bus = mock(InspectSignalBus.class);
-        service = new InspectService(sessionRepo, accountRepo, alertRepo, cheatRepo, online, bus);
+        service = new InspectService(sessionRepo, accountRepo, alertRepo, cheatRepo, online, bus,
+                mock(SessionStateService.class));
     }
 
     private InspectSession activeSession() {

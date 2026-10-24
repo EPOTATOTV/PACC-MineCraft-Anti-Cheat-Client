@@ -29,6 +29,7 @@ public class StatsService {
     private final InspectSessionRepository inspectSessionRepository;
     private final OnlineStatusService onlineStatusService;
     private final ConfidenceService confidenceService;
+    private final RealtimeMetricsService metrics;
 
     /** 置信度分级统计（近 7 天）：各级事件数量 + 阈值。 */
     public Map<String, Object> confidence() {
@@ -55,9 +56,21 @@ public class StatsService {
         Instant end = endDate == null ? Instant.now() : Instant.parse(endDate);
 
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("online_pteid", onlineStatusService.onlineCount());
-        m.put("detections_today", eventRepository.countByOccurredAtBetween(start, end));
-        m.put("redscreen_count", alertRepository.countByOccurredAtBetweenAndStateIn(start, end, List.of("PENDING_INSPECT","CONFIRMED","FALSE_POSITIVE")));
+        // 默认时间窗直接读实时计数；显式传日期时仍按数据库口径统计
+        boolean defaultWindow = startDate == null && endDate == null;
+        RealtimeMetricsService.Snapshot snapshot = defaultWindow
+                ? metrics.snapshot(onlineStatusService.onlineCount())
+                : null;
+        if (snapshot != null) {
+            m.put("online_pteid", snapshot.online());
+            m.put("detections_today", snapshot.detectionsToday());
+            m.put("redscreen_count", snapshot.redscreensToday());
+            m.put("detections_30m", snapshot.detections30m());
+        } else {
+            m.put("online_pteid", onlineStatusService.onlineCount());
+            m.put("detections_today", eventRepository.countByOccurredAtBetween(start, end));
+            m.put("redscreen_count", alertRepository.countByOccurredAtBetweenAndStateIn(start, end, List.of("PENDING_INSPECT","CONFIRMED","FALSE_POSITIVE")));
+        }
         m.put("pending_inspect", alertRepository.countByState("PENDING_INSPECT"));
         m.put("active_inspect", inspectSessionRepository.findByStateOrderByStartedAtDesc("ACTIVE").size());
         m.put("total_cheat_records", cheatRecordRepository.countByRevokedFalse());

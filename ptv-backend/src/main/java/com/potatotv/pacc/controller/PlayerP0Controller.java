@@ -23,11 +23,14 @@ import com.potatotv.pacc.repository.SecurityTotpRepository;
 import com.potatotv.pacc.repository.SupportTicketRepository;
 import com.potatotv.pacc.repository.TicketMessageRepository;
 import com.potatotv.pacc.service.AccountService;
+import com.potatotv.pacc.service.HotCacheService;
 import com.potatotv.pacc.service.NotificationService;
 import com.potatotv.pacc.service.TotpService;
 import com.potatotv.pacc.service.ReputationService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -82,6 +86,10 @@ public class PlayerP0Controller {
     private final NotificationService notificationService;
     private final TotpService totpService;
     private final ReputationService reputationService;
+    private final HotCacheService hotCache;
+
+    @Value("${pacc.cache.detection-ttl-seconds:300}")
+    private long detectionTtlSeconds;
 
     private String pteidOf(HttpServletRequest req) {
         Object v = req.getAttribute("pteid");
@@ -273,8 +281,9 @@ public class PlayerP0Controller {
             Map<String, Object> n = new LinkedHashMap<>();
             n.put("id", "rs-" + a.getAlertId());
             n.put("kind", "redscreen");
-            n.put("title", "检测到作弊行为（" + a.getCheatType() + "）");
-            n.put("body", "风险评分 " + a.getRiskScore() + "，等级 L" + a.getLevel());
+            // P-03：玩家端告警只给通用文案，检测项与风险分留在 PTEID 内部证据链
+            n.put("title", "检测到违规行为");
+            n.put("body", "管理平台已介入核查。");
             n.put("read", ilRead(pteid, "rs-" + a.getAlertId()));
             n.put("createdAt", a.getOccurredAt() == null ? now.toString() : a.getOccurredAt().toString());
             all.add(n);
@@ -609,32 +618,30 @@ public class PlayerP0Controller {
 
     private List<DetectionEvent> eventsOf(String pteid) {
         if (pteid.isEmpty()) return List.of();
-        return eventRepository.findAll().stream()
-                .filter(e -> pteid.equals(e.getPteid())).toList();
+        return hotCache.getOrLoad(HotCacheService.playerDetectionsKey(pteid), detectionTtl(),
+                new TypeReference<List<DetectionEvent>>() { },
+                () -> eventRepository.findByPteidOrderByOccurredAtDesc(pteid));
     }
 
     private List<RedscreenAlert> redsOf(String pteid) {
         if (pteid.isEmpty()) return List.of();
-        return redscreenRepository.findAll().stream()
-                .filter(a -> pteid.equals(a.getPteid())).toList();
+        return hotCache.getOrLoad(HotCacheService.playerRedsKey(pteid), detectionTtl(),
+                new TypeReference<List<RedscreenAlert>>() { },
+                () -> redscreenRepository.findByPteidOrderByOccurredAtDesc(pteid));
     }
 
-    /** 构建红屏详情（证据缺省时返回空证据区，前端表现为空态）。 */
+    private Duration detectionTtl() {
+        return Duration.ofSeconds(Math.max(1L, detectionTtlSeconds));
+    }
+
+    /** 构建红屏详情（证据缺省时返回空证据区，前端表现为空态）。P-03：不返回检测项名称。 */
     private Map<String, Object> buildDetail(RedscreenAlert a) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("eventId", a.getAlertId());
         out.put("triggeredAt", a.getOccurredAt() == null ? "" : a.getOccurredAt().toString());
         out.put("level", a.getLevel());
         out.put("state", a.getState());
-        out.put("cheatType", a.getCheatType());
         out.put("riskScore", a.getRiskScore());
-        List<Map<String, Object>> hits = new ArrayList<>();
-        Map<String, Object> hit = new LinkedHashMap<>();
-        hit.put("name", a.getCheatType());
-        hit.put("matched", true);
-        hit.put("risk", a.getRiskScore());
-        hits.add(hit);
-        out.put("hitDetectors", hits);
         out.put("evidence", Map.of());
         List<Map<String, Object>> timeline = new ArrayList<>();
         timeline.add(tl(a.getOccurredAt(), "触发红屏"));

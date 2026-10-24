@@ -55,6 +55,8 @@ public class ServerPluginService {
     private final RedscreenAlertRepository alertRepository;
     private final RedscreenService redscreenService;
     private final AdminAlertWebhookService adminAlertWebhook;
+    private final HotCacheService hotCache;
+    private final RealtimeMetricsService metrics;
 
     @Value("${pacc.server-plugin.config-version:1}")
     private String configVersion;
@@ -153,11 +155,19 @@ public class ServerPluginService {
                         "PACC 中置信事件",
                         "server=" + req.serverId() + " pteid=" + req.pteid()
                                 + " type=" + req.cheatType() + " conf=" + event.getConfidence());
+                metrics.recordAlert();
             } catch (Exception e) {
                 log.warn("透明度告警推送失败 serverId={} err={}", req.serverId(), e.getMessage());
             }
         }
         eventRepository.save(event);
+        metrics.recordDetection(event.getConfidence());
+        if (!isBlank(req.pteid())) {
+            hotCache.evict(HotCacheService.playerDetectionsKey(req.pteid()));
+            if (event.isRedscreenTriggered()) {
+                hotCache.evict(HotCacheService.playerRedsKey(req.pteid()));
+            }
+        }
         return new EventAck(event.isRedscreenTriggered(), event.getAlertId());
     }
 

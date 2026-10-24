@@ -34,6 +34,7 @@ public class AccountService {
     private final PeripheralRepository peripheralRepository;
     private final PteidGenerator pteidGenerator;
     private final TokenService tokenService;
+    private final SessionStateService sessionState;
 
     /** 共享随机源：SecureRandom 线程安全，省去每次用量都重新构造与播种。 */
     private static final java.security.SecureRandom SECURE_RANDOM = new java.security.SecureRandom();
@@ -292,6 +293,7 @@ public class AccountService {
         rec.setLastLoginAt(now);
         rec.setActive(true);
         deviceRepository.save(rec);
+        sessionState.rememberDevice(pteid, deviceId, hashedFp, rec.getPlatform());
     }
 
     /** 当前账号的全部登录设备（当前使用优先）。 */

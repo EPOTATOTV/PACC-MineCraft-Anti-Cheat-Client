@@ -59,6 +59,9 @@ class RedscreenServiceTest {
                 mock(NotificationService.class),
                 mock(AdminAlertWebhookService.class),
                 mock(ThreatIntelExtractor.class),
+                mock(HotCacheService.class),
+                mock(SessionStateService.class),
+                mock(RealtimeMetricsService.class),
                 new ObjectMapper(), THRESHOLD, SEVERE, 10);
     }
 

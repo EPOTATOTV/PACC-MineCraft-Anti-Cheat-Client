@@ -40,4 +40,7 @@ public interface DetectionEventRepository extends JpaRepository<DetectionEvent, 
 
     /** P-06 跨端证据链：按 PTEID 取玩家端最近事件。 */
     List<DetectionEvent> findTop200ByPteidOrderByOccurredAtDesc(String pteid);
+
+    /** 玩家端实时保护页：按 PTEID 取全部事件（走 V42 的 pteid + occurred_at 索引）。 */
+    List<DetectionEvent> findByPteidOrderByOccurredAtDesc(String pteid);
 }

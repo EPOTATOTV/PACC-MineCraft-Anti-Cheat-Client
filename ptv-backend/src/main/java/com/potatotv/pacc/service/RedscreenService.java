@@ -45,6 +45,9 @@ public class RedscreenService {
     private final NotificationService notificationService;
     private final AdminAlertWebhookService adminAlertWebhook;
     private final ThreatIntelExtractor threatIntelExtractor;
+    private final HotCacheService hotCache;
+    private final SessionStateService sessionState;
+    private final RealtimeMetricsService metrics;
     private final ObjectMapper mapper;
 
     private final int redscreenThreshold;
@@ -62,6 +65,9 @@ public class RedscreenService {
                             NotificationService notificationService,
                             AdminAlertWebhookService adminAlertWebhook,
                             ThreatIntelExtractor threatIntelExtractor,
+                            HotCacheService hotCache,
+                            SessionStateService sessionState,
+                            RealtimeMetricsService metrics,
                             ObjectMapper mapper,
                             @Value("${pacc.detection.redscreen-threshold:85}") int redscreenThreshold,
                             @Value("${pacc.detection.severe-threshold:95}") int severeThreshold,
@@ -77,6 +83,9 @@ public class RedscreenService {
         this.notificationService = notificationService;
         this.adminAlertWebhook = adminAlertWebhook;
         this.threatIntelExtractor = threatIntelExtractor;
+        this.hotCache = hotCache;
+        this.sessionState = sessionState;
+        this.metrics = metrics;
         this.mapper = mapper;
         this.redscreenThreshold = redscreenThreshold;
         this.severeThreshold = severeThreshold;
@@ -125,6 +134,10 @@ public class RedscreenService {
                 .occurredAt(Instant.now())
                 .build();
         alertRepository.save(alert);
+        hotCache.evict(HotCacheService.playerRedsKey(pteid));
+        metrics.recordRedscreen();
+        // 红屏锁定 15 分钟：解锁流程失败时由 TTL 兜底，避免账号被永久锁死
+        sessionState.lockRedscreen(pteid, 15 * 60L);
 
         // 写入统一通知主表（站内白名单/定向方式进通知中心，WS 帧由下方 broadcast 派发）
         try {

@@ -57,7 +57,8 @@ class ServerPluginServiceTest {
 
         service = new ServerPluginService(registrationRepository, eventRepository, punishmentRepository,
                 accountRepository, alertRepository, redscreenService,
-                mock(AdminAlertWebhookService.class));
+                mock(AdminAlertWebhookService.class), mock(HotCacheService.class),
+                mock(RealtimeMetricsService.class));
         ReflectionTestUtils.setField(service, "configVersion", "1");
         ReflectionTestUtils.setField(service, "punishmentMode", 0);
         ReflectionTestUtils.setField(service, "enabledChecksCsv", "MOVE,COMBAT");

@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.potatotv.pacc.domain.Account;
 import com.potatotv.pacc.domain.DetectionEvent;
 import com.potatotv.pacc.service.AccountService;
+import com.potatotv.pacc.service.HotCacheService;
 import com.potatotv.pacc.service.InspectSignalBus;
 import com.potatotv.pacc.service.MapBpEventBus;
 import com.potatotv.pacc.service.OnlineStatusService;
+import com.potatotv.pacc.service.RealtimeMetricsService;
 import com.potatotv.pacc.service.RedscreenService;
 import com.potatotv.pacc.service.RiskScoringService;
 import com.potatotv.pbp.gen.PaccEnvelope;
@@ -48,6 +50,8 @@ public class PlayerWebSocketHandler extends AbstractWebSocketHandler {
     private final MapBpEventBus mapBpEventBus;
     private final PaccWireCodec paccWireCodec;
     private final WssSessionKeys sessionKeys;
+    private final HotCacheService hotCache;
+    private final RealtimeMetricsService metrics;
 
     @Override
     public void afterConnectionEstablished(@NonNull WebSocketSession session) {
@@ -64,6 +68,7 @@ public class PlayerWebSocketHandler extends AbstractWebSocketHandler {
     protected void handleTextMessage(@NonNull WebSocketSession session, @NonNull TextMessage message) {
         String pteid = (String) session.getAttributes().get("pteid");
         String edition = (String) session.getAttributes().getOrDefault("edition", "UNKNOWN");
+        onlineStatusService.heartbeat(pteid);
         try {
             JsonNode node = mapper.readTree(message.getPayload());
             String type = node.path("type").asText();
@@ -115,6 +120,7 @@ public class PlayerWebSocketHandler extends AbstractWebSocketHandler {
     @Override
     protected void handleBinaryMessage(@NonNull WebSocketSession session, @NonNull BinaryMessage message) {
         String pteid = (String) session.getAttributes().get("pteid");
+        onlineStatusService.heartbeat(pteid);
         try {
             PaccEnvelope env = paccWireCodec.parse(message.getPayload().array());
             String type = env.getType();
@@ -234,9 +240,12 @@ public class PlayerWebSocketHandler extends AbstractWebSocketHandler {
             Account account = accountService.findByPteidOrNull(pteid);
             int score = riskScoringService.score(event, account);
             accountService.saveEvent(event);
+            hotCache.evict(HotCacheService.playerDetectionsKey(pteid));
+            metrics.recordDetection(score);
 
             // 触发红屏决策（含冷却去重 + 全服广播 + 查端排队）
             redscreenService.decideAndHandle(pteid, cheatTypeOf(eventType), score, edition, detail);
+            hotCache.evict(HotCacheService.playerRedsKey(pteid));
 
             // 高威胁可下发客户端就地防护指令。P-03：reason 用通用文案，不把检测项 / 证据细节
             // 发给玩家端（客户端控制台、抓包都能看到）

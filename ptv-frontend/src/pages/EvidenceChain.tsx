@@ -6,7 +6,7 @@ import type { TableColumnsType } from 'antd'
 import PageHeader from '../components/PageHeader'
 import MetricCard from '../components/MetricCard'
 import { api } from '../api/client'
-import type { CrossEvidenceChain, CrossEvidenceDevice, CrossEvidenceItem } from '../types'
+import type { CrossEvidenceChain, CrossEvidenceDevice, CrossEvidenceHardware, CrossEvidenceItem } from '../types'
 
 const { Text } = Typography
 
@@ -62,9 +62,9 @@ export default function EvidenceChain() {
   const submit = useCallback(() => {
     const key = keyword.trim()
     setPteid(key)
+    // 查询统一交给 params 变化触发的 effect，避免同一请求发两次
     setParams(key ? { pteid: key } : {})
-    void load(key)
-  }, [keyword, load, setParams])
+  }, [keyword, setParams])
 
   return (
     <div>
@@ -75,7 +75,7 @@ export default function EvidenceChain() {
         onCloseError={() => setErr('')}
       />
 
-      <Card size="small" style={{ marginBottom: 14 }}>
+      <Card size="small" className="pacc-glass-md" style={{ marginBottom: 14 }}>
         <Space.Compact style={{ width: '100%', maxWidth: 520 }}>
           <Input
             allowClear
@@ -109,6 +109,7 @@ export default function EvidenceChain() {
       <Card
         title="时间线"
         size="small"
+        className="pacc-glass-md"
         style={{ marginBottom: 14 }}
         styles={{ body: { padding: chain?.items.length ? '4px 16px' : 24 } }}
       >
@@ -128,8 +129,10 @@ export default function EvidenceChain() {
       </Card>
 
       <Card
-        title={`设备指纹 (${chain?.devices.length ?? 0})`}
+        title={`登录设备 (${chain?.devices.length ?? 0})`}
         size="small"
+        className="pacc-glass-md"
+        style={{ marginBottom: 14 }}
         styles={{ body: { padding: chain?.devices.length ? 0 : 24 } }}
       >
         {chain && chain.devices.length > 0 ? (
@@ -140,10 +143,31 @@ export default function EvidenceChain() {
             dataSource={chain.devices}
             pagination={false}
             scroll={{ x: 760 }}
-            locale={{ emptyText: '暂无设备指纹' }}
+            locale={{ emptyText: '暂无登录设备' }}
           />
         ) : (
-          <Empty description="暂无设备指纹" />
+          <Empty description="暂无登录设备" />
+        )}
+      </Card>
+
+      <Card
+        title={`硬件指纹 (${chain?.hardwareFingerprints.length ?? 0})`}
+        size="small"
+        className="pacc-glass-md"
+        styles={{ body: { padding: chain?.hardwareFingerprints.length ? 0 : 24 } }}
+      >
+        {chain && chain.hardwareFingerprints.length > 0 ? (
+          <Table
+            size="small"
+            rowKey="fingerprintHash"
+            columns={hardwareColumns}
+            dataSource={chain.hardwareFingerprints}
+            pagination={false}
+            scroll={{ x: 680 }}
+            locale={{ emptyText: '暂无硬件指纹' }}
+          />
+        ) : (
+          <Empty description="暂无硬件指纹" />
         )}
       </Card>
     </div>
@@ -169,6 +193,19 @@ const deviceColumns: TableColumnsType<CrossEvidenceDevice> = [
     width: 90,
     render: (active: boolean) => active ? <Tag color="green">当前设备</Tag> : <Tag>历史</Tag>,
   },
+]
+
+const hardwareColumns: TableColumnsType<CrossEvidenceHardware> = [
+  {
+    title: '指纹摘要',
+    dataIndex: 'fingerprintHash',
+    render: (value: string) => (
+      <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{value.slice(0, 18)}…{value.slice(-10)}</Text>
+    ),
+  },
+  { title: '首次出现', dataIndex: 'firstSeenAt', width: 170, render: (v?: string | null) => fmt(v) },
+  { title: '最近出现', dataIndex: 'lastSeenAt', width: 170, render: (v?: string | null) => fmt(v) },
+  { title: '出现次数', dataIndex: 'seenCount', width: 100, align: 'right' },
 ]
 
 function EvidenceRow({ item }: { item: CrossEvidenceItem }) {

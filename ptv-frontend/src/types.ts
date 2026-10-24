@@ -226,6 +226,17 @@ export interface CheatRecord {
   occurredAt: string
 }
 
+/** 玩家自助门户可见的违规记录（P-03：不含检测项名称）。 */
+export interface PlayerCheatRecord {
+  recordId: string
+  alertId?: string | null
+  level: number
+  riskScore: number
+  inspectConclusion?: string | null
+  revoked: boolean
+  occurredAt: string
+}
+
 export interface Appeal {
   appealId: string
   pteid: string
@@ -494,6 +505,9 @@ export interface RedScreenDetail {
   timeline: { at: string; action: string; note?: string }[]
   player?: { pteid: string; reputation: number; device: string }
 }
+
+/** 玩家自助门户的红屏详情（P-03：不含检测项与命中检测器）。 */
+export type PlayerRedScreenDetail = Omit<RedScreenDetail, 'cheatType' | 'hitDetectors'>
 
 /** 远程查端 ICE 服务器条目（GET /api/admin/webrtc/ice-servers → ice_servers）。 */
 export interface IceServerConfig {
@@ -1893,12 +1907,21 @@ export interface CrossEvidenceDevice {
   active: boolean
 }
 
+/** P-06 玩家端硬件指纹摘要。 */
+export interface CrossEvidenceHardware {
+  fingerprintHash: string
+  firstSeenAt?: string | null
+  lastSeenAt?: string | null
+  seenCount: number
+}
+
 /** P-06 跨端证据链响应。 */
 export interface CrossEvidenceChain {
   pteid: string
   clientEventCount: number
   serverEventCount: number
   devices: CrossEvidenceDevice[]
+  hardwareFingerprints: CrossEvidenceHardware[]
   items: CrossEvidenceItem[]
 }
 

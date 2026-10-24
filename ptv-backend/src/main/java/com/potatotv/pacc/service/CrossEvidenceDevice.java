@@ -3,10 +3,11 @@ package com.potatotv.pacc.service;
 import java.time.Instant;
 
 /**
- * 跨端证据链中的设备指纹（P-06）。
+ * 跨端证据链中的登录设备（P-06）。
  *
- * <p>玩家端上报的硬件指纹摘要落在 {@code t_device}。这里只返回摘要与设备元信息，
- * 不返回原始 USB / 进程明细；原始证据仍在 DetectionEvent 的 process/memory 字段里。
+ * <p>来源是登录时落下的 {@code t_device} 记录，只返回脱敏指纹与设备元信息。
+ * 玩家端上报的硬件指纹摘要在 {@link CrossEvidenceHardware} 里单独列出，
+ * 原始 USB / 进程明细不经过本接口。
  *
  * @param deviceId          稳定设备标识（pteid + 指纹摘要派生）
  * @param deviceFingerprint 设备指纹摘要（十六进制）

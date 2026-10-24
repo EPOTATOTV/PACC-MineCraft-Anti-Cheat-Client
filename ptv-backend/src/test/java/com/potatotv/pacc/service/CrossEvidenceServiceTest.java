@@ -2,9 +2,11 @@ package com.potatotv.pacc.service;
 
 import com.potatotv.pacc.domain.DetectionEvent;
 import com.potatotv.pacc.domain.DeviceRecord;
+import com.potatotv.pacc.domain.PlayerHardwareFingerprint;
 import com.potatotv.pacc.domain.ServerPluginEvent;
 import com.potatotv.pacc.repository.DetectionEventRepository;
 import com.potatotv.pacc.repository.DeviceRecordRepository;
+import com.potatotv.pacc.repository.PlayerHardwareFingerprintRepository;
 import com.potatotv.pacc.repository.ServerPluginEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ class CrossEvidenceServiceTest {
     private DetectionEventRepository detectionEventRepository;
     private ServerPluginEventRepository serverPluginEventRepository;
     private DeviceRecordRepository deviceRecordRepository;
+    private PlayerHardwareFingerprintRepository hardwareFingerprintRepository;
     private CrossEvidenceService service;
 
     @BeforeEach
@@ -34,8 +37,9 @@ class CrossEvidenceServiceTest {
         detectionEventRepository = mock(DetectionEventRepository.class);
         serverPluginEventRepository = mock(ServerPluginEventRepository.class);
         deviceRecordRepository = mock(DeviceRecordRepository.class);
+        hardwareFingerprintRepository = mock(PlayerHardwareFingerprintRepository.class);
         service = new CrossEvidenceService(detectionEventRepository, serverPluginEventRepository,
-                deviceRecordRepository);
+                deviceRecordRepository, hardwareFingerprintRepository);
     }
 
     @Test
@@ -106,13 +110,35 @@ class CrossEvidenceServiceTest {
     }
 
     @Test
+    void includesHardwareFingerprints() {
+        when(hardwareFingerprintRepository.findTop300ByPteidOrderByLastSeenAtDesc("PT1234ABCD"))
+                .thenReturn(List.of(PlayerHardwareFingerprint.builder()
+                        .pteid("PT1234ABCD")
+                        .fingerprintHash("b".repeat(64))
+                        .firstSeenAt(Instant.parse("2026-09-01T00:00:00Z"))
+                        .lastSeenAt(Instant.parse("2026-10-18T00:00:00Z"))
+                        .seenCount(7)
+                        .build()));
+
+        CrossEvidenceChain chain = service.chain("PT1234ABCD");
+
+        assertEquals(1, chain.hardwareFingerprints().size());
+        CrossEvidenceHardware hardware = chain.hardwareFingerprints().get(0);
+        assertEquals(64, hardware.fingerprintHash().length());
+        assertEquals(7, hardware.seenCount());
+        assertEquals(Instant.parse("2026-09-01T00:00:00Z"), hardware.firstSeenAt());
+    }
+
+    @Test
     void blankPteidShortCircuits() {
         CrossEvidenceChain chain = service.chain("   ");
         assertTrue(chain.items().isEmpty());
         assertTrue(chain.devices().isEmpty());
+        assertTrue(chain.hardwareFingerprints().isEmpty());
         verify(detectionEventRepository, never()).findTop200ByPteidOrderByOccurredAtDesc("   ");
         verify(serverPluginEventRepository, never()).findTop200ByPteidOrderByReceivedAtDesc("   ");
         verify(deviceRecordRepository, never()).findByPteidOrderByLastLoginAtDesc("   ");
+        verify(hardwareFingerprintRepository, never()).findTop300ByPteidOrderByLastSeenAtDesc("   ");
     }
 
     private static DetectionEvent client(String pteid, String id, Instant at) {

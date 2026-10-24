@@ -11,7 +11,8 @@ import java.util.List;
  * @param pteid            查询的 PTEID
  * @param clientEventCount 玩家端事件条数（窗口内）
  * @param serverEventCount 服务端事件条数（窗口内）
- * @param devices          该 PTEID 的设备指纹
+ * @param devices          该 PTEID 的登录设备
+ * @param hardwareFingerprints 该 PTEID 上报过的硬件指纹摘要
  * @param items            合并后的时间线，按发生时间倒序
  */
 public record CrossEvidenceChain(
@@ -19,5 +20,6 @@ public record CrossEvidenceChain(
         int clientEventCount,
         int serverEventCount,
         List<CrossEvidenceDevice> devices,
+        List<CrossEvidenceHardware> hardwareFingerprints,
         List<CrossEvidenceItem> items) {
 }

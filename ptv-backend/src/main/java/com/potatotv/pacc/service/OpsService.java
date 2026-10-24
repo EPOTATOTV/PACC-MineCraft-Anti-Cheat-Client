@@ -1,5 +1,7 @@
 package com.potatotv.pacc.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.potatotv.pacc.configcenter.ConfigChangeRelay;
 import com.potatotv.pacc.domain.ClientCrashReport;
 import com.potatotv.pacc.domain.ClientTelemetry;
 import com.potatotv.pacc.domain.RemoteConfig;
@@ -9,12 +11,14 @@ import com.potatotv.pacc.repository.RemoteConfigRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * v4.7 自动化运维：客户端崩溃/性能上报落库、聚合概览与远程配置。
@@ -26,6 +30,8 @@ public class OpsService {
     private final ClientCrashReportRepository crashRepository;
     private final ClientTelemetryRepository telemetryRepository;
     private final RemoteConfigRepository configRepository;
+    private final HotCacheService hotCache;
+    private final ConfigChangeRelay configChangeRelay;
 
     /** 崩溃上报落库。 */
     public ClientCrashReport reportCrash(String pteid, String clientVersion, String os, String arch,
@@ -111,11 +117,20 @@ public class OpsService {
                 .boolValue(boolValue)
                 .updatedBy(blankToNull(updatedBy))
                 .build());
-        return configRepository.save(cfg);
+        RemoteConfig saved = configRepository.save(cfg);
+        // 配置缓存立即失效，并通过 Pub/Sub 通知其它实例；5 秒内全实例生效
+        hotCache.evict(HotCacheService.OPS_ACTIVE_CONFIG_KEY);
+        configChangeRelay.notifyChanged("runtime.config", Set.of(key));
+        return saved;
     }
 
     /** 生效配置映射（key → 唯一有效值），供客户端/紧急调整，仅含 bool/int/double 之一。 */
     public Map<String, Object> activeConfig() {
+        return hotCache.getOrLoad(HotCacheService.OPS_ACTIVE_CONFIG_KEY, Duration.ofMinutes(5),
+                new TypeReference<Map<String, Object>>() { }, this::loadActiveConfig);
+    }
+
+    private Map<String, Object> loadActiveConfig() {
         Map<String, Object> m = new LinkedHashMap<>();
         for (RemoteConfig c : configRepository.findAll()) {
             int values = (c.getIntValue() == null ? 0 : 1)

@@ -10,6 +10,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.potatotv.pacc.cluster.RedisClient;
+import com.potatotv.pacc.configcenter.ConfigChangeRelay;
 import com.potatotv.pacc.domain.ClientCrashReport;
 import com.potatotv.pacc.domain.ClientTelemetry;
 import com.potatotv.pacc.domain.RemoteConfig;
@@ -21,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * v4.7 自动化运维单测：崩溃上报落库、性能聚合、远程配置 upsert 后 active 返回。
@@ -33,11 +37,16 @@ class OpsServiceTest {
     private OpsService service;
 
     @BeforeEach
+    @SuppressWarnings("unchecked")
     void setUp() {
         crashRepo = mock(ClientCrashReportRepository.class);
         telemetryRepo = mock(ClientTelemetryRepository.class);
         configRepo = mock(RemoteConfigRepository.class);
-        service = new OpsService(crashRepo, telemetryRepo, configRepo);
+        ObjectProvider<RedisClient> redisProvider = mock(ObjectProvider.class);
+        when(redisProvider.getIfAvailable()).thenReturn(null);
+        HotCacheService hotCache = new HotCacheService(redisProvider, new ObjectMapper());
+        service = new OpsService(crashRepo, telemetryRepo, configRepo, hotCache,
+                mock(ConfigChangeRelay.class));
     }
 
     @Test

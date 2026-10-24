@@ -32,6 +32,21 @@ spring:
     baseline-on-migrate: true
 
 pacc:
+  # 多实例共享存储（限流 / OTP / 告警队列 / 热缓存 / 会话状态 / 分布式锁）。
+  # 不开启时全部回退到进程内实现，单实例照常运行；开启后才要求 Redis 可达。
+  cluster:
+    redis-enabled: ${PACC_CLUSTER_REDIS_ENABLED:false}
+    redis-host: ${PACC_CLUSTER_REDIS_HOST:127.0.0.1}
+    redis-port: ${PACC_CLUSTER_REDIS_PORT:6379}
+    redis-auth: ${PACC_CLUSTER_REDIS_AUTH:}
+    redis-timeout-ms: ${PACC_CLUSTER_REDIS_TIMEOUT_MS:2000}
+    redis-pool-size: ${PACC_CLUSTER_REDIS_POOL_SIZE:16}
+  # R-03 检测结果热缓存：玩家端保护页按 PTEID 缓存，默认 5 分钟。
+  cache:
+    detection-ttl-seconds: ${PACC_DETECTION_CACHE_TTL_SECONDS:300}
+  # R-04 跨实例会话状态：本实例会话向 Redis 刷在线心跳的间隔。
+  session:
+    heartbeat-interval-ms: ${PACC_SESSION_HEARTBEAT_INTERVAL_MS:60000}
   security:
     # 对公发布：以下密钥必须经由环境变量注入，禁用内嵌默认值。
     # 任何一项为空/弱默认时，StartupSecretGuard 会在启动阶段直接抛错（fail-closed）。
@@ -134,6 +149,9 @@ pacc:
     max-elapsed-ms: ${PACC_ATTESTATION_MAX_ELAPSED_MS:500}
     # 是否强制要求上报的代码段哈希命中已知良好哈希库；灰度期默认 false（仅记录不拦截）。
     require-known-hash: ${PACC_ATTESTATION_REQUIRE_KNOWN_HASH:false}
+    # R-09 Mod 清单质询：有效期与客户端自述签名耗时上限。
+    mod-challenge-ttl-ms: ${PACC_MOD_CHALLENGE_TTL_MS:60000}
+    mod-max-elapsed-ms: ${PACC_MOD_MAX_ELAPSED_MS:5000}
   websocket:
     endpoint: /ws                # 玩家端 WebSocket 长连接端点
   # 远程查端 WebRTC ICE 参数（下发给管理端构造 RTCPeerConnection）。
@@ -162,6 +180,12 @@ pacc:
     discord-url: ${PACC_ALERT_DISCORD_WEBHOOK:}
     transparency-feishu-url: ${PACC_ALERT_TRANSPARENCY_FEISHU_WEBHOOK:}
     timeout-ms: ${PACC_ALERT_WEBHOOK_TIMEOUT_MS:5000}
+  # R-02 告警队列：Redis 负责即时消费，数据库定时扫描兜底；失败按退避重试，超限进死信。
+  alerts:
+    dispatch-interval-ms: ${PACC_ALERT_DISPATCH_INTERVAL_MS:10000}
+    dispatch-max-attempts: ${PACC_ALERT_DISPATCH_MAX_ATTEMPTS:3}
+    retry-backoff-ms: ${PACC_ALERT_RETRY_BACKOFF_MS:30000}
+    retry-backoff-max-ms: ${PACC_ALERT_RETRY_BACKOFF_MAX_MS:300000}
   ai:
     # AI 推理服务（Python / FastAPI，deploy/ai）。启用后风险评分按 15% 权重融合 AI 分
     enabled: false

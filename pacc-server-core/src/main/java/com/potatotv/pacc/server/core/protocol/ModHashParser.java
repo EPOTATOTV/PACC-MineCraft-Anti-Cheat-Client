@@ -4,28 +4,37 @@ import com.potatotv.pacc.addon.Json;
 
 import java.lang.System.Logger;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * {@code pacc:mods} 上报协议的服务端解析器——本类即协议规格。
  *
  * <h2>通道</h2>
  * <p>通道名 {@code pacc:mods}（Bukkit plugin channel id），方向为<b>客户端 → 服务端单向</b>。服务端只接收，
- * 不在此通道回发数据。
+ * 不在此通道回发数据。</p>
  *
- * <h2>载荷</h2>
- * <p>UTF-8 编码的 JSON，结构固定为：
+ * <h2>载荷 v1（兼容）</h2>
  * <pre>{@code
  * {"v":1,"mods":[{"id":"<modid>","sha256":"<64位十六进制小写>"}]}
  * }</pre>
- * <ul>
- *   <li>{@code v}：协议版本，当前为 {@code 1}；缺少时按 1 处理，出现其它版本一律丢弃。</li>
- *   <li>{@code mods}：条目数组，每项含 {@code id}（modid，可为空）与 {@code sha256}。</li>
- * </ul>
+ *
+ * <h2>载荷 v2（R-09 质询-签名）</h2>
+ * <pre>{@code
+ * {"v":2,"mods":[{"id":"<modid>","sha256":"<64位十六进制小写>"}],
+ *  "proof":{"challenge_id":"...","nonce":"...","signature":"<64位十六进制>","elapsed_ms":12}}
+ * }</pre>
+ * <p>签名口径：{@code HMAC-SHA256(secret, challengeId|nonce|modsDigest|elapsedMs)}，
+ * {@code modsDigest} 见 {@link #modsDigest(List)}。v2 缺少 proof 一律丢弃；v1 仍接受。</p>
  *
  * <h2>约束</h2>
  * <ul>
@@ -37,8 +46,7 @@ import java.util.Optional;
  * </ul>
  *
  * <h2>发送端</h2>
- * <p>客户端发送端由 {@code pacc-forge-mod} / {@code pacc-fabric-mod} 实现。本次仅定义协议与服务端接收，
- * 客户端发送端尚未实现。
+ * <p>客户端发送端由 {@code pacc-forge-mod} / {@code pacc-fabric-mod} 实现。</p>
  */
 public final class ModHashParser {
 
@@ -54,7 +62,16 @@ public final class ModHashParser {
     /** SHA-256 十六进制字符串长度。 */
     public static final int SHA256_HEX_LENGTH = 64;
 
-    private static final int PROTOCOL_VERSION = 1;
+    /** 当前协议版本；v1 仅兼容读取。 */
+    public static final int PROTOCOL_VERSION = 2;
+
+    private static final int LEGACY_PROTOCOL_VERSION = 1;
+    private static final int SIGNATURE_HEX_LENGTH = 64;
+    private static final int MIN_NONCE_LENGTH = 16;
+    private static final int MAX_NONCE_LENGTH = 128;
+    private static final int MAX_CHALLENGE_ID_LENGTH = 128;
+    private static final long MAX_ELAPSED_MS = 60_000L;
+
     private static final Logger LOG = System.getLogger(ModHashParser.class.getName());
 
     private ModHashParser() {
@@ -93,7 +110,8 @@ public final class ModHashParser {
         if (!(root instanceof Map<?, ?> map)) {
             return discard("顶层不是 JSON 对象");
         }
-        if (!versionSupported(map.get("v"))) {
+        int version = protocolVersion(map.get("v"));
+        if (version < 0) {
             return discard("协议版本不受支持");
         }
         if (!(map.get("mods") instanceof List<?> entries)) {
@@ -110,7 +128,18 @@ public final class ModHashParser {
             }
             mods.add(entry);
         }
-        return Optional.of(new ModHashReport(mods));
+        ModHashReport.Proof proof = null;
+        if (version >= PROTOCOL_VERSION) {
+            Object rawProof = map.get("proof");
+            if (!(rawProof instanceof Map<?, ?> proofMap)) {
+                return discard("v2 缺少 proof");
+            }
+            proof = parseProof(proofMap);
+            if (proof == null) {
+                return discard("proof 字段非法");
+            }
+        }
+        return Optional.of(new ModHashReport(mods, proof));
     }
 
     private static ModHashReport.ModEntry parseEntry(Object item) {
@@ -128,6 +157,35 @@ public final class ModHashParser {
         return new ModHashReport.ModEntry(id instanceof String s ? s : null, normalized);
     }
 
+    private static ModHashReport.Proof parseProof(Map<?, ?> proof) {
+        if (!(proof.get("challenge_id") instanceof String challengeId)) {
+            return null;
+        }
+        String cid = challengeId.trim();
+        if (cid.isEmpty() || cid.length() > MAX_CHALLENGE_ID_LENGTH) {
+            return null;
+        }
+        if (!(proof.get("nonce") instanceof String nonce)
+                || nonce.length() < MIN_NONCE_LENGTH || nonce.length() > MAX_NONCE_LENGTH) {
+            return null;
+        }
+        if (!(proof.get("signature") instanceof String signature)
+                || signature.length() != SIGNATURE_HEX_LENGTH) {
+            return null;
+        }
+        String sig = signature.toLowerCase(Locale.ROOT);
+        if (!isHex(sig)) {
+            return null;
+        }
+        long elapsedMs = proof.get("elapsed_ms") instanceof Number number
+                ? number.longValue()
+                : -1L;
+        if (elapsedMs < 0L || elapsedMs > MAX_ELAPSED_MS) {
+            return null;
+        }
+        return new ModHashReport.Proof(cid, nonce, sig, elapsedMs);
+    }
+
     /** 归一为小写并校验为 64 位十六进制；非法返回 {@code null}。供各平台配置 loader 复用同一套规则。 */
     public static String normalizeSha256(String raw) {
         if (raw == null) {
@@ -137,23 +195,73 @@ public final class ModHashParser {
         if (value.length() != SHA256_HEX_LENGTH) {
             return null;
         }
-        for (int i = 0; i < value.length(); i++) {
-            if (Character.digit(value.charAt(i), 16) < 0) {
-                return null;
-            }
+        if (!isHex(value)) {
+            return null;
         }
         return value.toLowerCase(Locale.ROOT);
     }
 
-    /** 缺少 {@code v} 视为版本 1；出现其它版本视为不兼容。 */
-    private static boolean versionSupported(Object version) {
+    /**
+     * Mod 清单摘要：按 (id, sha256) 排序、去重后，以 {@code id\nsha256} 逐行拼接再取 SHA-256。
+     * 客户端与服务端必须共用同一口径，否则签名永远对不上。
+     */
+    public static String modsDigest(List<ModHashReport.ModEntry> mods) {
+        if (mods == null || mods.isEmpty()) {
+            return sha256Hex(new byte[0]);
+        }
+        List<ModHashReport.ModEntry> sorted = new ArrayList<>(mods.size());
+        for (ModHashReport.ModEntry entry : mods) {
+            if (entry == null || entry.sha256() == null) {
+                continue;
+            }
+            sorted.add(new ModHashReport.ModEntry(
+                    entry.id() == null ? "" : entry.id(), entry.sha256()));
+        }
+        sorted.sort(Comparator.comparing(ModHashReport.ModEntry::id)
+                .thenComparing(ModHashReport.ModEntry::sha256));
+        Set<String> seen = new HashSet<>();
+        StringBuilder payload = new StringBuilder(sorted.size() * 80);
+        boolean first = true;
+        for (ModHashReport.ModEntry entry : sorted) {
+            if (!seen.add(entry.id() + '\u0000' + entry.sha256())) {
+                continue;
+            }
+            if (!first) {
+                payload.append('\n');
+            }
+            payload.append(entry.id()).append('\n').append(entry.sha256());
+            first = false;
+        }
+        return sha256Hex(payload.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** 签名原文：与服务端复算、客户端实现、单测三方共用同一串。 */
+    public static String canonicalSignaturePayload(String challengeId, String nonce,
+                                                   String modsDigest, long elapsedMs) {
+        return nz(challengeId) + "|" + nz(nonce) + "|" + nz(modsDigest) + "|" + elapsedMs;
+    }
+
+    public static String sha256Hex(byte[] value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JVM 缺失 SHA-256 实现", e);
+        }
+    }
+
+    /** 缺少 {@code v} 视为 v1；v1 / v2 之外返回 -1。 */
+    private static int protocolVersion(Object version) {
         if (version == null) {
-            return true;
+            return LEGACY_PROTOCOL_VERSION;
         }
+        int parsed;
         if (version instanceof Number number) {
-            return number.intValue() == PROTOCOL_VERSION;
+            parsed = number.intValue();
+        } else {
+            parsed = toIntOrMinusOne(String.valueOf(version));
         }
-        return PROTOCOL_VERSION == toIntOrMinusOne(String.valueOf(version));
+        return parsed == LEGACY_PROTOCOL_VERSION || parsed == PROTOCOL_VERSION ? parsed : -1;
     }
 
     private static int toIntOrMinusOne(String value) {
@@ -162,6 +270,19 @@ public final class ModHashParser {
         } catch (NumberFormatException ex) {
             return -1;
         }
+    }
+
+    private static boolean isHex(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.digit(value.charAt(i), 16) < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String nz(String value) {
+        return value == null ? "" : value;
     }
 
     private static <T> Optional<T> discard(String reason) {

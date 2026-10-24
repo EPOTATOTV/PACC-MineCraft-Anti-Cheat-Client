@@ -17,4 +17,16 @@ public interface PtvServerReporter {
 
     /** 上报一次实际处置（非告警）。 */
     void reportPunishment(String serverId, String playerUuid, PunishmentType type, String reason, long durationMs);
+
+    /**
+     * 把 Mod 清单质询证明转给 PTV 核验（R-09）。
+     *
+     * <p>默认实现不做任何事并回 false，表示该上报通道未接质询核验；
+     * 支持的服务端实现应异步请求并在拿到结果后回调。</p>
+     */
+    default void reportModProof(ModProofReport report, java.util.function.Consumer<Boolean> onResult) {
+        if (onResult != null) {
+            onResult.accept(false);
+        }
+    }
 }

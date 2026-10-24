@@ -64,8 +64,46 @@ class ModHashParserTest {
 
     @Test
     void unsupportedVersionIsDiscarded() {
-        assertTrue(ModHashParser.parse("{\"v\":2,\"mods\":[]}").isEmpty());
         assertTrue(ModHashParser.parse("{\"v\":\"x\",\"mods\":[]}").isEmpty());
+        assertTrue(ModHashParser.parse("{\"v\":3,\"mods\":[]}").isEmpty());
+    }
+
+    @Test
+    void v2WithoutProofIsDiscarded() {
+        assertTrue(ModHashParser.parse("{\"v\":2,\"mods\":[]}").isEmpty());
+    }
+
+    @Test
+    void signedV2PayloadCarriesProof() {
+        String nonce = "a".repeat(32);
+        String signature = "b".repeat(64);
+        Optional<ModHashReport> report = ModHashParser.parse(
+                "{\"v\":2,\"mods\":[{\"id\":\"x\",\"sha256\":\"" + LOWER + "\"}],"
+                        + "\"proof\":{\"challenge_id\":\"c1\",\"nonce\":\"" + nonce
+                        + "\",\"signature\":\"" + signature + "\",\"elapsed_ms\":12}}");
+        assertTrue(report.isPresent());
+        assertEquals("c1", report.get().proof().challengeId());
+        assertEquals(signature, report.get().proof().signature());
+    }
+
+    @Test
+    void v2MalformedProofIsDiscarded() {
+        String shortSig = "b".repeat(32);
+        assertTrue(ModHashParser.parse(
+                "{\"v\":2,\"mods\":[],\"proof\":{\"challenge_id\":\"c1\",\"nonce\":\""
+                        + "a".repeat(32) + "\",\"signature\":\"" + shortSig + "\",\"elapsed_ms\":1}}").isEmpty());
+        assertTrue(ModHashParser.parse(
+                "{\"v\":2,\"mods\":[],\"proof\":{\"challenge_id\":\"\",\"nonce\":\""
+                        + "a".repeat(32) + "\",\"signature\":\"" + "b".repeat(64)
+                        + "\",\"elapsed_ms\":1}}").isEmpty());
+    }
+
+    @Test
+    void modsDigestIgnoresOrderAndDuplicates() {
+        ModHashReport.ModEntry a = new ModHashReport.ModEntry("a", LOWER);
+        ModHashReport.ModEntry b = new ModHashReport.ModEntry("b", UPPER.toLowerCase());
+        assertEquals(ModHashParser.modsDigest(java.util.List.of(a, b)),
+                ModHashParser.modsDigest(java.util.List.of(b, a, a)));
     }
 
     @Test

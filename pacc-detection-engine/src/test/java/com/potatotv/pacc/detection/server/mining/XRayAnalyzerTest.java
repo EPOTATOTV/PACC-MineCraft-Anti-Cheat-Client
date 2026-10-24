@@ -132,4 +132,47 @@ class XRayAnalyzerTest {
         assertEquals(0.0, view.yawEntropyBits(), 1e-9);
         assertEquals(145.0 / 150.0, view.pathStraightness(), 1e-9);
     }
+
+    @Test
+    void pathProfileTracksStraightTunnel() {
+        OreDiscoveryStats stats = new OreDiscoveryStats();
+        for (int i = 0; i < 40; i++) {
+            stats.recordPosition("p1", 0, i * 4.0, 0f);
+            stats.recordTravel("p1", 4.0);
+        }
+        PathProfile path = stats.pathProfile("p1");
+        assertEquals(160.0, path.travelledBlocks(), 1e-9);
+        assertEquals(0.0, path.turnRate(), 1e-9);
+        assertTrue(path.longestStraightBlocks() >= 150.0);
+    }
+
+    @Test
+    void pathProfileCountsFrequentTurns() {
+        OreDiscoveryStats stats = new OreDiscoveryStats();
+        double[][] corners = {{0, 0}, {4, 0}, {4, 4}, {0, 4}};
+        for (int i = 0; i < 40; i++) {
+            double[] p = corners[i % 4];
+            stats.recordPosition("p1", p[0], p[1], 0f);
+            stats.recordTravel("p1", 4.0);
+        }
+        PathProfile path = stats.pathProfile("p1");
+        assertTrue(path.turnRate() > 0.5, "绕圈路径应被识别为频繁转向");
+        assertTrue(path.longestStraightBlocks() <= 8.0);
+    }
+
+    @Test
+    void pathAnalysisFlagsStraightOreSeeking() {
+        PathProfile path = new PathProfile(300, 0.02, 250);
+        assertTrue(analyzer.evaluatePath(path, new OreProfile(40, 20, 300)).isPresent());
+    }
+
+    @Test
+    void pathAnalysisRejectsTurningOrCommonOre() {
+        OreProfile rare = new OreProfile(40, 20, 300);
+        assertTrue(analyzer.evaluatePath(new PathProfile(300, 0.5, 250), rare).isEmpty());
+        assertTrue(analyzer.evaluatePath(new PathProfile(300, 0.02, 40), rare).isEmpty());
+        assertTrue(analyzer.evaluatePath(new PathProfile(50, 0.02, 40), rare).isEmpty());
+        assertTrue(analyzer.evaluatePath(new PathProfile(300, 0.02, 250),
+                new OreProfile(40, 4, 300)).isEmpty());
+    }
 }

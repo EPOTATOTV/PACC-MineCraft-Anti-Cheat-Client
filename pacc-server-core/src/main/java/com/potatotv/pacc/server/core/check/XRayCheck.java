@@ -65,6 +65,10 @@ public final class XRayCheck implements ServerCheck, MoveAware {
             // 基础双条件不成立时，再用视角相关性做补充判定；仍然要求稀有矿占比达标
             evidence = analyzer.evaluateViewCorrelation(stats.viewProfile(playerId), profile);
         }
+        if (evidence.isEmpty()) {
+            // R-10：最后用路径行为兜底，直线直插且几乎不转向
+            evidence = analyzer.evaluatePath(stats.pathProfile(playerId), profile);
+        }
         return evidence
                 .map(ev -> List.of(DetectionResult.violation(CheckType.INTERACTION, ev.detectorId(),
                         (int) Math.round(ev.confidence() * 100), ev.detail(), timestampMs)))

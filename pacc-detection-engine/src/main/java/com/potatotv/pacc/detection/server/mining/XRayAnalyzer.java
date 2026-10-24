@@ -49,6 +49,15 @@ public final class XRayAnalyzer {
     /** 路径直线度下限：接近 1 说明几乎沿直线直奔矿点。 */
     public static final double VIEW_PATH_STRAIGHT_MIN = 0.75;
 
+    /** 路径分析所需的最小累计路程（格），太短不判。 */
+    public static final double PATH_MIN_TRAVEL_BLOCKS = 128.0;
+
+    /** 路径转向率上限：越低越像沿直线直插。 */
+    public static final double PATH_MAX_TURN_RATE = 0.15;
+
+    /** 最长同向直线段下限（格）。 */
+    public static final double PATH_MIN_STRAIGHT_BLOCKS = 96.0;
+
     /** 置信度上限：统计类证据不给满值，留给融合层与人工复核。 */
     private static final double MAX_CONFIDENCE = 0.95;
 
@@ -117,6 +126,37 @@ public final class XRayAnalyzer {
                 "X-Ray 视角相关性 正对角度均值=%.1f° IQR=%.1f° yaw熵=%.2fbit 直线度=%.2f 稀有矿占比=%.2f 样本=%d",
                 view.meanAlignmentDeg(), view.alignmentIqrDeg(), view.yawEntropyBits(),
                 view.pathStraightness(), ore.rareRatio(), view.samples());
+        return Optional.of(Evidence.of(DETECTOR_ID, Layer.BEHAVIOR, confidence, detail));
+    }
+
+    /**
+     * R-10 路径行为补充判定：沿长直线直插矿点、几乎不转向。
+     *
+     * <p>只在前两项都没出证时兜底。要求稀有矿占比达标、每矿探索距离低于下限，
+     * 再叠加「转向率低 + 最长同向段长」。正常玩家挖直线矿道也可能命中这一段，
+     * 所以额外要求每矿探索距离足够短，把「效率高」和「透视」区分开。</p>
+     */
+    public Optional<Evidence> evaluatePath(PathProfile path, OreProfile ore) {
+        if (path == null || ore == null || !path.hasPathData()) {
+            return Optional.empty();
+        }
+        if (ore.totalOres() < MIN_VIEW_SAMPLES || ore.rareRatio() < VIEW_RARE_RATIO_MIN) {
+            return Optional.empty();
+        }
+        if (path.travelledBlocks() < PATH_MIN_TRAVEL_BLOCKS
+                || path.turnRate() > PATH_MAX_TURN_RATE
+                || path.longestStraightBlocks() < PATH_MIN_STRAIGHT_BLOCKS
+                || ore.blocksPerOre() > BLOCKS_PER_ORE_MIN) {
+            return Optional.empty();
+        }
+        double straightMargin = clamp((path.longestStraightBlocks() - PATH_MIN_STRAIGHT_BLOCKS)
+                / PATH_MIN_STRAIGHT_BLOCKS);
+        double turnMargin = clamp((PATH_MAX_TURN_RATE - path.turnRate()) / PATH_MAX_TURN_RATE);
+        double confidence = Math.min(MAX_CONFIDENCE, 0.55 + 0.2 * straightMargin + 0.15 * turnMargin);
+        String detail = String.format(Locale.ROOT,
+                "X-Ray 路径相关性 转向率=%.2f（上限 %.2f） 最长直线=%.0f格（下限 %.0f） 每矿距离=%.2f格 样本=%d",
+                path.turnRate(), PATH_MAX_TURN_RATE, path.longestStraightBlocks(),
+                PATH_MIN_STRAIGHT_BLOCKS, ore.blocksPerOre(), ore.totalOres());
         return Optional.of(Evidence.of(DETECTOR_ID, Layer.BEHAVIOR, confidence, detail));
     }
 }

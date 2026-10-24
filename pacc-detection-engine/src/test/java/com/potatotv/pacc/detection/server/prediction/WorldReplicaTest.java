@@ -100,12 +100,16 @@ class WorldReplicaTest {
 
     @Test
     void minecraftVersionMatrixDeclares26x() {
+        assertEquals(MinecraftVersion.V26_4, MinecraftVersion.parse("git-Paper-123 (MC: 26.4)"));
+        assertEquals(MinecraftVersion.V26_3, MinecraftVersion.parse("26.3"));
         assertEquals(MinecraftVersion.V26_2, MinecraftVersion.parse("git-Paper-123 (MC: 26.2)"));
         assertEquals(MinecraftVersion.V26_1, MinecraftVersion.parse("26.1.1"));
         assertEquals(MinecraftVersion.V1_21, MinecraftVersion.parse("1.21.1"));
         assertEquals(MinecraftVersion.V1_20, MinecraftVersion.parse("1.20.4"));
-        assertTrue(MinecraftVersion.V26_2.hasSulfurBlocks());
+        assertTrue(MinecraftVersion.V26_3.hasSulfurBlocks());
+        assertFalse(MinecraftVersion.V26_3.hasVulkanDefault());
+        assertTrue(MinecraftVersion.V26_4.hasVulkanDefault());
         assertFalse(MinecraftVersion.V26_1.hasSulfurBlocks());
-        assertEquals(MinecraftVersion.V26_2, MinecraftVersion.latest());
+        assertEquals(MinecraftVersion.V26_3, MinecraftVersion.latest());
     }
 }

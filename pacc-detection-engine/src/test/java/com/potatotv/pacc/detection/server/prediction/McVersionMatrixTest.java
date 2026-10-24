@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * P-01 版本矩阵门禁：CI 用 {@code -Dpacc.mc.version=26.1|26.2} 跑这个类，
- * 保证版本解析、世界高度与硫磺方块能力声明跟得上编排矩阵。
+ * P-01 / R-08 版本矩阵门禁：CI 用 {@code -Dpacc.mc.version=26.1|26.2|26.3|26.4}
+ * 跑这个类，保证版本解析、世界高度与硫磺/Vulkan 能力声明跟得上编排矩阵。
  */
 class McVersionMatrixTest {
 

@@ -1,5 +1,6 @@
 package com.potatotv.pacc.detection.server.mining;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +27,15 @@ public final class OreDiscoveryStats {
 
     /** yaw 熵分箱宽度（度）。 */
     private static final double YAW_BUCKET_DEG = 30.0;
+
+    /** 视角样本上限：长局也只保留最近这批，避免列表无限增长拖慢 TPS。 */
+    public static final int MAX_VIEW_SAMPLES = 512;
+
+    /** 方向判定所需的最小单步位移（格），过滤原地抖动。 */
+    private static final double MIN_DIRECTION_STEP = 0.1;
+
+    /** 相邻两段路径夹角超过该值算一次转向（度）。 */
+    private static final double TURN_ANGLE_DEG = 45.0;
 
     private final ConcurrentHashMap<String, Counter> counters = new ConcurrentHashMap<>();
 
@@ -83,6 +93,12 @@ public final class OreDiscoveryStats {
         return counter == null ? ViewCorrelationProfile.empty() : counter.viewSnapshot();
     }
 
+    /** 取玩家路径画像；没有移动数据时返回空画像。 */
+    public PathProfile pathProfile(String playerId) {
+        Counter counter = counters.get(playerId);
+        return counter == null ? PathProfile.empty() : counter.pathSnapshot();
+    }
+
     /** 会话结束或重连时清空，避免把上一局的数据算进这一局。 */
     public void reset(String playerId) {
         counters.remove(playerId);
@@ -102,8 +118,19 @@ public final class OreDiscoveryStats {
         private double lastZ;
         private float lastYaw;
 
-        private final List<Double> alignments = new ArrayList<>();
-        private final List<Double> yawSamples = new ArrayList<>();
+        private final ArrayDeque<Double> alignments = new ArrayDeque<>(MAX_VIEW_SAMPLES);
+        private final ArrayDeque<Double> yawSamples = new ArrayDeque<>(MAX_VIEW_SAMPLES);
+
+        private boolean hasDirection;
+        private double lastDirectionDeg;
+        private int directionSamples;
+        private int turns;
+        private double straightRun;
+        private double longestStraightRun;
+
+        private OreProfile cachedOreProfile;
+        private ViewCorrelationProfile cachedViewProfile;
+        private PathProfile cachedPathProfile;
 
         private synchronized void recordOre(OreType type, double oreX, double oreZ) {
             totalOres++;
@@ -111,17 +138,41 @@ public final class OreDiscoveryStats {
                 rareOres++;
             }
             if (hasPosition && !Double.isNaN(oreX) && !Double.isNaN(oreZ)) {
-                alignments.add(alignmentDeg(lastX, lastZ, lastYaw, oreX, oreZ));
-                yawSamples.add(normalizeYaw(lastYaw));
+                addBounded(alignments, alignmentDeg(lastX, lastZ, lastYaw, oreX, oreZ));
+                addBounded(yawSamples, normalizeYaw(lastYaw));
             }
+            cachedOreProfile = null;
+            cachedViewProfile = null;
         }
 
         private synchronized void recordTravel(double distance) {
             travelledBlocks += distance;
+            cachedOreProfile = null;
+            cachedViewProfile = null;
+            cachedPathProfile = null;
         }
 
         private synchronized void recordPosition(double x, double z, float yaw) {
-            if (!hasPosition) {
+            if (hasPosition) {
+                double dx = x - lastX;
+                double dz = z - lastZ;
+                double distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance >= MIN_DIRECTION_STEP && distance <= MAX_SINGLE_MOVE_BLOCKS) {
+                    double direction = Math.toDegrees(Math.atan2(dz, dx));
+                    if (hasDirection) {
+                        double delta = Math.abs(normalizeDelta(direction - lastDirectionDeg));
+                        if (delta > TURN_ANGLE_DEG) {
+                            turns++;
+                            straightRun = 0;
+                        }
+                    }
+                    directionSamples++;
+                    lastDirectionDeg = direction;
+                    hasDirection = true;
+                    straightRun += distance;
+                    longestStraightRun = Math.max(longestStraightRun, straightRun);
+                }
+            } else {
                 startX = x;
                 startZ = z;
                 hasPosition = true;
@@ -129,23 +180,66 @@ public final class OreDiscoveryStats {
             lastX = x;
             lastZ = z;
             lastYaw = yaw;
+            cachedViewProfile = null;
+            cachedPathProfile = null;
         }
 
         private synchronized OreProfile snapshot() {
-            return new OreProfile(totalOres, rareOres, travelledBlocks);
+            if (cachedOreProfile == null) {
+                cachedOreProfile = new OreProfile(totalOres, rareOres, travelledBlocks);
+            }
+            return cachedOreProfile;
         }
 
         private synchronized ViewCorrelationProfile viewSnapshot() {
-            if (alignments.isEmpty()) {
-                return ViewCorrelationProfile.empty();
+            if (cachedViewProfile != null) {
+                return cachedViewProfile;
             }
+            if (alignments.isEmpty()) {
+                cachedViewProfile = ViewCorrelationProfile.empty();
+                return cachedViewProfile;
+            }
+            List<Double> alignmentList = new ArrayList<>(alignments);
+            List<Double> yawList = new ArrayList<>(yawSamples);
             double mean = 0.0;
-            for (double angle : alignments) {
+            for (double angle : alignmentList) {
                 mean += angle;
             }
-            mean /= alignments.size();
-            return new ViewCorrelationProfile(alignments.size(), mean,
-                    iqr(alignments), entropyBits(yawSamples), straightness());
+            mean /= alignmentList.size();
+            cachedViewProfile = new ViewCorrelationProfile(alignmentList.size(), mean,
+                    iqr(alignmentList), entropyBits(yawList), straightness());
+            return cachedViewProfile;
+        }
+
+        private synchronized PathProfile pathSnapshot() {
+            if (cachedPathProfile != null) {
+                return cachedPathProfile;
+            }
+            if (directionSamples == 0) {
+                cachedPathProfile = PathProfile.empty();
+                return cachedPathProfile;
+            }
+            double turnRate = directionSamples <= 1 ? 0.0 : (double) turns / directionSamples;
+            cachedPathProfile = new PathProfile(travelledBlocks, turnRate, longestStraightRun);
+            return cachedPathProfile;
+        }
+
+        private static void addBounded(ArrayDeque<Double> samples, double value) {
+            if (samples.size() >= MAX_VIEW_SAMPLES) {
+                samples.removeFirst();
+            }
+            samples.addLast(value);
+        }
+
+        /** 归一化角度差到 [-180,180]。 */
+        private static double normalizeDelta(double delta) {
+            double value = delta % 360.0;
+            if (value >= 180.0) {
+                value -= 360.0;
+            } else if (value < -180.0) {
+                value += 360.0;
+            }
+            return value;
         }
 
         /** 路径直线度：起点到当前点的净位移 / 累计路程；没有路程时为 0。 */

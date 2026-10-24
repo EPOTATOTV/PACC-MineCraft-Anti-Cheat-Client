@@ -349,9 +349,10 @@ jobs:
             server-plugins/pacc-geyser/target/surefire-reports/
           if-no-files-found: ignore
 
-  # ---- MC 版本矩阵（P-01）----
-  # 26.x 起版本号改为年份口径。这里用矩阵把 26.1 / 26.2 的版本解析与方块物理表钉住；
-  # 预测引擎的模拟会话回归仍由 server-plugins job 里的 pacc-server-core 测试执行。
+  # ---- MC 版本矩阵（P-01 / R-08）----
+  # 26.x 起版本号改为年份口径。这里用矩阵把 26.1 / 26.2 / 26.3 / 26.4 的版本解析、
+  # 方块物理表与 Vulkan 能力位钉住；预测引擎的模拟会话回归仍由 server-plugins job
+  # 里的 pacc-server-core 测试执行。26.4 是快照，只验证解析与能力声明。
   mc-version-matrix:
     name: MC 版本矩阵 (${{ matrix.mc }})
     runs-on: ubuntu-24.04
@@ -359,7 +360,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mc: [ '26.1', '26.2' ]
+        mc: [ '26.1', '26.2', '26.3', '26.4' ]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5.1.0
       - name: 安装 JDK ${{ env.JAVA_VERSION }}
@@ -378,10 +379,10 @@ jobs:
           ( cd pacc-addon-scanner && mvn -B -q install )
           ( cd pacc-server-core && mvn -B -q test -Dtest=LegitSimulatorTest,CheatMatrixTest -Dpacc.mc.version=${{ matrix.mc }} )
 
-  # ---- 26.x 编译坐标（P-01）----
+  # ---- 26.x 编译坐标（P-01 / R-08）----
   # Paper 26.1+ 的 API 产物是 Java 25 字节码，默认的 JDK 21 构建读不了；
-  # 这里单独用 JDK 25 走 -Pmc26，验证 pacc-bukkit / pacc-paper / pacc-spigot 能对着
-  # Spigot 26.2 与 Paper 26.2.build.134-stable 编译，并检查 plugin.yml 的 api-version。
+  # 这里单独用 JDK 25，分别走 -Pmc26 与 -Pmc263，验证 pacc-bukkit / pacc-paper /
+  # pacc-spigot 能对着 Spigot 26.2/26.3 与 Paper 26.2/26.3 编译，并检查 plugin.yml。
   mc26-compile:
     name: 26.x 编译坐标
     runs-on: ubuntu-24.04
@@ -397,20 +398,31 @@ jobs:
       - name: 安装内部依赖
         run: |
           set -euo pipefail
-          ( cd pacc-detection-engine && mvn -B -q install -DskipTests )
-          ( cd pacc-addon-scanner && mvn -B -q install -DskipTests )
-          ( cd pacc-server-core && mvn -B -q install -DskipTests )
+          ( cd pacc-detection-engine && mvn -B -q install -DskipTests -Djacoco.skip=true )
+          ( cd pacc-addon-scanner && mvn -B -q install -DskipTests -Djacoco.skip=true )
+          ( cd pacc-server-core && mvn -B -q install -DskipTests -Djacoco.skip=true )
       - name: 26.2 编译 pacc-bukkit / pacc-paper / pacc-spigot
         run: |
           set -euo pipefail
           ( cd server-plugins/pacc-bukkit && mvn -B -q install -DskipTests -Pmc26 )
           ( cd server-plugins/pacc-paper && mvn -B -q package -DskipTests -Pmc26 )
           ( cd server-plugins/pacc-spigot && mvn -B -q package -DskipTests -Pmc26 )
-      - name: 校验 plugin.yml api-version
+      - name: 校验 26.2 plugin.yml api-version
         run: |
           set -euo pipefail
           grep -q "api-version: '26.2'" server-plugins/pacc-paper/target/classes/plugin.yml
           grep -q "api-version: '26.2'" server-plugins/pacc-spigot/target/classes/plugin.yml
+      - name: 26.3 编译 pacc-bukkit / pacc-paper / pacc-spigot
+        run: |
+          set -euo pipefail
+          ( cd server-plugins/pacc-bukkit && mvn -B -q install -DskipTests -Pmc263 )
+          ( cd server-plugins/pacc-paper && mvn -B -q package -DskipTests -Pmc263 )
+          ( cd server-plugins/pacc-spigot && mvn -B -q package -DskipTests -Pmc263 )
+      - name: 校验 26.3 plugin.yml api-version
+        run: |
+          set -euo pipefail
+          grep -q "api-version: '26.3'" server-plugins/pacc-paper/target/classes/plugin.yml
+          grep -q "api-version: '26.3'" server-plugins/pacc-spigot/target/classes/plugin.yml
 
   # ---- 指纹包定期校验（技术文档 §5.5 U-09）----
   signature-pack:

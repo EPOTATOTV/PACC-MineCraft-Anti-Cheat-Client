@@ -36,6 +36,23 @@ services:
       retries: 10
       start_period: 30s
 
+  # R-01~R-07：多实例共享的限流账本 / 告警队列 / 热缓存 / 会话状态 / 分布式锁 / 实时指标。
+  # 数据可丢（缓存与队列都有数据库兜底），但打开 AOF，重启后未消费的告警能继续投递。
+  redis:
+    image: redis:7-alpine
+    container_name: pacc-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - pacc-redis-data:/data
+    ports:
+      - "${PACC_REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   ptv-backend:
     build:
       context: .
@@ -45,6 +62,8 @@ services:
     restart: unless-stopped
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-pacc}?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
@@ -68,6 +87,26 @@ services:
       PACC_FEISHU_ADMIN_USERIDS: ${PACC_FEISHU_ADMIN_USERIDS:-}
       PACC_MAIL_RESET_BASE_URL: ${PACC_MAIL_RESET_BASE_URL:-https://pacc.potatotv.asia}
       PACC_DETECTION_REDSCREEN_THRESHOLD: ${PACC_REDSCREEN_THRESHOLD:-85}
+      # P-07 管理端告警渠道（飞书 / Discord 机器人 Webhook，留空即关闭）
+      PACC_ALERT_WEBHOOK_ENABLED: ${PACC_ALERT_WEBHOOK_ENABLED:-true}
+      PACC_ALERT_FEISHU_WEBHOOK: ${PACC_ALERT_FEISHU_WEBHOOK:-}
+      PACC_ALERT_DISCORD_WEBHOOK: ${PACC_ALERT_DISCORD_WEBHOOK:-}
+      PACC_ALERT_TRANSPARENCY_FEISHU_WEBHOOK: ${PACC_ALERT_TRANSPARENCY_FEISHU_WEBHOOK:-}
+      PACC_ALERT_WEBHOOK_TIMEOUT_MS: ${PACC_ALERT_WEBHOOK_TIMEOUT_MS:-5000}
+      # P-09 规则市场签名校验（公钥为 Base64 编码的 X.509 DER）
+      PACC_RULES_REQUIRE_SIGNATURE: ${PACC_RULES_REQUIRE_SIGNATURE:-false}
+      PACC_RULES_SIGNATURE_PUBKEY: ${PACC_RULES_SIGNATURE_PUBKEY:-}
+      # R-01~R-07 Redis 专项：默认开启；置 false 时全部回退进程内实现。
+      PACC_CLUSTER_REDIS_ENABLED: ${PACC_CLUSTER_REDIS_ENABLED:-true}
+      PACC_CLUSTER_REDIS_HOST: redis
+      PACC_CLUSTER_REDIS_PORT: "6379"
+      PACC_CLUSTER_REDIS_AUTH: ${PACC_CLUSTER_REDIS_AUTH:-}
+      PACC_CLUSTER_REDIS_POOL_SIZE: ${PACC_CLUSTER_REDIS_POOL_SIZE:-16}
+      PACC_DETECTION_CACHE_TTL_SECONDS: ${PACC_DETECTION_CACHE_TTL_SECONDS:-300}
+      PACC_SESSION_HEARTBEAT_INTERVAL_MS: ${PACC_SESSION_HEARTBEAT_INTERVAL_MS:-60000}
+      PACC_ALERT_DISPATCH_MAX_ATTEMPTS: ${PACC_ALERT_DISPATCH_MAX_ATTEMPTS:-3}
+      PACC_MOD_CHALLENGE_TTL_MS: ${PACC_MOD_CHALLENGE_TTL_MS:-60000}
+      PACC_MOD_MAX_ELAPSED_MS: ${PACC_MOD_MAX_ELAPSED_MS:-5000}
       PACC_SEED: ${PACC_SEED:-false}
       TZ: Asia/Shanghai
     ports:
@@ -219,6 +258,7 @@ services:
 
 volumes:
   pacc-mysql-data:
+  pacc-redis-data:
   pacc-ai-model:
   pacc-prometheus-data:
   pacc-grafana-data:

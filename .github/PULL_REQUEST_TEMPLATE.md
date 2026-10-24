@@ -43,6 +43,12 @@
 - [ ] 不涉及数据库改动
 - [ ] 包含 Flyway 迁移脚本，版本号在 V3x 之上递增，且已在 MySQL 8 上实跑过
 
+## 检测规则回归（P-08）
+
+- [ ] 不涉及检测逻辑改动
+- [ ] 修复误报时已在 `FalsePositiveCase` / 拉普拉斯回归库登记回归用例，并关联对应 issue
+- [ ] 新增检测项时已补齐误报回归用例，`FalsePositiveRegressionTest` 通过
+
 ## 安全自查
 
 - [ ] 没有提交密钥、证书、凭据（`_err*.txt`、`*.pem`、`*.p12`、service account json 等）

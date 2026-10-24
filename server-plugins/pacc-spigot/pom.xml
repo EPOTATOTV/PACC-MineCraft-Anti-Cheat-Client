@@ -89,13 +89,20 @@
     </build>
 
     <profiles>
-        <!-- P-01：26.2 编译坐标。Spigot API 从 26.x 起仍是 -R0.1-SNAPSHOT 口径；
-             需要 JDK 25 才能读取 26.x 的 API 产物。 -->
+        <!-- P-01 / R-08：26.x 编译坐标。Spigot API 从 26.x 起仍是 -R0.1-SNAPSHOT 口径；
+             需要 JDK 25 才能读取 26.x 的 API 产物。mc26 钉 26.2，mc263 钉 26.3。 -->
         <profile>
             <id>mc26</id>
             <properties>
                 <spigot.api.version>26.2-R0.1-SNAPSHOT</spigot.api.version>
                 <plugin.api.version>26.2</plugin.api.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>mc263</id>
+            <properties>
+                <spigot.api.version>26.3-R0.1-SNAPSHOT</spigot.api.version>
+                <plugin.api.version>26.3</plugin.api.version>
             </properties>
         </profile>
     </profiles>

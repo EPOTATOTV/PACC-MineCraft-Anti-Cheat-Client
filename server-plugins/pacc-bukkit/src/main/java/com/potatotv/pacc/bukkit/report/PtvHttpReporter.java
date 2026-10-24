@@ -3,6 +3,7 @@ package com.potatotv.pacc.bukkit.report;
 import com.potatotv.pacc.server.core.model.DetectionEvent;
 import com.potatotv.pacc.server.core.model.PunishmentType;
 import com.potatotv.pacc.server.core.model.ServerInfo;
+import com.potatotv.pacc.server.core.report.ModProofReport;
 import com.potatotv.pacc.server.core.report.PtvServerReporter;
 
 import java.lang.System.Logger;
@@ -13,7 +14,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -32,6 +35,7 @@ public final class PtvHttpReporter implements PtvServerReporter {
     private static final String REGISTER_PATH = "/api/v1/server/register";
     private static final String EVENT_PATH = "/api/v1/server/event";
     private static final String PUNISHMENT_PATH = "/api/v1/server/punishment";
+    private static final String MOD_VERIFY_PATH = "/api/v1/server/mod-verify";
 
     private final String baseUrl;
     private final String secret;
@@ -87,6 +91,35 @@ public final class PtvHttpReporter implements PtvServerReporter {
         post(PUNISHMENT_PATH, body);
     }
 
+    @Override
+    public void reportModProof(ModProofReport report, Consumer<Boolean> onResult) {
+        if (report == null) {
+            if (onResult != null) {
+                onResult.accept(false);
+            }
+            return;
+        }
+        StringBuilder mods = new StringBuilder("[");
+        List<com.potatotv.pacc.server.core.protocol.ModHashReport.ModEntry> entries = report.mods();
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) {
+                mods.append(',');
+            }
+            var entry = entries.get(i);
+            mods.append('{').append(field("id", entry.id()))
+                    .append(',').append(field("sha256", entry.sha256())).append('}');
+        }
+        mods.append(']');
+        String body = "{" + field("serverId", report.serverId())
+                + "," + field("playerUuid", report.playerUuid())
+                + "," + field("challengeId", report.challengeId())
+                + "," + field("nonce", report.nonce())
+                + ",\"mods\":" + mods
+                + ",\"elapsedMs\":" + report.elapsedMs()
+                + "," + field("signature", report.signature()) + "}";
+        postWithResult(MOD_VERIFY_PATH, body, onResult);
+    }
+
     private void post(String path, String json) {
         if (baseUrl.isBlank()) {
             return;
@@ -94,6 +127,47 @@ public final class PtvHttpReporter implements PtvServerReporter {
         String endpoint = stripTrailingSlash(baseUrl) + path;
         String signature = sign(json);
         CompletableFuture.runAsync(() -> send(endpoint, json, signature));
+    }
+
+    private void postWithResult(String path, String json, Consumer<Boolean> onResult) {
+        if (baseUrl.isBlank()) {
+            if (onResult != null) {
+                onResult.accept(false);
+            }
+            return;
+        }
+        String endpoint = stripTrailingSlash(baseUrl) + path;
+        String signature = sign(json);
+        CompletableFuture.runAsync(() -> {
+            boolean pass = sendForResult(endpoint, json, signature);
+            if (onResult != null) {
+                onResult.accept(pass);
+            }
+        });
+    }
+
+    private boolean sendForResult(String endpoint, String json, String signature) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Content-Type", "application/json")
+                    .header(SIGNATURE_HEADER, signature)
+                    .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 300) {
+                LOG.log(Logger.Level.WARNING, "Mod 质询核验返回非成功状态: " + response.statusCode());
+                return false;
+            }
+            String body = response.body() == null ? "" : response.body().replace(" ", "");
+            return body.contains("\"status\":\"PASS\"");
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (Exception ex) {
+            LOG.log(Logger.Level.WARNING, "Mod 质询核验请求失败: " + ex.getMessage());
+            return false;
+        }
     }
 
     private void send(String endpoint, String json, String signature) {

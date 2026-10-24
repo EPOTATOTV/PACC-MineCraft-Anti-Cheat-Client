@@ -86,12 +86,18 @@
     </build>
 
     <profiles>
-        <!-- P-01：26.2 编译坐标。需要 JDK 25（Paper 26.x 的 API 产物是 Java 25 字节码），
-             CI 的 mc26-compile job 用 -Pmc26 单独验证；默认构建仍是 1.20.4。 -->
+        <!-- P-01 / R-08：26.x 编译坐标。需要 JDK 25（Paper 26.x 的 API 产物是 Java 25 字节码），
+             CI 的 mc26-compile job 用 -Pmc26 / -Pmc263 分别验证；默认构建仍是 1.20.4。 -->
         <profile>
             <id>mc26</id>
             <properties>
                 <spigot.api.version>26.2-R0.1-SNAPSHOT</spigot.api.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>mc263</id>
+            <properties>
+                <spigot.api.version>26.3-R0.1-SNAPSHOT</spigot.api.version>
             </properties>
         </profile>
     </profiles>

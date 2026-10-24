@@ -91,13 +91,21 @@
     </build>
 
     <profiles>
-        <!-- P-01：26.2 编译坐标（Paper 新版本号从 26.1 起改为 <mc>.<build>-<status>）。
-             Paper 26.x API 是 Java 25 字节码，必须在 JDK 25 上构建。 -->
+        <!-- P-01 / R-08：26.x 编译坐标（Paper 新版本号从 26.1 起改为 <mc>.<build>-<status>）。
+             Paper 26.x API 是 Java 25 字节码，必须在 JDK 25 上构建。
+             mc26 钉 26.2，mc263 钉 26.3 的最新稳定 build；两者都保留，便于回归。 -->
         <profile>
             <id>mc26</id>
             <properties>
                 <paper.api.version>26.2.build.134-stable</paper.api.version>
                 <plugin.api.version>26.2</plugin.api.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>mc263</id>
+            <properties>
+                <paper.api.version>26.3.build.218-stable</paper.api.version>
+                <plugin.api.version>26.3</plugin.api.version>
             </properties>
         </profile>
     </profiles>

@@ -73,8 +73,13 @@ public class PaccBukkitPlugin extends JavaPlugin {
                 Bukkit.getPort());
         ServerPluginConfig pluginConfig = loader.serverPluginConfig();
 
+        // 上报器要先于 ModHashTracker 创建：v2 质询证明需要即时转给 PTV 核验
+        PtvServerReporter reporter = loader.ptvUrl().isBlank()
+                ? NoopPtvServerReporter.INSTANCE
+                : new PtvHttpReporter(loader.ptvUrl(), loader.ptvSecret());
+
         brandTracker = new ClientBrandTracker();
-        modHashTracker = new ModHashTracker();
+        modHashTracker = new ModHashTracker(reporter, loader.ptvServerId());
         BukkitPlatformAdapter adapter = new BukkitPlatformAdapter(this, loader, brandTracker, modHashTracker);
 
         // 先接数据包源再装配检查项：事务发包口要在构造时注入，否则延迟补偿拿不到真实 id
@@ -95,10 +100,6 @@ public class PaccBukkitPlugin extends JavaPlugin {
         // 以 PTV 上报密钥派生证据链密钥（§8.2），过短自动降级为不启用链式哈希
         checks.addAll(IntelChecks.defaults(IntelChecks.chainKeyFrom(loader.ptvSecret()),
                 adapter.transactionSender()));
-
-        PtvServerReporter reporter = loader.ptvUrl().isBlank()
-                ? NoopPtvServerReporter.INSTANCE
-                : new PtvHttpReporter(loader.ptvUrl(), loader.ptvSecret());
 
         engine = new DetectionEngine(pluginConfig, adapter, checks, reporter);
         // 每刻喂一次实测刻长（§5.3 U-05）：Timer 的归一化基准随 TPS 漂移，卡服时不会全服误报

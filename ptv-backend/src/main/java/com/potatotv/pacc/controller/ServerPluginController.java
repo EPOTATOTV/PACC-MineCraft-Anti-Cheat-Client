@@ -1,6 +1,7 @@
 package com.potatotv.pacc.controller;
 
 import com.potatotv.pacc.service.ServerPluginService;
+import com.potatotv.pacc.service.security.ModChallengeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class ServerPluginController {
 
     private final ServerPluginService service;
+    private final ModChallengeService modChallengeService;
 
     @PostMapping("/register")
     public Map<String, Object> register(@RequestBody ServerPluginService.RegisterRequest req) {
@@ -51,5 +53,11 @@ public class ServerPluginController {
     @GetMapping("/config")
     public ServerPluginService.ConfigResponse config() {
         return service.config();
+    }
+
+    /** Mod 清单质询核验：插件把玩家上报的 v2 报文转给 PTV，质询一次性消费。 */
+    @PostMapping("/mod-verify")
+    public ModChallengeService.Result modVerify(@RequestBody ModChallengeService.VerifyRequest req) {
+        return modChallengeService.verify(req == null ? null : req.pteid(), req);
     }
 }

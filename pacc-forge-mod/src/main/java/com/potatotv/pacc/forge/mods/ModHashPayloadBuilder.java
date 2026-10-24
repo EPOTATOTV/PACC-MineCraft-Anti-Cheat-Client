@@ -1,5 +1,7 @@
 package com.potatotv.pacc.forge.mods;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -27,8 +29,11 @@ import java.util.Set;
  */
 public final class ModHashPayloadBuilder {
 
-    /** 协议版本，与 {@code ModHashParser} 的当前版本一致。 */
-    public static final int PROTOCOL_VERSION = 1;
+    /** 当前协议版本（含质询证明）。 */
+    public static final int PROTOCOL_VERSION = 2;
+
+    /** 兼容版本：旧服务端只认 v1，无质询证明。 */
+    public static final int LEGACY_PROTOCOL_VERSION = 1;
 
     /** 单次上报条目数上限，须与 {@code ModHashParser.MAX_ENTRIES} 保持一致。 */
     public static final int MAX_ENTRIES = 128;
@@ -39,11 +44,63 @@ public final class ModHashPayloadBuilder {
     private ModHashPayloadBuilder() {
     }
 
-    /** 组装 UTF-8 JSON 报文。传入 {@code null} 视为空清单。 */
+    /** 组装 v1 兼容报文（无质询证明）。新客户端应优先使用 {@link #buildSigned}。 */
     public static String build(List<InstalledMod> mods) {
+        return render(collect(mods), LEGACY_PROTOCOL_VERSION, null);
+    }
+
+    /** 组装 v1 兼容报文的字节形式。 */
+    public static byte[] buildBytes(List<InstalledMod> mods) {
+        return build(mods).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 组装 v2 报文：对 Mod 清单摘要与质询参数做 HMAC-SHA256，服务端据此校验
+     * 清单未被替换、质询未被重放。
+     *
+     * @param secret HMAC 共享密钥（与 PTV 的 wss-sign-secret 一致）
+     */
+    public static String buildSigned(List<InstalledMod> mods, String challengeId, String nonce,
+                                     String secret, long elapsedMs) {
+        if (challengeId == null || challengeId.isBlank()) {
+            throw new IllegalArgumentException("challengeId 不能为空");
+        }
+        if (nonce == null || nonce.isBlank()) {
+            throw new IllegalArgumentException("nonce 不能为空");
+        }
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalArgumentException("签名密钥不能为空");
+        }
         List<Entry> entries = collect(mods);
-        StringBuilder json = new StringBuilder(entries.size() * 120 + 24);
-        json.append("{\"v\":").append(PROTOCOL_VERSION).append(",\"mods\":[");
+        String digest = digest(entries);
+        String signature = hmacHex(secret,
+                canonicalSignaturePayload(challengeId, nonce, digest, elapsedMs));
+        Proof proof = new Proof(challengeId.trim(), nonce.trim(), signature, Math.max(0L, elapsedMs));
+        return render(entries, PROTOCOL_VERSION, proof);
+    }
+
+    /** 组装 v2 报文的字节形式。 */
+    public static byte[] buildSignedBytes(List<InstalledMod> mods, String challengeId, String nonce,
+                                          String secret, long elapsedMs) {
+        return buildSigned(mods, challengeId, nonce, secret, elapsedMs).getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** Mod 清单摘要，口径与服务端 {@code ModHashParser.modsDigest} 一致。 */
+    public static String modsDigest(List<InstalledMod> mods) {
+        return digest(collect(mods));
+    }
+
+    /** 签名原文：{@code challengeId|nonce|modsDigest|elapsedMs}。 */
+    public static String canonicalSignaturePayload(String challengeId, String nonce,
+                                                   String modsDigest, long elapsedMs) {
+        return (challengeId == null ? "" : challengeId) + "|"
+                + (nonce == null ? "" : nonce) + "|"
+                + (modsDigest == null ? "" : modsDigest) + "|" + elapsedMs;
+    }
+
+    private static String render(List<Entry> entries, int version, Proof proof) {
+        StringBuilder json = new StringBuilder(entries.size() * 120 + 160);
+        json.append("{\"v\":").append(version).append(",\"mods\":[");
         for (int i = 0; i < entries.size(); i++) {
             if (i > 0) {
                 json.append(',');
@@ -52,12 +109,36 @@ public final class ModHashPayloadBuilder {
             json.append("{\"id\":\"").append(escape(entry.id()))
                     .append("\",\"sha256\":\"").append(entry.sha256()).append("\"}");
         }
-        return json.append("]}").toString();
+        json.append(']');
+        if (proof != null) {
+            json.append(",\"proof\":{\"challenge_id\":\"").append(escape(proof.challengeId()))
+                    .append("\",\"nonce\":\"").append(escape(proof.nonce()))
+                    .append("\",\"signature\":\"").append(proof.signature())
+                    .append("\",\"elapsed_ms\":").append(proof.elapsedMs()).append('}');
+        }
+        return json.append('}').toString();
     }
 
-    /** 组装报文的字节形式，即实际通过通道发送的内容。 */
-    public static byte[] buildBytes(List<InstalledMod> mods) {
-        return build(mods).getBytes(StandardCharsets.UTF_8);
+    private static String digest(List<Entry> entries) {
+        StringBuilder payload = new StringBuilder(entries.size() * 80);
+        for (int i = 0; i < entries.size(); i++) {
+            if (i > 0) {
+                payload.append('\n');
+            }
+            Entry entry = entries.get(i);
+            payload.append(entry.id()).append('\n').append(entry.sha256());
+        }
+        return sha256Hex(payload.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String hmacHex(String secret, String data) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of().formatHex(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("HMAC-SHA256 计算失败", e);
+        }
     }
 
     /**
@@ -116,6 +197,10 @@ public final class ModHashPayloadBuilder {
     }
 
     private record Entry(String id, String sha256) {
+    }
+
+    /** v2 质询证明参数。 */
+    public record Proof(String challengeId, String nonce, String signature, long elapsedMs) {
     }
 
     /**

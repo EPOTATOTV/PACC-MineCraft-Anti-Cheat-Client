@@ -59,6 +59,17 @@ class ModHashPayloadBuilderTest {
     }
 
     @Test
+    void signedBuildCarriesV2Proof() {
+        String json = ModHashPayloadBuilder.buildSigned(
+                List.of(new ModHashPayloadBuilder.InstalledMod("alpha", bytes("abc"))),
+                "challenge-1", "a".repeat(32), "test-secret", 5L);
+        assertTrue(json.startsWith("{\"v\":2,"));
+        assertTrue(json.contains("\"proof\":{\"challenge_id\":\"challenge-1\""));
+        assertTrue(json.contains("\"elapsed_ms\":5"));
+        assertTrue(json.matches(".*\"signature\":\"[0-9a-f]{64}\".*"));
+    }
+
+    @Test
     void buildBytesIsUtf8OfBuild() {
         List<ModHashPayloadBuilder.InstalledMod> mods = List.of(
                 new ModHashPayloadBuilder.InstalledMod("alpha", bytes("abc")));

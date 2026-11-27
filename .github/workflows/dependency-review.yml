@@ -28,7 +28,7 @@ jobs:
 
       - name: 评审依赖差异
         # v5.0.0
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec
         # 私库没买 GitHub Advanced Security 时这个 action 必然以
         # 「Dependency review is not supported on this repository. Please ensure that
         # Dependency graph is enabled along with GitHub Advanced Security」失败——
